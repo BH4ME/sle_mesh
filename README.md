@@ -87,3 +87,7 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_TERMINAL_TEST \
 - `cipher_mac`
 
 但 `cipher_mac` 目前只是占位字段，`app_packet` 是明文。后续版本如果要加密，应在 `GROUP_DATA` 层把 `app_packet` 替换为 `ciphertext`，并让 `cipher_mac` 成为真实认证标签。
+
+## License
+
+Apache-2.0
