@@ -1,0 +1,10 @@
+*.o
+*.out
+*.elf
+*.bin
+*.map
+*.log
+.DS_Store
+build/
+out/
+cmake-build-*/
