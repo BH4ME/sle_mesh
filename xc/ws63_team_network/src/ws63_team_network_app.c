@@ -1,4 +1,5 @@
 #include "sle_team_cli.h"
+#include "sle_team_web_api.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,6 +15,7 @@
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 #include "lwip/netifapi.h"
+#include "lwip/sockets.h"
 #include "wifi_device.h"
 #include "wifi_hotspot.h"
 #include "wifi_hotspot_config.h"
@@ -111,6 +113,10 @@
 #define SLE_TEAM_WIFI_AP_TASK_PRIO 13
 #define SLE_TEAM_WIFI_IFNAME_MAX_SIZE 16
 #define SLE_TEAM_WIFI_INIT_WAIT_MAX_MS 10000
+#define SLE_TEAM_HTTP_PORT 80
+#define SLE_TEAM_HTTP_BACKLOG 2
+#define SLE_TEAM_HTTP_REQ_BUF_SIZE 384
+#define SLE_TEAM_HTTP_JSON_BUF_SIZE 2048
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -127,6 +133,7 @@ typedef struct {
 static sle_team_ws63_runtime_t g_team_rt;
 static sle_team_node_t g_team_node;
 static sle_team_cli_t g_team_cli;
+static sle_team_web_event_log_t g_team_events;
 
 static uart_buffer_config_t g_uart_buffer_config = {
     .rx_buffer = g_team_rt.uart_rx_buf,
@@ -185,6 +192,32 @@ static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
 {
     unused(user_ctx);
     osal_printk("[team] alert member=%u reason=%u\r\n", member_id, reason);
+}
+
+static void team_web_record_packet(sle_team_web_event_direction_t direction, const uint8_t *buf, uint16_t len,
+    const char *fallback)
+{
+    sle_team_mesh_packet_t mesh;
+    sle_team_app_packet_t app;
+    const uint8_t *app_payload = NULL;
+    uint16_t app_payload_len = 0;
+    uint8_t channel_hash = 0;
+    uint8_t cipher_mac[2] = {0};
+    char summary[SLE_TEAM_WEB_EVENT_SUMMARY_SIZE];
+
+    if (buf != NULL && len > 0U && sle_team_decode_mesh_packet(&mesh, buf, len) == SLE_TEAM_OK &&
+        sle_team_unwrap_mesh_group_data(&mesh, &channel_hash, cipher_mac, &app_payload, &app_payload_len) ==
+            SLE_TEAM_OK &&
+        sle_team_decode_app_packet(&app, app_payload, app_payload_len) == SLE_TEAM_OK) {
+        (void)snprintf(summary, sizeof(summary), "%s %u->%u seq=%u",
+            sle_team_web_msg_type_name(app.app_msg_type), app.src_id, app.dst_id, app.seq);
+        sle_team_web_event_push(&g_team_events, team_now_s(NULL), direction, app.app_msg_type, app.src_id, app.dst_id,
+            app.seq, summary);
+        return;
+    }
+
+    sle_team_web_event_push(&g_team_events, team_now_s(NULL), direction, 0U, 0U, 0U, 0U,
+        fallback != NULL ? fallback : "packet");
 }
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
@@ -249,6 +282,120 @@ static int team_wifi_ap_start(void)
     return 0;
 }
 
+static int team_http_send_all(int fd, const char *data, size_t len)
+{
+    size_t sent_len = 0;
+
+    while (sent_len < len) {
+        int ret = send(fd, data + sent_len, len - sent_len, 0);
+        if (ret <= 0) {
+            return -1;
+        }
+        sent_len += (size_t)ret;
+    }
+    return 0;
+}
+
+static void team_http_send_response(int fd, const char *status, const char *content_type, const char *body)
+{
+    char header[256];
+    size_t body_len = body != NULL ? strlen(body) : 0U;
+    int header_len;
+
+    header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %u\r\n"
+        "Connection: close\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Cache-Control: no-store\r\n"
+        "\r\n",
+        status, content_type, (unsigned int)body_len);
+    if (header_len > 0) {
+        (void)team_http_send_all(fd, header, (size_t)header_len);
+    }
+    if (body_len > 0U) {
+        (void)team_http_send_all(fd, body, body_len);
+    }
+}
+
+static void team_http_handle_client(int fd)
+{
+    char req[SLE_TEAM_HTTP_REQ_BUF_SIZE];
+    char json[SLE_TEAM_HTTP_JSON_BUF_SIZE];
+    int ret;
+
+    ret = recv(fd, req, sizeof(req) - 1U, 0);
+    if (ret <= 0) {
+        return;
+    }
+    req[ret] = '\0';
+
+    if (strncmp(req, "GET /api/status", 15) == 0) {
+        ret = sle_team_web_write_status_json(&g_team_node, team_now_s(NULL), "ws63-softap", json, sizeof(json));
+        team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
+            ret < 0 ? "{\"error\":\"status\"}" : json);
+    } else if (strncmp(req, "GET /api/nodes", 14) == 0) {
+        ret = sle_team_web_write_nodes_json(&g_team_node, json, sizeof(json));
+        team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
+            ret < 0 ? "{\"error\":\"nodes\"}" : json);
+    } else if (strncmp(req, "GET /api/events", 15) == 0) {
+        ret = sle_team_web_write_events_json(&g_team_events, json, sizeof(json));
+        team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
+            ret < 0 ? "{\"error\":\"events\"}" : json);
+    } else {
+        team_http_send_response(fd, "200 OK", "text/html; charset=utf-8",
+            "<!doctype html><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>SLE Team WS63</title><h1>SLE Team WS63</h1>"
+            "<p>API: <a href=\"/api/status\">/api/status</a> "
+            "<a href=\"/api/nodes\">/api/nodes</a> <a href=\"/api/events\">/api/events</a></p>");
+    }
+}
+
+static void team_http_server_loop(void)
+{
+    int listen_fd;
+    int client_fd;
+    int opt = 1;
+    struct sockaddr_in addr = {0};
+    struct sockaddr_in client_addr = {0};
+    socklen_t client_len = sizeof(client_addr);
+
+    listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listen_fd < 0) {
+        team_wifi_print("http socket failed");
+        return;
+    }
+
+    (void)setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = PP_HTONL(INADDR_ANY);
+    addr.sin_port = htons(SLE_TEAM_HTTP_PORT);
+
+    if (bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        team_wifi_print("http bind failed");
+        closesocket(listen_fd);
+        return;
+    }
+    if (listen(listen_fd, SLE_TEAM_HTTP_BACKLOG) != 0) {
+        team_wifi_print("http listen failed");
+        closesocket(listen_fd);
+        return;
+    }
+
+    osal_printk("[team-wifi] http server ready port=%u\r\n", SLE_TEAM_HTTP_PORT);
+    while (1) {
+        client_len = sizeof(client_addr);
+        client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &client_len);
+        if (client_fd < 0) {
+            osal_msleep(100);
+            continue;
+        }
+        team_http_handle_client(client_fd);
+        closesocket(client_fd);
+    }
+}
+
 static void *team_wifi_ap_task(const char *arg)
 {
     errcode_t ret;
@@ -273,7 +420,9 @@ static void *team_wifi_ap_task(const char *arg)
     team_wifi_print("wifi init ready");
     if (team_wifi_ap_start() != 0) {
         team_wifi_print("softap start failed");
+        return NULL;
     }
+    team_http_server_loop();
     return NULL;
 }
 
@@ -395,6 +544,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         team_print("leader send failed");
         return SLE_TEAM_ERR_FORMAT;
     }
+    team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "leader tx");
     return SLE_TEAM_OK;
 #else
     ssapc_write_param_t *param = get_g_sle_uart_send_param();
@@ -409,6 +559,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         team_print("member send failed");
         return SLE_TEAM_ERR_FORMAT;
     }
+    team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "member tx");
     return SLE_TEAM_OK;
 #endif
 }
@@ -465,6 +616,7 @@ static void team_server_write_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_
     if (status != ERRCODE_SLE_SUCCESS || write_cb_para == NULL || write_cb_para->value == NULL) {
         return;
     }
+    team_web_record_packet(SLE_TEAM_WEB_EVENT_RX, write_cb_para->value, write_cb_para->length, "leader rx");
     (void)sle_team_node_on_packet(&g_team_node, write_cb_para->value, write_cb_para->length);
 }
 
@@ -484,6 +636,7 @@ static void team_client_rx_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_
     if (status != ERRCODE_SLE_SUCCESS || data == NULL || data->data == NULL) {
         return;
     }
+    team_web_record_packet(SLE_TEAM_WEB_EVENT_RX, data->data, data->data_len, "member rx");
     (void)sle_team_node_on_packet(&g_team_node, data->data, data->data_len);
 }
 
@@ -525,6 +678,7 @@ static void *team_network_task(const char *arg)
 {
     unused(arg);
 
+    sle_team_web_event_log_init(&g_team_events);
     team_node_init();
     team_uart_init();
     team_uart_cli_start();
