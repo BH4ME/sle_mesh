@@ -4,7 +4,7 @@
 
 当前版本：
 
-- `v1.2.2`
+- `v1.2.3`
 
 当前重点不是 WebUI 或 GNSS 业务完整实现，而是先把下面这些基础能力打稳：
 
@@ -45,6 +45,26 @@
 - 同一份 `dist` 可放进 WS63 板端 HTTP，也可部署到域名作为上位机
 
 详细接入计划见 [docs/webui-plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/webui-plan.md)。
+
+## WS63 板端 WiFi 控制台
+
+当前 `v1.2.3` 已在 leader 固件里加入板端 SoftAP + HTTP 控制台：
+
+- SSID：`SLE-TEAM-WS63-L1`
+- 密码：`123456789`
+- 板端地址：`http://192.168.43.1/`
+- API：`/api/status`、`/api/nodes`、`/api/events`
+
+手机调试时要注意：WS63 SoftAP 没有外网，iOS/部分浏览器会自动切回蜂窝数据，右上角如果显示 `5G` 而不是 WiFi 图标，页面请求会出现 `Network request failed`。这不是 WS63 HTTP 服务必然崩溃，而是手机没有稳定走 WS63 的 WiFi 路由。
+
+`v1.2.3` 的板端页面已经做了抗抖处理：接口失败时保留最后一次成功数据，不再把瞬时失败刷成整页红色错误。当前页面采用手动刷新为主：打开页面后会拉一次 status，之后用页面里的 `status`、`nodes`、`events` 按钮刷新数据。Nodes/Events 为空数组 `[]` 表示 leader 当前还没有 member 加入。
+
+当前现场基线只确认 `status` 正常；`nodes/events` 仍不稳定，不能标记为通过。后续要继续修 nodes/events 页面请求和 member 入网数据展示。
+
+如果刷新页面时偶尔失败，优先看两点：
+
+- 手机是否仍连在 `SLE-TEAM-WS63-L1`，而不是切到了蜂窝或其他 WiFi。
+- 串口如果只出现 `errno=104`，通常是浏览器刷新时取消旧连接，不等于板端 HTTP 服务崩溃。
 
 早期草案保留在 [docs/protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol.md)，但当前实现以 `docs/protocol/` 和 `include/`、`src/` 为准。
 

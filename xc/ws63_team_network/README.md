@@ -19,6 +19,50 @@ member --HB/POS--> leader
 - 串口终端输入命令，调用 `sle_team_cli`
 - SLE 收到二进制包后进入 `sle_team_node_on_packet`
 - 周期任务调用 `sle_team_node_tick`
+- leader 可启动 SoftAP，并通过手机访问板端 HTTP 控制台
+
+## v1.2.3 WiFi 控制台
+
+leader 固件当前提供本机控制台：
+
+```text
+SSID: SLE-TEAM-WS63-L1
+Password: 123456789
+URL: http://192.168.43.1/
+```
+
+接口：
+
+```text
+GET /api/status
+GET /api/nodes
+GET /api/events
+```
+
+页面行为：
+
+- 打开页面时自动拉一次 `status`。
+- 后续用页面内 `status`、`nodes`、`events` 按钮手动刷新。
+- 失败时保留最后一次成功数据，避免 Safari 刷新/取消连接时出现整页红色错误。
+- `nodes` / `events` 显示 `[]` 表示 leader 当前没有 member 入网。
+
+当前现场基线：
+
+- `status` 已确认正常。
+- `nodes/events` 仍不稳定，不能作为已通过功能。
+- 当前 leader 没有 member 加入，所以节点和事件列表没有真实业务数据。
+
+手机调试注意：
+
+- WS63 SoftAP 没有外网，手机可能自动切蜂窝；如果浏览器请求失败，先确认手机仍连在 `SLE-TEAM-WS63-L1`。
+- Safari 刷新页面会取消旧 HTTP 连接，串口可能出现 `errno=104`。这通常是客户端断开，不代表板端 HTTP 服务崩溃。
+- 板端 HTTP 是轻量单连接服务，调试时优先使用页面内按钮，不要连续点浏览器底部刷新。
+
+最新已烧录过的 leader 测试包：
+
+```text
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader_wifi_console_stable_fetch/ws63-liteos-app_all.fwpkg
+```
 
 ## 当前不是完整 Mesh
 

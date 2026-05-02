@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 
-#define SLE_TEAM_WEB_EVENT_COUNT 32U
-#define SLE_TEAM_WEB_EVENT_SUMMARY_SIZE 96U
+#define SLE_TEAM_WEB_EVENT_COUNT 8U
+#define SLE_TEAM_WEB_EVENT_SUMMARY_SIZE 64U
 
 typedef enum {
     SLE_TEAM_WEB_EVENT_RX = 0,

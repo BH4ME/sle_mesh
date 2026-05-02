@@ -1,6 +1,7 @@
 #include "sle_team_cli.h"
 #include "sle_team_web_api.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,6 +17,7 @@
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 #include "lwip/netifapi.h"
 #include "lwip/sockets.h"
+#include "lwip/tcpip.h"
 #include "wifi_device.h"
 #include "wifi_hotspot.h"
 #include "wifi_hotspot_config.h"
@@ -113,10 +115,14 @@
 #define SLE_TEAM_WIFI_AP_TASK_PRIO 13
 #define SLE_TEAM_WIFI_IFNAME_MAX_SIZE 16
 #define SLE_TEAM_WIFI_INIT_WAIT_MAX_MS 10000
+#define SLE_TEAM_TCPIP_INIT_WAIT_MAX_MS 10000
+#define SLE_TEAM_WIFI_AP_RETRY_MS 5000
+#define SLE_TEAM_HTTP_START_DELAY_MS 5000
+#define SLE_TEAM_HTTP_RETRY_MS 5000
 #define SLE_TEAM_HTTP_PORT 80
 #define SLE_TEAM_HTTP_BACKLOG 2
-#define SLE_TEAM_HTTP_REQ_BUF_SIZE 384
-#define SLE_TEAM_HTTP_JSON_BUF_SIZE 2048
+#define SLE_TEAM_HTTP_REQ_BUF_SIZE 192
+#define SLE_TEAM_HTTP_JSON_BUF_SIZE 1024
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -135,6 +141,15 @@ static sle_team_node_t g_team_node;
 static sle_team_cli_t g_team_cli;
 static sle_team_web_event_log_t g_team_events;
 
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+static char g_team_http_req_buf[SLE_TEAM_HTTP_REQ_BUF_SIZE];
+static char g_team_http_json_buf[SLE_TEAM_HTTP_JSON_BUF_SIZE];
+static volatile int g_team_http_listen_fd = -1;
+static volatile int g_team_http_last_errno = 0;
+static volatile uint32_t g_team_http_accept_count = 0;
+static volatile uint8_t g_team_http_ready = 0;
+#endif
+
 static uart_buffer_config_t g_uart_buffer_config = {
     .rx_buffer = g_team_rt.uart_rx_buf,
     .rx_buffer_size = SLE_TEAM_UART_RX_BUF_SIZE,
@@ -149,6 +164,45 @@ static void team_print(const char *text)
 static void team_wifi_print(const char *text)
 {
     osal_printk("[team-wifi] %s\r\n", text);
+}
+
+static void team_wifi_print_status(void)
+{
+    osal_printk("[team-wifi] status wifi_inited=%ld softap_enabled=%ld ssid=%s ip=192.168.43.%u\r\n",
+        (long)wifi_is_wifi_inited(),
+        (long)wifi_is_softap_enabled(),
+        CONFIG_SLE_TEAM_WIFI_AP_SSID,
+        CONFIG_SLE_TEAM_WIFI_AP_IP_LAST);
+}
+
+static int team_tcpip_init_wait(void)
+{
+    uint32_t wait_ms = 0;
+
+    if (tcpip_init_finish == 0) {
+        team_wifi_print("tcpip init start");
+        tcpip_init(NULL, NULL);
+    }
+    while (tcpip_init_finish == 0) {
+        osal_msleep(100);
+        wait_ms += 100;
+        if (wait_ms >= SLE_TEAM_TCPIP_INIT_WAIT_MAX_MS) {
+            team_wifi_print("tcpip init timeout");
+            return -1;
+        }
+    }
+    team_wifi_print("tcpip init ready");
+    return 0;
+}
+
+static void team_http_print_status(void)
+{
+    osal_printk("[team-wifi] http ready=%u fd=%d errno=%d accepts=%lu tcpip=%ld\r\n",
+        g_team_http_ready,
+        g_team_http_listen_fd,
+        g_team_http_last_errno,
+        (unsigned long)g_team_http_accept_count,
+        (long)tcpip_init_finish);
 }
 #endif
 
@@ -230,10 +284,17 @@ static int team_wifi_ap_start(void)
     ip4_addr_t gw;
     ip4_addr_t ipaddr;
     ip4_addr_t netmask;
+    errcode_t ret;
+    err_t lwip_ret;
+
+    if (wifi_is_softap_enabled() != 0) {
+        team_wifi_print("softap already enabled");
+        return 0;
+    }
 
     IP4_ADDR(&ipaddr, 192, 168, 43, CONFIG_SLE_TEAM_WIFI_AP_IP_LAST);
     IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw, 192, 168, 43, CONFIG_SLE_TEAM_WIFI_AP_IP_LAST);
+    IP4_ADDR(&gw, 192, 168, 43, 2);
 
     (void)snprintf((char *)ap_config.ssid, sizeof(ap_config.ssid), "%s", CONFIG_SLE_TEAM_WIFI_AP_SSID);
     (void)snprintf((char *)ap_config.pre_shared_key, sizeof(ap_config.pre_shared_key), "%s",
@@ -249,12 +310,14 @@ static int team_wifi_ap_start(void)
     advance_config.protocol_mode = 4;
     advance_config.hidden_ssid_flag = 1;
 
-    if (wifi_set_softap_config_advance(&advance_config) != 0) {
-        team_wifi_print("softap advance config failed");
+    ret = wifi_set_softap_config_advance(&advance_config);
+    if (ret != ERRCODE_SUCC) {
+        osal_printk("[team-wifi] softap advance config failed ret=0x%x\r\n", ret);
         return -1;
     }
-    if (wifi_softap_enable(&ap_config) != 0) {
-        team_wifi_print("softap enable failed");
+    ret = wifi_softap_enable(&ap_config);
+    if (ret != ERRCODE_SUCC) {
+        osal_printk("[team-wifi] softap enable failed ret=0x%x\r\n", ret);
         return -1;
     }
 
@@ -264,21 +327,23 @@ static int team_wifi_ap_start(void)
         (void)wifi_softap_disable();
         return -1;
     }
-    if (netifapi_netif_set_addr(netif_p, &ipaddr, &netmask, &gw) != 0) {
-        team_wifi_print("softap set ip failed");
+    lwip_ret = netifapi_netif_set_addr(netif_p, &ipaddr, &netmask, &gw);
+    if (lwip_ret != ERR_OK) {
+        osal_printk("[team-wifi] softap set ip failed ret=%ld\r\n", (long)lwip_ret);
         (void)wifi_softap_disable();
         return -1;
     }
-    if (netifapi_dhcps_start(netif_p, NULL, 0) != 0) {
-        team_wifi_print("softap dhcp start failed");
-        (void)wifi_softap_disable();
-        return -1;
+    lwip_ret = netifapi_dhcps_start(netif_p, NULL, 0);
+    if (lwip_ret != ERR_OK) {
+        osal_printk("[team-wifi] softap dhcp start failed ret=%ld\r\n", (long)lwip_ret);
+        team_wifi_print("softap kept up without dhcp; use static client ip if needed");
     }
 
     osal_printk("[team-wifi] softap started ssid=%s ip=192.168.43.%u channel=%u\r\n",
         CONFIG_SLE_TEAM_WIFI_AP_SSID,
         CONFIG_SLE_TEAM_WIFI_AP_IP_LAST,
         CONFIG_SLE_TEAM_WIFI_AP_CHANNEL);
+    team_wifi_print_status();
     return 0;
 }
 
@@ -289,6 +354,9 @@ static int team_http_send_all(int fd, const char *data, size_t len)
     while (sent_len < len) {
         int ret = send(fd, data + sent_len, len - sent_len, 0);
         if (ret <= 0) {
+            g_team_http_last_errno = errno;
+            osal_printk("[team-wifi] http send failed fd=%d ret=%d errno=%d sent=%u/%u\r\n",
+                fd, ret, g_team_http_last_errno, (unsigned int)sent_len, (unsigned int)len);
             return -1;
         }
         sent_len += (size_t)ret;
@@ -298,7 +366,7 @@ static int team_http_send_all(int fd, const char *data, size_t len)
 
 static void team_http_send_response(int fd, const char *status, const char *content_type, const char *body)
 {
-    char header[256];
+    char header[192];
     size_t body_len = body != NULL ? strlen(body) : 0U;
     int header_len;
 
@@ -312,43 +380,129 @@ static void team_http_send_response(int fd, const char *status, const char *cont
         "\r\n",
         status, content_type, (unsigned int)body_len);
     if (header_len > 0) {
-        (void)team_http_send_all(fd, header, (size_t)header_len);
+        int send_ret = team_http_send_all(fd, header, (size_t)header_len);
+        osal_printk("[team-wifi] http header sent fd=%d len=%d ret=%d\r\n", fd, header_len, send_ret);
     }
     if (body_len > 0U) {
-        (void)team_http_send_all(fd, body, body_len);
+        int send_ret = team_http_send_all(fd, body, body_len);
+        osal_printk("[team-wifi] http body sent fd=%d len=%u ret=%d\r\n", fd, (unsigned int)body_len, send_ret);
     }
+}
+
+static void team_http_send_response_chunks(int fd, const char *status, const char *content_type,
+    const char * const *chunks, size_t chunk_count)
+{
+    char header[192];
+    size_t body_len = 0U;
+    int header_len;
+    size_t i;
+
+    for (i = 0; i < chunk_count; i++) {
+        body_len += strlen(chunks[i]);
+    }
+
+    header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %u\r\n"
+        "Connection: close\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Cache-Control: no-store\r\n"
+        "\r\n",
+        status, content_type, (unsigned int)body_len);
+    if (header_len > 0) {
+        int send_ret = team_http_send_all(fd, header, (size_t)header_len);
+        osal_printk("[team-wifi] http header sent fd=%d len=%d ret=%d\r\n", fd, header_len, send_ret);
+    }
+
+    for (i = 0; i < chunk_count; i++) {
+        size_t len = strlen(chunks[i]);
+        int send_ret = team_http_send_all(fd, chunks[i], len);
+        osal_printk("[team-wifi] http chunk sent fd=%d idx=%u len=%u ret=%d\r\n",
+            fd, (unsigned int)i, (unsigned int)len, send_ret);
+        if (send_ret != 0) {
+            break;
+        }
+    }
+}
+
+static void team_http_send_console(int fd)
+{
+    static const char * const chunks[] = {
+        "<!doctype html><html><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>SLE Team WS63</title><style>",
+        "body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;"
+        "background:#f6f7f9;color:#16181d}header{padding:18px 16px;background:#101820;color:white}",
+        "h1{font-size:22px;margin:0 0 4px}.sub{opacity:.72;font-size:13px}"
+        "main{padding:14px;display:grid;gap:12px}",
+        ".card{background:white;border:1px solid #dde1e7;border-radius:8px;padding:14px}"
+        ".row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #edf0f3}",
+        ".row:last-child{border-bottom:0}.k{color:#68707d}.v{font-weight:600;text-align:right;word-break:break-word}"
+        "pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;line-height:1.45}",
+        ".ok{color:#087443}.bad{color:#b42318}.warn{color:#9a5b00}.bar{display:flex;gap:8px;margin-top:10px}"
+        "button{font:inherit;border:1px solid #c9d0da;border-radius:6px;background:white;color:#182230;padding:8px 10px}",
+        "</style></head><body><header><h1>SLE Team WS63</h1>"
+        "<div class=\"sub\">192.168.43.1 local console</div></header><main>",
+        "<section class=\"card\" id=\"status\"><div class=\"row\"><span class=\"k\">HTTP</span>"
+        "<span class=\"v\">loading</span></div></section>",
+        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Nodes</h2>"
+        "<pre id=\"nodes\">loading</pre></section>",
+        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Events</h2>"
+        "<pre id=\"events\">loading</pre>",
+        "<div class=\"bar\"><button onclick=\"loadStatus()\">status</button><button onclick=\"loadNodes()\">nodes</button>"
+        "<button onclick=\"loadEvents()\">events</button></div></section></main><script>",
+        "function esc(x){return String(x).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}"
+        "function row(k,v,c){return '<div class=\"row\"><span class=\"k\">'+k+'</span><span class=\"v '+(c||'')+'\">'+esc(v)+'</span></div>'}",
+        "async function get(p){let r=await fetch(p+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error(r.status);return r.json()}"
+        "var lastStatus='',lastNodes='',lastEvents='';"
+        "async function loadStatus(){try{let s=await get('/api/status');",
+        "document.getElementById('status').innerHTML=row('State',s.state,s.state==='online'?'ok':'bad')+"
+        "row('Role',s.role)+row('Self',s.selfId)+row('Leader',s.leaderId)+row('Joined',s.joined)+",
+        "row('Seq',s.nextSeq)+row('Uptime',s.uptimeS+'s')+row('Transport',s.transport)+row('Link','ok','ok');"
+        "lastStatus=document.getElementById('status').innerHTML}",
+        "catch(e){document.getElementById('status').innerHTML=lastStatus||row('HTTP','tap status','warn')}}",
+        "async function loadNodes(){try{lastNodes=JSON.stringify(await get('/api/nodes'),null,2);document.getElementById('nodes').textContent=lastNodes}"
+        "catch(e){document.getElementById('nodes').textContent=lastNodes||'tap nodes'}}",
+        "async function loadEvents(){try{lastEvents=JSON.stringify(await get('/api/events'),null,2);document.getElementById('events').textContent=lastEvents}"
+        "catch(e){document.getElementById('events').textContent=lastEvents||'tap events'}}",
+        "loadStatus();</script></body></html>"
+    };
+
+    team_http_send_response_chunks(fd, "200 OK", "text/html; charset=utf-8",
+        chunks, sizeof(chunks) / sizeof(chunks[0]));
 }
 
 static void team_http_handle_client(int fd)
 {
-    char req[SLE_TEAM_HTTP_REQ_BUF_SIZE];
-    char json[SLE_TEAM_HTTP_JSON_BUF_SIZE];
     int ret;
 
-    ret = recv(fd, req, sizeof(req) - 1U, 0);
+    ret = recv(fd, g_team_http_req_buf, sizeof(g_team_http_req_buf) - 1U, 0);
     if (ret <= 0) {
+        g_team_http_last_errno = errno;
+        osal_printk("[team-wifi] http recv failed fd=%d ret=%d errno=%d\r\n", fd, ret, g_team_http_last_errno);
         return;
     }
-    req[ret] = '\0';
+    g_team_http_req_buf[ret] = '\0';
+    osal_printk("[team-wifi] http recv fd=%d len=%d line=%s\r\n", fd, ret, g_team_http_req_buf);
 
-    if (strncmp(req, "GET /api/status", 15) == 0) {
-        ret = sle_team_web_write_status_json(&g_team_node, team_now_s(NULL), "ws63-softap", json, sizeof(json));
+    if (strncmp(g_team_http_req_buf, "GET /api/status", 15) == 0) {
+        ret = sle_team_web_write_status_json(&g_team_node, team_now_s(NULL), "ws63-softap", g_team_http_json_buf,
+            sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
-            ret < 0 ? "{\"error\":\"status\"}" : json);
-    } else if (strncmp(req, "GET /api/nodes", 14) == 0) {
-        ret = sle_team_web_write_nodes_json(&g_team_node, json, sizeof(json));
+            ret < 0 ? "{\"error\":\"status\"}" : g_team_http_json_buf);
+    } else if (strncmp(g_team_http_req_buf, "GET /api/nodes", 14) == 0) {
+        ret = sle_team_web_write_nodes_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
-            ret < 0 ? "{\"error\":\"nodes\"}" : json);
-    } else if (strncmp(req, "GET /api/events", 15) == 0) {
-        ret = sle_team_web_write_events_json(&g_team_events, json, sizeof(json));
+            ret < 0 ? "{\"error\":\"nodes\"}" : g_team_http_json_buf);
+    } else if (strncmp(g_team_http_req_buf, "GET /api/events", 15) == 0) {
+        ret = sle_team_web_write_events_json(&g_team_events, g_team_http_json_buf, sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
-            ret < 0 ? "{\"error\":\"events\"}" : json);
+            ret < 0 ? "{\"error\":\"events\"}" : g_team_http_json_buf);
+    } else if (strncmp(g_team_http_req_buf, "GET /favicon.ico", 16) == 0) {
+        team_http_send_response(fd, "204 No Content", "text/plain", "");
     } else {
-        team_http_send_response(fd, "200 OK", "text/html; charset=utf-8",
-            "<!doctype html><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            "<title>SLE Team WS63</title><h1>SLE Team WS63</h1>"
-            "<p>API: <a href=\"/api/status\">/api/status</a> "
-            "<a href=\"/api/nodes\">/api/nodes</a> <a href=\"/api/events\">/api/events</a></p>");
+        team_http_send_console(fd);
     }
 }
 
@@ -361,28 +515,42 @@ static void team_http_server_loop(void)
     struct sockaddr_in client_addr = {0};
     socklen_t client_len = sizeof(client_addr);
 
-    listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (listen_fd < 0) {
-        team_wifi_print("http socket failed");
-        return;
+    while (1) {
+        listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (listen_fd < 0) {
+            g_team_http_last_errno = errno;
+            osal_printk("[team-wifi] http socket failed fd=%d errno=%d, retrying\r\n", listen_fd,
+                g_team_http_last_errno);
+            osal_msleep(SLE_TEAM_HTTP_RETRY_MS);
+            continue;
+        }
+        g_team_http_listen_fd = listen_fd;
+
+        (void)setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = PP_HTONL(INADDR_ANY);
+        addr.sin_port = htons(SLE_TEAM_HTTP_PORT);
+
+        if (bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+            g_team_http_last_errno = errno;
+            osal_printk("[team-wifi] http bind failed errno=%d, retrying\r\n", g_team_http_last_errno);
+            closesocket(listen_fd);
+            g_team_http_listen_fd = -1;
+            osal_msleep(SLE_TEAM_HTTP_RETRY_MS);
+            continue;
+        }
+        if (listen(listen_fd, SLE_TEAM_HTTP_BACKLOG) != 0) {
+            g_team_http_last_errno = errno;
+            osal_printk("[team-wifi] http listen failed errno=%d, retrying\r\n", g_team_http_last_errno);
+            closesocket(listen_fd);
+            g_team_http_listen_fd = -1;
+            osal_msleep(SLE_TEAM_HTTP_RETRY_MS);
+            continue;
+        }
+        break;
     }
 
-    (void)setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = PP_HTONL(INADDR_ANY);
-    addr.sin_port = htons(SLE_TEAM_HTTP_PORT);
-
-    if (bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        team_wifi_print("http bind failed");
-        closesocket(listen_fd);
-        return;
-    }
-    if (listen(listen_fd, SLE_TEAM_HTTP_BACKLOG) != 0) {
-        team_wifi_print("http listen failed");
-        closesocket(listen_fd);
-        return;
-    }
-
+    g_team_http_ready = 1;
     osal_printk("[team-wifi] http server ready port=%u\r\n", SLE_TEAM_HTTP_PORT);
     while (1) {
         client_len = sizeof(client_addr);
@@ -391,7 +559,10 @@ static void team_http_server_loop(void)
             osal_msleep(100);
             continue;
         }
+        g_team_http_accept_count++;
         team_http_handle_client(client_fd);
+        osal_msleep(20);
+        (void)shutdown(client_fd, SHUT_RDWR);
         closesocket(client_fd);
     }
 }
@@ -418,10 +589,18 @@ static void *team_wifi_ap_task(const char *arg)
         }
     }
     team_wifi_print("wifi init ready");
-    if (team_wifi_ap_start() != 0) {
-        team_wifi_print("softap start failed");
+    if (team_tcpip_init_wait() != 0) {
         return NULL;
     }
+    while (wifi_is_softap_enabled() == 0) {
+        if (team_wifi_ap_start() == 0) {
+            break;
+        }
+        team_wifi_print("softap start failed, retrying");
+        team_wifi_print_status();
+        osal_msleep(SLE_TEAM_WIFI_AP_RETRY_MS);
+    }
+    osal_msleep(SLE_TEAM_HTTP_START_DELAY_MS);
     team_http_server_loop();
     return NULL;
 }
@@ -670,6 +849,16 @@ static void team_handle_cli_queue_once(void)
     (void)memset_s(&msg, sizeof(msg), 0, sizeof(msg));
     if (osal_msg_queue_read_copy(g_team_rt.cli_queue_id, &msg, &msg_size, SLE_TEAM_CLI_QUEUE_TIMEOUT_MS) ==
         OSAL_SUCCESS) {
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+        if (strcmp(msg.line, "wifi") == 0) {
+            team_wifi_print_status();
+            return;
+        }
+        if (strcmp(msg.line, "http") == 0) {
+            team_http_print_status();
+            return;
+        }
+#endif
         sle_team_cli_handle_line(&g_team_cli, msg.line);
     }
 }
