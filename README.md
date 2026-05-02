@@ -10,7 +10,7 @@
 
 - 主从节点共用同一套包帧定义
 - 串口终端控制组网和消息发送
-- 通过宏定义选择 `leader/member` 角色
+- WS63 当前共用同一套源码，编译产物仍按 `leader/member` 分包；烧录时用脚本确认角色，避免拿错包
 - 支持 `HELLO / ACK / CONFIG / HEARTBEAT / POS_REPORT / ALERT`
 - 外层采用 MeshCore 风格包帧，内层使用当前项目自定义业务包
 
@@ -70,6 +70,28 @@
 - 串口如果只出现 `errno=104`，通常是浏览器刷新时取消旧连接，不等于板端 HTTP 服务崩溃。
 
 早期草案保留在 [docs/protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol.md)，但当前实现以 `docs/protocol/` 和 `include/`、`src/` 为准。
+
+## WS63 烧录确认
+
+当前 leader/member 不需要改业务源码，但仍是两个已编译固件包。为了避免重新编译很慢又烧错包，统一使用烧录确认脚本：
+
+```sh
+scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
+scripts/ws63_flash_team.sh member /dev/tty.usbserial-110
+```
+
+脚本会打印角色、串口和固件路径，并要求输入 `flash leader` 或 `flash member` 才会继续。
+macOS 烧录优先使用 `/dev/tty.usbserial-*`。
+
+需要重新出包时，统一用 VM 构建脚本：
+
+```sh
+scripts/ws63_build_team_vm.sh leader
+scripts/ws63_build_team_vm.sh member
+```
+
+WS63 样例现在同时编入 SLE UART server/client 代码，并强制打开 `SUPPORT_SLE_PERIPHERAL` 与 `SUPPORT_SLE_CENTRAL`。
+因此后续切角色主要是应用层默认角色和节点 ID 的配置差异，不再维护两份业务代码。
 
 ## 快速编译验证
 

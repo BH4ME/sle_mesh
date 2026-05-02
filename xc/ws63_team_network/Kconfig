@@ -107,8 +107,8 @@ config SLE_TEAM_WIFI_AP_IP_LAST
 
 config SUPPORT_SLE_PERIPHERAL
     bool
-    default y if SLE_TEAM_NODE_IS_LEADER
+    default y
 
 config SUPPORT_SLE_CENTRAL
     bool
-    default y if !SLE_TEAM_NODE_IS_LEADER
+    default y

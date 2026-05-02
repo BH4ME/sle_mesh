@@ -27,14 +27,11 @@
 #endif
 
 #include "sle_errcode.h"
-#if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
 #include "sle_device_discovery.h"
 #include "sle_ssap_server.h"
 #include "sle_uart_server.h"
-#else
 #include "sle_ssap_client.h"
 #include "sle_uart_client.h"
-#endif
 
 #ifndef CONFIG_SLE_TEAM_SELF_ID
 #if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
@@ -965,19 +962,21 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         return SLE_TEAM_ERR_ARG;
     }
 
-#if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
-    if (sle_uart_client_is_connected() == 0U) {
-        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NO_MEMBER\r\n",
-            dst_id, SLE_TEAM_ERR_UNSUPPORTED);
-        return SLE_TEAM_ERR_UNSUPPORTED;
+    if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+        if (sle_uart_client_is_connected() == 0U) {
+            osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NO_MEMBER\r\n",
+                dst_id, SLE_TEAM_ERR_UNSUPPORTED);
+            return SLE_TEAM_ERR_UNSUPPORTED;
+        }
+        if (sle_uart_server_send_report_by_handle(buf, len) != ERRCODE_SLE_SUCCESS) {
+            osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n",
+                dst_id, SLE_TEAM_ERR_FORMAT);
+            return SLE_TEAM_ERR_FORMAT;
+        }
+        team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "leader tx");
+        return SLE_TEAM_OK;
     }
-    if (sle_uart_server_send_report_by_handle(buf, len) != ERRCODE_SLE_SUCCESS) {
-        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n", dst_id, SLE_TEAM_ERR_FORMAT);
-        return SLE_TEAM_ERR_FORMAT;
-    }
-    team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "leader tx");
-    return SLE_TEAM_OK;
-#else
+
     ssapc_write_param_t *param = get_g_sle_uart_send_param();
     uint16_t conn_id = get_g_sle_uart_conn_id();
     if (param == NULL || param->handle == 0U) {
@@ -993,7 +992,6 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
     }
     team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "member tx");
     return SLE_TEAM_OK;
-#endif
 }
 
 static void team_node_init(void)
@@ -1030,7 +1028,6 @@ static void team_node_init(void)
     sle_team_cli_init(&g_team_cli, &g_team_node, team_cli_print, NULL);
 }
 
-#if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
 static void team_server_read_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_read_cb_t *read_cb_para,
     errcode_t status)
 {
@@ -1052,15 +1049,6 @@ static void team_server_write_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_
     (void)sle_team_node_on_packet(&g_team_node, write_cb_para->value, write_cb_para->length);
 }
 
-static void team_sle_start(void)
-{
-    if (sle_uart_server_init(team_server_read_cb, team_server_write_cb) == ERRCODE_SLE_SUCCESS) {
-        team_print("leader sle server ready");
-    } else {
-        team_print("leader sle server init failed");
-    }
-}
-#else
 static void team_client_rx_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data, errcode_t status)
 {
     unused(client_id);
@@ -1084,10 +1072,18 @@ void sle_uart_indication_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
 
 static void team_sle_start(void)
 {
+    if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+        if (sle_uart_server_init(team_server_read_cb, team_server_write_cb) == ERRCODE_SLE_SUCCESS) {
+            team_print("leader sle server ready");
+        } else {
+            team_print("leader sle server init failed");
+        }
+        return;
+    }
+
     sle_uart_client_init(team_client_rx_cb, team_client_rx_cb);
     team_print("member sle client started");
 }
-#endif
 
 static void team_handle_cli_queue_once(void)
 {

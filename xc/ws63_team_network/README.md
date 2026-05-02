@@ -201,6 +201,16 @@ Mac 侧已拷出的固件路径：
 /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_member_serial_led/ws63-liteos-app_member_all.fwpkg
 ```
 
+统一 SLE 能力版固件路径：
+
+```text
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader_unified_sle/ws63-liteos-app_leader_all.fwpkg
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_member_unified_sle/ws63-liteos-app_member_all.fwpkg
+```
+
+这版仍按 `leader/member` 分包保存默认角色和节点 ID，但两包来自同一套源码，并且都编入 SLE UART server/client 代码。
+Kconfig 同时打开 `SUPPORT_SLE_PERIPHERAL` 和 `SUPPORT_SLE_CENTRAL`，后续切角色不再维护两套 SLE 适配代码。
+
 这版用于确认真实 SLE 收发：
 
 - `[cli-rx]` 表示串口命令返回，不代表 SLE 收到包。
@@ -212,13 +222,18 @@ Mac 侧已拷出的固件路径：
 烧录 leader 示例：
 
 ```sh
-/Users/bh4me_macair/Library/Python/3.9/bin/burn \
-  -p /dev/tty.usbserial-10 \
-  -b 115200 \
-  /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader/ws63-liteos-app_team_leader_all.fwpkg
+scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
 ```
 
-看到 `Waiting for device reset...` 后，需要按板子的 `RST/RESET` 键让烧录器握手。
+烧录 member 示例：
+
+```sh
+scripts/ws63_flash_team.sh member /dev/tty.usbserial-110
+```
+
+脚本会在烧录前打印角色、串口和固件路径，并要求输入 `flash leader` 或 `flash member` 才会继续。
+macOS 烧录优先使用 `/dev/tty.usbserial-*`，不要用 `/dev/cu.usbserial-*`。
+看到 `Waiting for device reset...` 后，需要按板子的 `RST/RESET` 或 `BOOT + RESET` 让烧录器握手。
 
 ## 串口命令
 
