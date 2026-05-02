@@ -14,6 +14,7 @@
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 #include "lwip/netifapi.h"
+#include "wifi_device.h"
 #include "wifi_hotspot.h"
 #include "wifi_hotspot_config.h"
 #endif
@@ -109,6 +110,7 @@
 #define SLE_TEAM_WIFI_AP_TASK_STACK_SIZE 0x1000
 #define SLE_TEAM_WIFI_AP_TASK_PRIO 13
 #define SLE_TEAM_WIFI_IFNAME_MAX_SIZE 16
+#define SLE_TEAM_WIFI_INIT_WAIT_MAX_MS 10000
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -249,10 +251,24 @@ static int team_wifi_ap_start(void)
 
 static void *team_wifi_ap_task(const char *arg)
 {
+    errcode_t ret;
+    uint32_t wait_ms = 0;
+
     unused(arg);
+
+    team_wifi_print("task started");
+    if (wifi_is_wifi_inited() == 0) {
+        ret = wifi_init();
+        osal_printk("[team-wifi] wifi_init ret=0x%x\r\n", ret);
+    }
 
     while (wifi_is_wifi_inited() == 0) {
         osal_msleep(100);
+        wait_ms += 100;
+        if (wait_ms >= SLE_TEAM_WIFI_INIT_WAIT_MAX_MS) {
+            team_wifi_print("wifi init timeout");
+            return NULL;
+        }
     }
     team_wifi_print("wifi init ready");
     if (team_wifi_ap_start() != 0) {
