@@ -48,13 +48,13 @@ http://localhost:5173/
 
 默认不会显示假数据。进入“连接/设置”页或总览顶部可以切换：
 
-- WiFi：填写任意一块带 HTTP API 的 WS63 地址，如 `http://192.168.4.1`
+- WiFi：填写任意一块带 HTTP API 的 WS63 地址，如 `http://192.168.43.1`
 - 串口：选择 WebSerial 串口，默认 `115200`
 
 域名上位机模式：
 
 ```text
-https://console.example.com/?api=http://192.168.4.1
+https://console.example.com/?api=http://192.168.43.1
 ```
 
 如果页面和 API 同源，直接打开页面即可，不需要 `api` 参数。
@@ -122,6 +122,8 @@ WiFi 入口不限定 leader。两种方式都可以落地：
 ```
 
 ### POST /api/send
+
+当前 WS63 leader 固件已落地 `GET /api/status`、`GET /api/nodes`、`GET /api/events`。`POST /api/send` 是 WebUI 已预留的下一步接口。
 
 ```json
 {

@@ -293,7 +293,7 @@ function renderSettings(): string {
         <div>
           <strong>域名上位机</strong>
           <span>部署同一份 dist 到任意静态托管，使用 ?api=http://device-ip 指向网关。</span>
-          <code>https://console.example.com/?api=http://192.168.4.1</code>
+          <code>https://console.example.com/?api=http://192.168.43.1</code>
         </div>
       </div>
     </section>
@@ -304,7 +304,7 @@ function renderSettings(): string {
       <pre class="api-spec">GET  /api/status
 GET  /api/nodes
 GET  /api/events
-POST /api/send
+POST /api/send  (下一步接入)
 {
   "type": "position",
   "dstId": 1,
@@ -331,7 +331,7 @@ function renderConnectionPanel(layout: "compact" | "full"): string {
         </div>
         <div class="connection-fields">
           <label>WS63 HTTP API 地址
-            <input name="apiBase" type="url" placeholder="http://192.168.4.1 或 http://member-ip" value="${escapeHtml(state.connection.apiBase)}" />
+            <input name="apiBase" type="url" placeholder="http://192.168.43.1 或 http://member-ip" value="${escapeHtml(state.connection.apiBase)}" />
           </label>
           <label>串口波特率
             <input name="serialBaud" type="number" min="9600" max="921600" value="${state.connection.serialBaud}" />
@@ -446,7 +446,7 @@ function bindEvents(): void {
       serialBaud: readNumber(form, "serialBaud") ?? 115200,
     };
     if (nextConfig.mode === "wifi" && nextConfig.apiBase === "") {
-      state.error = "WiFi 模式需要填写 WS63 HTTP API 地址，例如 http://192.168.4.1";
+      state.error = "WiFi 模式需要填写 WS63 HTTP API 地址，例如 http://192.168.43.1";
       renderShell();
       return;
     }

@@ -28,11 +28,11 @@ MeshCore 的核心形态：
 任意 WS63 节点作为 WiFi AP 或 STA 后提供 HTTP：
 
 ```text
-http://192.168.4.1/
-http://192.168.4.1/api/status
-http://192.168.4.1/api/nodes
-http://192.168.4.1/api/events
-http://192.168.4.1/api/send
+http://192.168.43.1/
+http://192.168.43.1/api/status
+http://192.168.43.1/api/nodes
+http://192.168.43.1/api/events
+http://192.168.43.1/api/send
 ```
 
 浏览器直接连板子查看数据和节点。leader 可以提供全队聚合视图；member 也可以提供自身视图和它缓存到的网络视图。
@@ -48,7 +48,7 @@ https://console.example.com/
 通过参数指定设备 API：
 
 ```text
-https://console.example.com/?api=http://192.168.4.1
+https://console.example.com/?api=http://192.168.43.1
 ```
 
 后续也可以让域名后端代理多个设备。
