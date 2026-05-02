@@ -42,16 +42,16 @@ http://192.168.43.1/api/send
 把 `webui/dist` 部署到域名：
 
 ```text
-https://console.example.com/
+https://sleweb.mecho.top/
 ```
 
 通过参数指定设备 API：
 
 ```text
-https://console.example.com/?api=http://192.168.43.1
+https://sleweb.mecho.top/?api=http://192.168.43.1
 ```
 
-后续也可以让域名后端代理多个设备。
+注意：HTTPS 域名页面直接访问私网 HTTP 设备 API 可能被浏览器混合内容策略拦截。后续可以让域名后端代理多个设备，或提供 HTTPS 网关。
 
 ## 固件端需要补的接口
 

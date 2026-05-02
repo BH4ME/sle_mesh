@@ -23,6 +23,9 @@ import { decodePacketHex, formatCoordinate } from "./protocol/codec";
 import type { SendCommand, TeamEvent, TeamNode, TeamStatus } from "./protocol/types";
 import "./styles/app.css";
 
+const hostedConsoleUrl = "https://sleweb.mecho.top";
+const defaultDeviceApiUrl = "http://192.168.43.1";
+
 let api = createTeamApi();
 
 interface AppState {
@@ -292,8 +295,8 @@ function renderSettings(): string {
         </div>
         <div>
           <strong>域名上位机</strong>
-          <span>部署同一份 dist 到任意静态托管，使用 ?api=http://device-ip 指向网关。</span>
-          <code>https://console.example.com/?api=http://192.168.43.1</code>
+          <span>部署在 sleweb.mecho.top，串口连接可直接使用；WiFi API 直连私网设备时需要浏览器允许 HTTPS 页面访问本地 HTTP 地址。</span>
+          <code>${hostedConsoleUrl}/?api=${defaultDeviceApiUrl}</code>
         </div>
       </div>
     </section>
@@ -331,7 +334,7 @@ function renderConnectionPanel(layout: "compact" | "full"): string {
         </div>
         <div class="connection-fields">
           <label>WS63 HTTP API 地址
-            <input name="apiBase" type="url" placeholder="http://192.168.43.1 或 http://member-ip" value="${escapeHtml(state.connection.apiBase)}" />
+            <input name="apiBase" type="url" placeholder="${defaultDeviceApiUrl} 或 http://member-ip" value="${escapeHtml(state.connection.apiBase)}" />
           </label>
           <label>串口波特率
             <input name="serialBaud" type="number" min="9600" max="921600" value="${state.connection.serialBaud}" />
@@ -342,7 +345,7 @@ function renderConnectionPanel(layout: "compact" | "full"): string {
           <button class="text-button" type="button" data-action="serial-connect">选择串口</button>
         </div>
         <div class="note">
-          当前是 <strong>${connectionLabel()}</strong>。WiFi 可以连接任意一块带 HTTP API 的 WS63，leader 或 member 都可以；串口是浏览器直接连接一块板子的 UART CLI。
+          当前是 <strong>${connectionLabel()}</strong>。WiFi 可以连接任意一块带 HTTP API 的 WS63，leader 或 member 都可以；串口是浏览器直接连接一块板子的 UART CLI。域名上位机地址是 <strong>${hostedConsoleUrl}</strong>。
         </div>
       </form>
     </section>
@@ -446,7 +449,7 @@ function bindEvents(): void {
       serialBaud: readNumber(form, "serialBaud") ?? 115200,
     };
     if (nextConfig.mode === "wifi" && nextConfig.apiBase === "") {
-      state.error = "WiFi 模式需要填写 WS63 HTTP API 地址，例如 http://192.168.43.1";
+      state.error = `WiFi 模式需要填写 WS63 HTTP API 地址，例如 ${defaultDeviceApiUrl}`;
       renderShell();
       return;
     }

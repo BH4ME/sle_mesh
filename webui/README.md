@@ -54,10 +54,13 @@ http://localhost:5173/
 域名上位机模式：
 
 ```text
-https://console.example.com/?api=http://192.168.43.1
+https://sleweb.mecho.top/
+https://sleweb.mecho.top/?api=http://192.168.43.1
 ```
 
 如果页面和 API 同源，直接打开页面即可，不需要 `api` 参数。
+
+注意：`https://sleweb.mecho.top` 是 HTTPS 页面。浏览器可能默认拦截它直接访问 `http://192.168.43.1` 这种私网 HTTP API。需要 WiFi 直连板端时，优先使用板端页面 `http://192.168.43.1/`；域名上位机更适合串口/WebSerial、后续 HTTPS 代理，或允许本地 HTTP 访问的浏览器环境。
 
 WiFi 入口不限定 leader。两种方式都可以落地：
 
