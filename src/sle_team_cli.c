@@ -65,6 +65,34 @@ static int parse_i32(const char *s, int32_t min_value, int32_t max_value, int32_
     return 0;
 }
 
+static const char *sle_team_cli_err_name(int ret)
+{
+    switch (ret) {
+        case SLE_TEAM_OK:
+            return "OK";
+        case SLE_TEAM_ERR_ARG:
+            return "ARG";
+        case SLE_TEAM_ERR_BUF:
+            return "BUF";
+        case SLE_TEAM_ERR_FORMAT:
+            return "FORMAT";
+        case SLE_TEAM_ERR_UNSUPPORTED:
+            return "NOT_READY";
+        default:
+            return "ERR";
+    }
+}
+
+static void sle_team_cli_print_send_result(sle_team_cli_t *cli, const char *type, uint8_t dst_id, int ret)
+{
+    if (ret == SLE_TEAM_OK) {
+        sle_team_cli_printf(cli, "sle_tx_ok type=%s dst=%u", type, dst_id);
+    } else {
+        sle_team_cli_printf(cli, "sle_tx_fail type=%s dst=%u ret=%d reason=%s",
+            type, dst_id, ret, sle_team_cli_err_name(ret));
+    }
+}
+
 void sle_team_cli_init(sle_team_cli_t *cli, sle_team_node_t *node, sle_team_cli_print_fn print, void *user_ctx)
 {
     if (cli == NULL) {
@@ -124,8 +152,7 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
 
     if (strcmp(argv[0], "hello") == 0) {
         uint8_t dst = (argc >= 2) ? (uint8_t)strtoul(argv[1], NULL, 0) : cli->node->cfg.leader_id;
-        (void)sle_team_node_send_hello(cli->node, dst);
-        sle_team_cli_printf(cli, "hello sent to %u", dst);
+        sle_team_cli_print_send_result(cli, "HELLO", dst, sle_team_node_send_hello(cli->node, dst));
         return;
     }
 
@@ -141,8 +168,8 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
             sle_team_cli_puts(cli, "bad number");
             return;
         }
-        (void)sle_team_node_send_heartbeat(cli->node, (uint8_t)v[0], (uint8_t)v[1], (int8_t)sv[0], (uint8_t)v[2]);
-        sle_team_cli_puts(cli, "heartbeat sent");
+        sle_team_cli_print_send_result(cli, "HEARTBEAT", (uint8_t)v[0],
+            sle_team_node_send_heartbeat(cli->node, (uint8_t)v[0], (uint8_t)v[1], (int8_t)sv[0], (uint8_t)v[2]));
         return;
     }
 
@@ -170,8 +197,8 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
         pos.battery_percent = (uint8_t)v[3];
         pos.fix_status = (uint8_t)v[4];
         pos.sat_count = (uint8_t)v[5];
-        (void)sle_team_node_send_position(cli->node, (uint8_t)v[0], &pos);
-        sle_team_cli_puts(cli, "position sent");
+        sle_team_cli_print_send_result(cli, "POS_REPORT", (uint8_t)v[0],
+            sle_team_node_send_position(cli->node, (uint8_t)v[0], &pos));
         return;
     }
 
@@ -195,15 +222,14 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
         alert.last_latitude_e6 = sv[0];
         alert.last_longitude_e6 = sv[1];
         alert.last_report_s = v[3];
-        (void)sle_team_node_send_alert(cli->node, (uint8_t)v[0], &alert);
-        sle_team_cli_puts(cli, "alert sent");
+        sle_team_cli_print_send_result(cli, "ALERT", (uint8_t)v[0],
+            sle_team_node_send_alert(cli->node, (uint8_t)v[0], &alert));
         return;
     }
 
     if (strcmp(argv[0], "config") == 0) {
         uint8_t dst = (argc >= 2) ? (uint8_t)strtoul(argv[1], NULL, 0) : SLE_TEAM_BROADCAST_ID;
-        (void)sle_team_node_send_config(cli->node, dst);
-        sle_team_cli_puts(cli, "config sent");
+        sle_team_cli_print_send_result(cli, "CONFIG", dst, sle_team_node_send_config(cli->node, dst));
         return;
     }
 
@@ -219,8 +245,8 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
             sle_team_cli_puts(cli, "bad number");
             return;
         }
-        (void)sle_team_node_send_ack(cli->node, (uint8_t)v[0], (uint16_t)v[1], (uint8_t)v[2], (uint8_t)v[3]);
-        sle_team_cli_puts(cli, "ack sent");
+        sle_team_cli_print_send_result(cli, "ACK", (uint8_t)v[0],
+            sle_team_node_send_ack(cli->node, (uint8_t)v[0], (uint16_t)v[1], (uint8_t)v[2], (uint8_t)v[3]));
         return;
     }
 

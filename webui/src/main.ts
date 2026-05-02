@@ -243,9 +243,17 @@ function renderSendForm(): string {
 }
 
 function renderEvent(event: TeamEvent): string {
+  const labels: Record<TeamEvent["direction"], string> = {
+    rx: "SLE RX",
+    tx: "SLE TX",
+    fail: "失败",
+    cli: "串口",
+    state: "状态",
+    system: "系统",
+  };
   return `
     <article class="event-row">
-      <div class="event-type ${event.direction}">${event.direction}</div>
+      <div class="event-type ${event.direction}">${labels[event.direction]}</div>
       <div>
         <strong>${event.type}</strong>
         <span>${escapeHtml(event.summary)}</span>

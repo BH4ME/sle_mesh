@@ -443,13 +443,13 @@ textarea {
 }
 
 .event-row {
-  grid-template-columns: 56px minmax(0, 1fr) auto;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
   align-items: center;
 }
 
 .event-type {
   display: grid;
-  width: 44px;
+  width: 62px;
   height: 28px;
   place-items: center;
   color: #234b3e;
@@ -468,6 +468,21 @@ textarea {
 .event-type.tx {
   color: #3f4e87;
   background: #e8ecff;
+}
+
+.event-type.fail {
+  color: #8a1f1f;
+  background: #ffe4e0;
+}
+
+.event-type.cli {
+  color: #68541b;
+  background: #fff1bd;
+}
+
+.event-type.state {
+  color: #5b436e;
+  background: #f0e4ff;
 }
 
 time {

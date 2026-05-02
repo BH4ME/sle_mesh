@@ -194,6 +194,21 @@ Mac 侧已拷出的固件路径：
 /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_member/ws63-liteos-app_team_member_all.fwpkg
 ```
 
+当前串口事件和 LED 反馈版固件路径：
+
+```text
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader_serial_led/ws63-liteos-app_leader_all.fwpkg
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_member_serial_led/ws63-liteos-app_member_all.fwpkg
+```
+
+这版用于确认真实 SLE 收发：
+
+- `[cli-rx]` 表示串口命令返回，不代表 SLE 收到包。
+- `[sle-tx-ok]` 表示本板已把业务包交给 SLE driver，LED 快闪两下。
+- `[sle-tx-fail]` 表示本板尝试 SLE 发送失败，LED 不闪。
+- `[sle-rx]` 表示本板真实收到 SLE 业务包，LED 慢闪一下。
+- `[state]` 表示状态机、WiFi 或系统状态日志。
+
 烧录 leader 示例：
 
 ```sh

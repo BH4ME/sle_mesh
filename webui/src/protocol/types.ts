@@ -8,6 +8,10 @@ export type AppMessageType =
   | "ALERT"
   | "CONFIG"
   | "ACK"
+  | "PACKET"
+  | "CLI"
+  | "STATE"
+  | "SYSTEM"
   | "UNKNOWN";
 
 export interface TeamStatus {
@@ -41,7 +45,7 @@ export interface TeamNode {
 export interface TeamEvent {
   id: string;
   time: string;
-  direction: "rx" | "tx" | "system";
+  direction: "rx" | "tx" | "fail" | "cli" | "state" | "system";
   type: AppMessageType;
   srcId?: number;
   dstId?: number;

@@ -100,6 +100,32 @@ static void sle_team_mark_joined(sle_team_node_t *node, uint8_t member_id)
     }
 }
 
+static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
+{
+    uint8_t i;
+    uint16_t timeout_s;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return;
+    }
+
+    timeout_s = node->cfg.heartbeat_timeout_s;
+    if (timeout_s == 0U) {
+        return;
+    }
+
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        sle_team_member_record_t *member = &node->members[i];
+        if (member->online == 0U) {
+            continue;
+        }
+        if ((now_s - member->last_seen_s) > timeout_s) {
+            member->online = 0U;
+            sle_team_log(node, "member heartbeat timeout");
+        }
+    }
+}
+
 static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
     const sle_team_hello_body_t *hello;
@@ -252,6 +278,7 @@ void sle_team_node_tick(sle_team_node_t *node)
     }
 
     now_s = sle_team_now(node);
+    sle_team_prune_stale_members(node, now_s);
 
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined == 0U) {
         if ((now_s - node->last_hello_s) >= 3U) {

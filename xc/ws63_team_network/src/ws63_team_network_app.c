@@ -10,6 +10,7 @@
 #include "app_init.h"
 #include "common_def.h"
 #include "errcode.h"
+#include "gpio.h"
 #include "pinctrl.h"
 #include "securec.h"
 #include "soc_osal.h"
@@ -67,6 +68,14 @@
 #define CONFIG_SLE_TEAM_UART_RXD_PIN 18
 #endif
 
+#ifndef CONFIG_SLE_TEAM_LED_PIN
+#define CONFIG_SLE_TEAM_LED_PIN 2
+#endif
+
+#ifndef CONFIG_SLE_TEAM_LED_ACTIVE_LOW
+#define CONFIG_SLE_TEAM_LED_ACTIVE_LOW 1
+#endif
+
 #ifndef CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S
 #define CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S 3
 #endif
@@ -112,6 +121,16 @@
 #define SLE_TEAM_CLI_LINE_SIZE 192
 #define SLE_TEAM_CLI_QUEUE_LEN 4
 #define SLE_TEAM_CLI_QUEUE_TIMEOUT_MS 200
+#define SLE_TEAM_LED_QUEUE_LEN 6
+#define SLE_TEAM_LED_QUEUE_TIMEOUT_MS 1000
+#define SLE_TEAM_LED_TASK_STACK_SIZE 0x800
+#define SLE_TEAM_LED_TASK_PRIO 29
+#define SLE_TEAM_LED_TX_ON_MS 40
+#define SLE_TEAM_LED_TX_OFF_MS 40
+#define SLE_TEAM_LED_TX_PULSES 2
+#define SLE_TEAM_LED_RX_ON_MS 220
+#define SLE_TEAM_LED_RX_OFF_MS 120
+#define SLE_TEAM_LED_RX_PULSES 1
 
 #define SLE_TEAM_WIFI_AP_TASK_STACK_SIZE 0x1000
 #define SLE_TEAM_WIFI_AP_TASK_PRIO 13
@@ -131,12 +150,19 @@ typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
 } sle_team_cli_msg_t;
 
+typedef enum {
+    SLE_TEAM_LED_EVENT_TX = 1,
+    SLE_TEAM_LED_EVENT_RX = 2,
+} sle_team_led_event_t;
+
 typedef struct {
     uint8_t uart_rx_buf[SLE_TEAM_UART_RX_BUF_SIZE];
     char line_buf[SLE_TEAM_CLI_LINE_SIZE];
     uint16_t line_len;
     unsigned long cli_queue_id;
+    unsigned long led_queue_id;
     uint8_t cli_queue_ready;
+    uint8_t led_queue_ready;
 } sle_team_ws63_runtime_t;
 
 static sle_team_ws63_runtime_t g_team_rt;
@@ -161,7 +187,89 @@ static uart_buffer_config_t g_uart_buffer_config = {
 
 static void team_print(const char *text)
 {
-    osal_printk("[team] %s\r\n", text);
+    osal_printk("[state] %s\r\n", text);
+}
+
+static void team_led_set(uint8_t on)
+{
+    if (CONFIG_SLE_TEAM_LED_ACTIVE_LOW) {
+        (void)uapi_gpio_set_val(CONFIG_SLE_TEAM_LED_PIN, on != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH);
+    } else {
+        (void)uapi_gpio_set_val(CONFIG_SLE_TEAM_LED_PIN, on != 0U ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
+    }
+}
+
+static void team_led_post(sle_team_led_event_t event)
+{
+    uint8_t msg = (uint8_t)event;
+
+    if (g_team_rt.led_queue_ready == 0U) {
+        return;
+    }
+    (void)osal_msg_queue_write_copy(g_team_rt.led_queue_id, &msg, (uint32_t)sizeof(msg), 0);
+}
+
+static void team_led_blink(uint8_t pulses, uint32_t on_ms, uint32_t off_ms)
+{
+    uint8_t i;
+
+    for (i = 0U; i < pulses; i++) {
+        team_led_set(1U);
+        osal_msleep(on_ms);
+        team_led_set(0U);
+        if (i + 1U < pulses) {
+            osal_msleep(off_ms);
+        }
+    }
+}
+
+static void *team_led_task(const char *arg)
+{
+    uint8_t event = 0U;
+    uint32_t msg_size;
+
+    unused(arg);
+
+    (void)uapi_pin_set_mode(CONFIG_SLE_TEAM_LED_PIN, HAL_PIO_FUNC_GPIO);
+    (void)uapi_gpio_set_dir(CONFIG_SLE_TEAM_LED_PIN, GPIO_DIRECTION_OUTPUT);
+    team_led_set(0U);
+    osal_printk("[state] led pin=%u active_low=%u\r\n",
+        CONFIG_SLE_TEAM_LED_PIN, CONFIG_SLE_TEAM_LED_ACTIVE_LOW ? 1U : 0U);
+
+    while (1) {
+        msg_size = sizeof(event);
+        if (osal_msg_queue_read_copy(g_team_rt.led_queue_id, &event, &msg_size, SLE_TEAM_LED_QUEUE_TIMEOUT_MS) !=
+            OSAL_SUCCESS) {
+            continue;
+        }
+        if (event == (uint8_t)SLE_TEAM_LED_EVENT_TX) {
+            team_led_blink(SLE_TEAM_LED_TX_PULSES, SLE_TEAM_LED_TX_ON_MS, SLE_TEAM_LED_TX_OFF_MS);
+        } else if (event == (uint8_t)SLE_TEAM_LED_EVENT_RX) {
+            team_led_blink(SLE_TEAM_LED_RX_PULSES, SLE_TEAM_LED_RX_ON_MS, SLE_TEAM_LED_RX_OFF_MS);
+        }
+    }
+    return NULL;
+}
+
+static void team_led_start(void)
+{
+    osal_task *task = NULL;
+
+    if (osal_msg_queue_create("team_led_q", SLE_TEAM_LED_QUEUE_LEN, &g_team_rt.led_queue_id, 0,
+        sizeof(uint8_t)) == OSAL_SUCCESS) {
+        g_team_rt.led_queue_ready = 1U;
+    } else {
+        team_print("led queue create failed");
+        return;
+    }
+
+    osal_kthread_lock();
+    task = osal_kthread_create((osal_kthread_handler)team_led_task, NULL, "TeamLedTask",
+        SLE_TEAM_LED_TASK_STACK_SIZE);
+    if (task != NULL) {
+        osal_kthread_set_priority(task, SLE_TEAM_LED_TASK_PRIO);
+    }
+    osal_kthread_unlock();
 }
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
@@ -219,13 +327,19 @@ static uint32_t team_now_s(void *user_ctx)
 static void team_log(void *user_ctx, const char *text)
 {
     unused(user_ctx);
-    team_print(text);
+    osal_printk("[state] %s\r\n", text);
 }
 
 static void team_cli_print(void *user_ctx, const char *text)
 {
     unused(user_ctx);
-    osal_printk("[cli] %s\r\n", text);
+    if (strncmp(text, "sle_tx_ok", 9) == 0) {
+        osal_printk("[sle-tx-ok] %s\r\n", text + 10);
+    } else if (strncmp(text, "sle_tx_fail", 11) == 0) {
+        osal_printk("[sle-tx-fail] %s\r\n", text + 12);
+    } else {
+        osal_printk("[cli-rx] %s\r\n", text);
+    }
 }
 
 static void team_joined(void *user_ctx, uint8_t member_id)
@@ -269,6 +383,8 @@ static void team_web_record_packet(sle_team_web_event_direction_t direction, con
         sle_team_decode_app_packet(&app, app_payload, app_payload_len) == SLE_TEAM_OK) {
         (void)snprintf(summary, sizeof(summary), "%s %u->%u seq=%u",
             sle_team_web_msg_type_name(app.app_msg_type), app.src_id, app.dst_id, app.seq);
+        osal_printk("[%s] %s\r\n", direction == SLE_TEAM_WEB_EVENT_TX ? "sle-tx-ok" : "sle-rx", summary);
+        team_led_post(direction == SLE_TEAM_WEB_EVENT_TX ? SLE_TEAM_LED_EVENT_TX : SLE_TEAM_LED_EVENT_RX);
         sle_team_web_event_push(&g_team_events, team_now_s(NULL), direction, app.app_msg_type, app.src_id, app.dst_id,
             app.seq, summary);
         return;
@@ -851,11 +967,12 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
 
 #if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
     if (sle_uart_client_is_connected() == 0U) {
-        team_print("leader has no connected member");
+        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NO_MEMBER\r\n",
+            dst_id, SLE_TEAM_ERR_UNSUPPORTED);
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (sle_uart_server_send_report_by_handle(buf, len) != ERRCODE_SLE_SUCCESS) {
-        team_print("leader send failed");
+        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n", dst_id, SLE_TEAM_ERR_FORMAT);
         return SLE_TEAM_ERR_FORMAT;
     }
     team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "leader tx");
@@ -864,13 +981,14 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
     ssapc_write_param_t *param = get_g_sle_uart_send_param();
     uint16_t conn_id = get_g_sle_uart_conn_id();
     if (param == NULL || param->handle == 0U) {
-        team_print("member not ready to send");
+        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NOT_READY\r\n",
+            dst_id, SLE_TEAM_ERR_UNSUPPORTED);
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     param->data_len = len;
     param->data = (uint8_t *)buf;
     if (ssapc_write_req(0, conn_id, param) != ERRCODE_SLE_SUCCESS) {
-        team_print("member send failed");
+        osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n", dst_id, SLE_TEAM_ERR_FORMAT);
         return SLE_TEAM_ERR_FORMAT;
     }
     team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "member tx");
@@ -1026,6 +1144,8 @@ static void *team_network_task(const char *arg)
 static void team_network_entry(void)
 {
     osal_task *task = NULL;
+
+    team_led_start();
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
     team_wifi_ap_entry();

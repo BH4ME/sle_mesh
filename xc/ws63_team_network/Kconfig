@@ -38,6 +38,18 @@ config SLE_TEAM_UART_RXD_PIN
     int "UART RXD pin"
     default 18
 
+config SLE_TEAM_LED_PIN
+    int "SLE activity LED GPIO"
+    default 2
+    help
+        BearPi-Pico H3863 onboard user LED is normally GPIO_2.
+
+config SLE_TEAM_LED_ACTIVE_LOW
+    bool "SLE activity LED is active low"
+    default y
+    help
+        The onboard user LED turns on when GPIO_2 is driven low.
+
 config SLE_TEAM_HEARTBEAT_INTERVAL_S
     int "Heartbeat interval in seconds"
     default 3

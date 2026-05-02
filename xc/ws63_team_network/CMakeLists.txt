@@ -15,6 +15,8 @@ endif()
 
 set(SLE_TEAM_IS_LEADER FALSE)
 set(SLE_TEAM_SDK_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../..)
+set(SLE_TEAM_UART_SERVER_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server)
+set(SLE_TEAM_UART_CLIENT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_client)
 set(SLE_TEAM_CONFIG_FILE
     ${SLE_TEAM_SDK_ROOT}/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config
 )
@@ -42,18 +44,22 @@ if(SLE_TEAM_IS_LEADER)
         ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server/sle_uart_server_adv.c
         ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server/sle_uart_server.c
     )
-    set(SLE_TEAM_ROLE_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server)
+    set(SLE_TEAM_ROLE_HEADERS ${SLE_TEAM_UART_SERVER_HEADERS})
 else()
     list(APPEND SOURCES_LIST
         ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_client/sle_uart_client.c
     )
-    set(SLE_TEAM_ROLE_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_client)
+    set(SLE_TEAM_ROLE_HEADERS ${SLE_TEAM_UART_CLIENT_HEADERS})
 endif()
+
+include_directories(${SLE_TEAM_ROLE_HEADERS})
 
 set(SOURCES "${SOURCES}" ${SOURCES_LIST} PARENT_SCOPE)
 set(PUBLIC_HEADER
     "${PUBLIC_HEADER}"
     ${SLE_MESH_ROOT}/include
     ${SLE_TEAM_ROLE_HEADERS}
+    ${SLE_TEAM_UART_SERVER_HEADERS}
+    ${SLE_TEAM_UART_CLIENT_HEADERS}
     PARENT_SCOPE
 )

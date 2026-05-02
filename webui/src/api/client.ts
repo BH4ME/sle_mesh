@@ -155,6 +155,57 @@ function sendCommandToCli(command: SendCommand): string {
   return `config ${command.dstId}`;
 }
 
+function appTypeFromText(text: string): TeamEvent["type"] {
+  const upper = text.toUpperCase();
+  if (upper.includes("HEARTBEAT")) return "HEARTBEAT";
+  if (upper.includes("POS_REPORT") || upper.includes("POSITION") || upper.includes(" POS ")) return "POS_REPORT";
+  if (upper.includes("ALERT")) return "ALERT";
+  if (upper.includes("CONFIG")) return "CONFIG";
+  if (upper.includes("HELLO")) return "HELLO";
+  if (upper.includes("ACK")) return "ACK";
+  if (upper.includes("PACKET")) return "PACKET";
+  if (text.startsWith("[cli-tx]") || text.startsWith("[cli-rx]") || text.startsWith("[cli]")) return "CLI";
+  if (text.startsWith("[state]") || text.startsWith("[team]")) return "STATE";
+  if (text.startsWith("[team-wifi]")) return "SYSTEM";
+  return "UNKNOWN";
+}
+
+function cleanTaggedLine(line: string): string {
+  return line.replace(/^\[[^\]]+\]\s*/, "");
+}
+
+function serialLineToEvent(line: string, index: number): TeamEvent {
+  const cleaned = cleanTaggedLine(line);
+  const base = {
+    id: `serial-line-${Date.now()}-${index}`,
+    time: new Date().toISOString(),
+    type: appTypeFromText(line),
+    summary: cleaned,
+  };
+  if (line.startsWith("[sle-tx-ok]")) {
+    return { ...base, direction: "tx", summary: `SLE发送成功：${cleaned}` };
+  }
+  if (line.startsWith("[sle-tx-fail]")) {
+    return { ...base, direction: "fail", summary: `SLE发送失败：${cleaned}` };
+  }
+  if (line.startsWith("[sle-rx]")) {
+    return { ...base, direction: "rx", summary: `SLE收到：${cleaned}` };
+  }
+  if (line.startsWith("[cli-tx]")) {
+    return { ...base, direction: "cli", summary: `串口命令：${cleaned}` };
+  }
+  if (line.startsWith("[cli-rx]") || line.startsWith("[cli]")) {
+    return { ...base, direction: "cli", summary: `串口返回：${cleaned}` };
+  }
+  if (line.startsWith("[state]") || line.startsWith("[team]")) {
+    return { ...base, direction: "state", summary: `状态：${cleaned}` };
+  }
+  if (line.startsWith("[team-wifi]")) {
+    return { ...base, direction: "state", summary: `WiFi状态：${cleaned}` };
+  }
+  return { ...base, direction: "system", summary: line };
+}
+
 export class SerialTeamApi implements TeamApi {
   private lastLines: string[] = [];
 
@@ -174,6 +225,7 @@ export class SerialTeamApi implements TeamApi {
     const port = await this.ensurePort();
     const writer = port.writable!.getWriter();
     try {
+      this.lastLines = [...this.lastLines, `[cli-tx] ${command}`].slice(-80);
       await writer.write(new TextEncoder().encode(`${command}\r\n`));
     } finally {
       writer.releaseLock();
@@ -200,7 +252,7 @@ export class SerialTeamApi implements TeamApi {
       .map((line) => line.trim())
       .filter(Boolean)
       .forEach((line) => lines.push(line));
-    this.lastLines = [...this.lastLines, ...lines].slice(-40);
+    this.lastLines = [...this.lastLines, ...lines].slice(-80);
     return lines;
   }
 
@@ -226,33 +278,14 @@ export class SerialTeamApi implements TeamApi {
     return this.lastLines
       .slice(-20)
       .reverse()
-      .map((line, index) => ({
-        id: `serial-line-${index}`,
-        time: new Date().toISOString(),
-        direction: line.includes("[team]") || line.includes("[cli]") ? "rx" : "system",
-        type: line.includes("pos") ? "POS_REPORT" : line.includes("alert") ? "ALERT" : "UNKNOWN",
-        summary: line,
-      }));
+      .map((line, index) => serialLineToEvent(line, index));
   }
 
   async send(command: SendCommand): Promise<TeamEvent> {
     const cli = sendCommandToCli(command);
-    const lines = await this.runCli(cli, 700);
-    return {
-      id: `serial-${Date.now()}`,
-      time: new Date().toISOString(),
-      direction: "tx",
-      type:
-        command.type === "heartbeat"
-          ? "HEARTBEAT"
-          : command.type === "position"
-            ? "POS_REPORT"
-            : command.type === "alert"
-              ? "ALERT"
-              : "CONFIG",
-      dstId: command.dstId,
-      summary: lines.find((line) => line.includes("[cli]")) ?? cli,
-    };
+    await this.runCli(cli, 700);
+    const latest = [...this.lastLines].reverse().find((line) => line.includes("[sle-tx-")) ?? `[cli-tx] ${cli}`;
+    return serialLineToEvent(latest, Date.now());
   }
 }
 
