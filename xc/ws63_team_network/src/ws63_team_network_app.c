@@ -1,5 +1,6 @@
 #include "sle_team_cli.h"
 #include "sle_team_web_api.h"
+#include "ws63_console_pages.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -440,21 +441,25 @@ static void team_http_append_html_shell_start(char *buf, size_t buf_size, size_t
     static const char * const chunks[] = {
         "<!doctype html><html><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-        "<title>SLE Team WS63</title><style>",
+        "<title>" WS63_CONSOLE_BOARD_TITLE "</title><style>",
         "body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;"
-        "background:#f6f7f9;color:#16181d}header{padding:18px 16px;background:#101820;color:white}",
+        "background:" WS63_CONSOLE_COLOR_PAGE_BG ";color:" WS63_CONSOLE_COLOR_TEXT
+        "}header{padding:18px 16px;background:" WS63_CONSOLE_COLOR_HEADER_BG ";color:white}",
         "h1{font-size:22px;margin:0 0 4px}.sub{opacity:.72;font-size:13px}"
         "main{padding:14px;display:grid;gap:12px}",
-        ".card{background:white;border:1px solid #dde1e7;border-radius:8px;padding:14px}"
+        ".card{background:" WS63_CONSOLE_COLOR_CARD_BG ";border:1px solid " WS63_CONSOLE_COLOR_BORDER
+        ";border-radius:8px;padding:14px}"
         ".row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #edf0f3}",
-        ".row:last-child{border-bottom:0}.k{color:#68707d}.v{font-weight:600;text-align:right;word-break:break-word}"
+        ".row:last-child{border-bottom:0}.k{color:" WS63_CONSOLE_COLOR_MUTED
+        "}.v{font-weight:600;text-align:right;word-break:break-word}"
         "pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;line-height:1.45}",
-        ".ok{color:#087443}.bad{color:#b42318}.warn{color:#9a5b00}.bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}"
-        ".tag{font-size:12px;color:#68707d;margin-top:8px}"
+        ".ok{color:" WS63_CONSOLE_COLOR_OK "}.bad{color:" WS63_CONSOLE_COLOR_BAD "}.warn{color:"
+        WS63_CONSOLE_COLOR_WARN "}.bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}"
+        ".tag{font-size:12px;color:" WS63_CONSOLE_COLOR_MUTED ";margin-top:8px}"
         "a{font:inherit;border:1px solid #c9d0da;border-radius:6px;background:white;color:#182230;padding:8px 10px;text-decoration:none}"
         "a.on{background:#182230;color:#fff;border-color:#182230}",
-        "</style></head><body><header><h1>SLE Team WS63</h1>"
-        "<div class=\"sub\">192.168.43.1 local console</div></header><main>"
+        "</style></head><body><header><h1>" WS63_CONSOLE_BOARD_TITLE "</h1>"
+        "<div class=\"sub\">" WS63_CONSOLE_BOARD_SUBTITLE "</div></header><main>"
     };
     size_t i;
 
@@ -464,12 +469,16 @@ static void team_http_append_html_shell_start(char *buf, size_t buf_size, size_t
         team_http_append_str(buf, buf_size, used, chunks[i]);
     }
     team_http_append_fmt(buf, buf_size, used,
-        "<div class=\"bar\"><a class=\"%s\" href=\"/\">status</a><a class=\"%s\" href=\"/nodes\">nodes</a>"
-        "<a class=\"%s\" href=\"/events\">events</a><a href=\"/api/status\">json</a></div>",
+        "<div class=\"bar\"><a class=\"%s\" href=\"" WS63_CONSOLE_TAB_STATUS_HREF "\">"
+        WS63_CONSOLE_TAB_STATUS_LABEL "</a><a class=\"%s\" href=\"" WS63_CONSOLE_TAB_NODES_HREF "\">"
+        WS63_CONSOLE_TAB_NODES_LABEL "</a><a class=\"%s\" href=\"" WS63_CONSOLE_TAB_EVENTS_HREF "\">"
+        WS63_CONSOLE_TAB_EVENTS_LABEL "</a><a href=\"" WS63_CONSOLE_TAB_JSON_HREF "\">"
+        WS63_CONSOLE_TAB_JSON_LABEL "</a></div>",
         strcmp(active, "status") == 0 ? "on" : "",
         strcmp(active, "nodes") == 0 ? "on" : "",
         strcmp(active, "events") == 0 ? "on" : "");
-    team_http_append_fmt(buf, buf_size, used, "<div class=\"tag\">page=%s ssr=v3</div>", active);
+    team_http_append_fmt(buf, buf_size, used, "<div class=\"tag\">page=%s " WS63_CONSOLE_BOARD_VERSION "</div>",
+        active);
 }
 
 static void team_http_append_html_end(char *buf, size_t buf_size, size_t *used)
@@ -484,29 +493,38 @@ static void team_http_send_status_page(int fd)
     team_http_append_html_shell_start(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "status");
     team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "<section class=\"card\">");
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">State</span><span class=\"v ok\">%s</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_STATE_LABEL
+        "</span><span class=\"v ok\">%s</span></div>",
         sle_team_web_state_name((uint8_t)g_team_node.state));
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Role</span><span class=\"v\">%s</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_ROLE_LABEL
+        "</span><span class=\"v\">%s</span></div>",
         sle_team_web_role_name((uint8_t)g_team_node.cfg.role));
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Self</span><span class=\"v\">%u</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_SELF_LABEL
+        "</span><span class=\"v\">%u</span></div>",
         g_team_node.cfg.self_id);
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Leader</span><span class=\"v\">%u</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_LEADER_LABEL
+        "</span><span class=\"v\">%u</span></div>",
         g_team_node.cfg.leader_id);
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Joined</span><span class=\"v\">%s</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_JOINED_LABEL
+        "</span><span class=\"v\">%s</span></div>",
         g_team_node.joined != 0U ? "true" : "false");
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Seq</span><span class=\"v\">%u</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_SEQ_LABEL
+        "</span><span class=\"v\">%u</span></div>",
         g_team_node.next_seq);
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Uptime</span><span class=\"v\">%lus</span></div>",
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_UPTIME_LABEL
+        "</span><span class=\"v\">%lus</span></div>",
         (unsigned long)team_now_s(NULL));
     team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-        "<div class=\"row\"><span class=\"k\">Transport</span><span class=\"v\">ws63-softap</span></div>"
-        "<div class=\"row\"><span class=\"k\">Link</span><span class=\"v ok\">ok</span></div>"
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_TRANSPORT_LABEL
+        "</span><span class=\"v\">ws63-softap</span></div>"
+        "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_LINK_LABEL
+        "</span><span class=\"v ok\">ok</span></div>"
         "</section>");
     team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
     team_http_send_response(fd, "200 OK", "text/html; charset=utf-8", g_team_http_html_buf);
@@ -528,21 +546,25 @@ static void team_http_send_nodes_page(int fd)
         }
         wrote = 1U;
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<div class=\"row\"><span class=\"k\">Node</span><span class=\"v\">%u</span></div>",
+            "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_NODE_NODE_LABEL
+            "</span><span class=\"v\">%u</span></div>",
             member->member_id);
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<div class=\"row\"><span class=\"k\">Battery</span><span class=\"v\">%u%%</span></div>",
+            "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_NODE_BATTERY_LABEL
+            "</span><span class=\"v\">%u%%</span></div>",
             member->battery_percent);
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<div class=\"row\"><span class=\"k\">RSSI</span><span class=\"v\">%d</span></div>",
+            "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_NODE_RSSI_LABEL
+            "</span><span class=\"v\">%d</span></div>",
             member->last_rssi_dbm);
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<div class=\"row\"><span class=\"k\">Seq</span><span class=\"v\">%u</span></div>",
+            "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_NODE_SEQ_LABEL
+            "</span><span class=\"v\">%u</span></div>",
             member->last_seq);
     }
     if (wrote == 0U) {
         team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<pre>[]\nNo member joined leader yet.</pre>");
+            "<pre>[]\n" WS63_CONSOLE_EMPTY_NODES "</pre>");
     }
     team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "</section>");
     team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
@@ -559,7 +581,7 @@ static void team_http_send_events_page(int fd)
         "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Events</h2>");
     if (g_team_events.count == 0U) {
         team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-            "<pre>[]\nNo team events yet.</pre>");
+            "<pre>[]\n" WS63_CONSOLE_EMPTY_EVENTS "</pre>");
     }
     for (i = 0U; i < g_team_events.count; i++) {
         uint8_t index = (uint8_t)((g_team_events.head + SLE_TEAM_WEB_EVENT_COUNT - 1U - i) %

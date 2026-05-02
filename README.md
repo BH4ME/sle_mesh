@@ -42,7 +42,8 @@
 - 消息流
 - 测试发送
 - `Mesh Packet -> GROUP_DATA -> App Packet` 十六进制解析器
-- 同一份 `dist` 可放进 WS63 板端 HTTP，也可部署到域名作为上位机
+- 域名上位机使用 Vite/TypeScript，WS63 板端使用 C 端 SSR
+- 两端共享 `webui/shared/console-pages.json` 中的名称、入口、标签和配色
 
 详细接入计划见 [docs/webui-plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/webui-plan.md)。
 
@@ -60,6 +61,8 @@
 `v1.2.3` 的当前可用基线是 `ssr=v3`：板端直接渲染 `/`、`/nodes`、`/events` 三个 HTML 页面，并使用带 `Content-Length` 的完整 HTTP 响应，避免 iOS/微信内置浏览器对流式响应一闪而过。页面底部会显示 `page=... ssr=v3`，用于现场确认固件版本。
 
 当前现场已经确认 `status`、`nodes`、`events` 页面均可打开。Nodes/Events 显示空数组 `[]` 表示 leader 当前还没有 member 加入，不代表页面失败。JSON API 仍保留给上位机或调试使用。
+
+为了保护 WS63 RAM 和兼容手机浏览器，板端页面不直接烧录 Vite 产物，也不运行前端 JS。当前做法是同源配置、不同渲染目标：域名页面从 `webui/shared/console-pages.json` 读取配置，板端通过 `tools/gen_ws63_console_header.mjs` 生成 `xc/ws63_team_network/src/ws63_console_pages.h`，再由 C 代码拼出完整 HTML 响应。
 
 如果刷新页面时偶尔失败，优先看两点：
 

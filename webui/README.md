@@ -4,8 +4,9 @@
 
 ## 目标
 
-- 同一份静态文件可以放到 WS63 板端 HTTP 服务里。
-- 同一份静态文件也可以部署到域名上，当上位机使用。
+- 域名上位机使用 Vite/TypeScript，可部署到 `sleweb.mecho.top`。
+- WS63 板端使用 C 端 SSR，不运行前端 JS，保留 `Content-Length` 完整响应。
+- 两端共享 `shared/console-pages.json` 里的产品名、入口、标签、空状态文案和配色。
 - UI 通过 HTTP API 读取节点、消息和状态，不直接绑定某一种传输方式。
 
 ## 页面
@@ -29,8 +30,20 @@ webui/dist/
 
 当前产物很小，适合作为嵌入式静态资源：
 
-- JS gzip 约 6.4 KB
-- CSS gzip 约 1.7 KB
+- JS gzip 约 8.4 KB
+- CSS gzip 约 2.0 KB
+
+注意：当前 WS63 稳定板端控制台不是直接烧录这份 Vite `dist`。为了省 RAM 并兼容 iOS/微信浏览器，板端继续使用 `xc/ws63_team_network/src/ws63_team_network_app.c` 的无 JS SSR 页面。共享内容由下面命令生成到 C 头文件：
+
+```sh
+node ../tools/gen_ws63_console_header.mjs
+```
+
+生成文件：
+
+```text
+xc/ws63_team_network/src/ws63_console_pages.h
+```
 
 ## 运行
 

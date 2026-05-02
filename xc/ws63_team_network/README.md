@@ -45,6 +45,8 @@ GET /api/events
 - 页面使用带 `Content-Length` 的完整 HTTP 响应，避免 iOS/微信内置浏览器对流式响应一闪而过。
 - 页面底部显示 `page=... ssr=v3`，用于确认当前烧录的是这版固件。
 - `nodes` / `events` 显示 `[]` 表示 leader 当前没有 member 入网。
+- 页面文案和配色来自仓库根目录的 `webui/shared/console-pages.json`，通过 `tools/gen_ws63_console_header.mjs` 生成 `src/ws63_console_pages.h`。
+- 板端不直接运行 Vite/TypeScript 产物，不加载前端 JS；这是为了减少 RAM 压力并保持手机浏览器兼容性。
 
 当前现场基线：
 

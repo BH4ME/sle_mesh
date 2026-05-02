@@ -21,10 +21,11 @@ import {
 } from "./api/client";
 import { decodePacketHex, formatCoordinate } from "./protocol/codec";
 import type { SendCommand, TeamEvent, TeamNode, TeamStatus } from "./protocol/types";
+import consolePages from "../shared/console-pages.json";
 import "./styles/app.css";
 
-const hostedConsoleUrl = "https://sleweb.mecho.top";
-const defaultDeviceApiUrl = "http://192.168.43.1";
+const hostedConsoleUrl = consolePages.hostedConsoleUrl;
+const defaultDeviceApiUrl = consolePages.defaultDeviceApiUrl;
 
 let api = createTeamApi();
 
@@ -95,7 +96,7 @@ function renderShell(): void {
           <div class="brand-mark">${icon(Radio, 24)}</div>
           <div>
             <strong>SLE Team</strong>
-            <span>WS63 Console</span>
+            <span>${escapeHtml(consolePages.product)}</span>
           </div>
         </div>
         <nav class="nav" aria-label="Primary">
