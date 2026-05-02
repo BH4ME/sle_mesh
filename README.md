@@ -32,6 +32,20 @@
 - [docs/protocol/terminal-cli.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/terminal-cli.md)
 - [docs/protocol/versioning.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/versioning.md)
 
+## WebUI
+
+第一版 Web 控制台在 [webui/](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui)。
+
+它参考 Meshtastic Web 和 MeshCore Web App 的使用形态，但按本项目协议实现：
+
+- 节点列表
+- 消息流
+- 测试发送
+- `Mesh Packet -> GROUP_DATA -> App Packet` 十六进制解析器
+- 同一份 `dist` 可放进 WS63 板端 HTTP，也可部署到域名作为上位机
+
+详细接入计划见 [docs/webui-plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/webui-plan.md)。
+
 早期草案保留在 [docs/protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol.md)，但当前实现以 `docs/protocol/` 和 `include/`、`src/` 为准。
 
 ## 快速编译验证

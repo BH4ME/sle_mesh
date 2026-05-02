@@ -1,0 +1,72 @@
+config SLE_TEAM_NODE_IS_LEADER
+    bool "Build as team leader"
+    default y
+    help
+        Enable this on the leader device. Disable it on member devices.
+
+config SLE_TEAM_SELF_ID
+    int "Self node id"
+    default 1 if SLE_TEAM_NODE_IS_LEADER
+    default 2
+    range 1 254
+    help
+        Unique node id in one team. The leader normally uses 1.
+
+config SLE_TEAM_LEADER_ID
+    int "Leader node id"
+    default 1
+    range 1 254
+
+config SLE_TEAM_TEAM_ID
+    int "Team id"
+    default 1
+    range 1 254
+
+config SLE_TEAM_CHANNEL_HASH
+    hex "SLE mesh channel hash"
+    default 0x11
+
+config SLE_TEAM_UART_BUS
+    int "UART bus for terminal CLI"
+    default 0
+
+config SLE_TEAM_UART_TXD_PIN
+    int "UART TXD pin"
+    default 17
+
+config SLE_TEAM_UART_RXD_PIN
+    int "UART RXD pin"
+    default 18
+
+config SLE_TEAM_HEARTBEAT_INTERVAL_S
+    int "Heartbeat interval in seconds"
+    default 3
+    range 1 60
+
+config SLE_TEAM_REPORT_INTERVAL_S
+    int "Position report interval in seconds"
+    default 5
+    range 1 300
+
+config SLE_TEAM_WARN_DISTANCE_M
+    int "Warn distance in meters"
+    default 50
+    range 1 10000
+
+config SLE_TEAM_LOST_DISTANCE_M
+    int "Lost distance in meters"
+    default 80
+    range 1 10000
+
+config SLE_TEAM_HEARTBEAT_TIMEOUT_S
+    int "Heartbeat timeout in seconds"
+    default 10
+    range 1 300
+
+config SUPPORT_SLE_PERIPHERAL
+    bool
+    default y if SLE_TEAM_NODE_IS_LEADER
+
+config SUPPORT_SLE_CENTRAL
+    bool
+    default y if !SLE_TEAM_NODE_IS_LEADER
