@@ -69,6 +69,9 @@ typedef struct {
     uint8_t leader_id;
     sle_team_node_role_t role;
     uint8_t channel_hash;
+    uint8_t member_filter_enabled;
+    uint8_t allowed_member_count;
+    uint8_t allowed_member_ids[SLE_TEAM_MAX_MEMBERS];
     uint16_t report_interval_s;
     uint16_t heartbeat_interval_s;
     uint16_t warn_distance_m;
@@ -102,6 +105,11 @@ int sle_team_node_send_ack(sle_team_node_t *node, uint8_t dst_id, uint16_t ack_s
     uint8_t status_code);
 
 const sle_team_member_record_t *sle_team_node_find_member(const sle_team_node_t *node, uint8_t member_id);
+uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t member_id);
+int sle_team_node_allow_all_members(sle_team_node_t *node);
+int sle_team_node_set_allowed_members(sle_team_node_t *node, const uint8_t *member_ids, uint8_t count);
+int sle_team_node_add_allowed_member(sle_team_node_t *node, uint8_t member_id);
+int sle_team_node_remove_allowed_member(sle_team_node_t *node, uint8_t member_id);
 
 #ifdef __cplusplus
 }

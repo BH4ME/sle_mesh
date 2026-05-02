@@ -114,6 +114,7 @@ void sle_team_cli_print_help(sle_team_cli_t *cli)
     sle_team_cli_puts(cli, "  config [dst]");
     sle_team_cli_puts(cli, "  ack [dst] [ack_seq] [acked_type] [status]");
     sle_team_cli_puts(cli, "  members");
+    sle_team_cli_puts(cli, "  allow [all|only <id...>|add <id>|del <id>]");
     sle_team_cli_puts(cli, "  state");
 }
 
@@ -262,10 +263,69 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
         return;
     }
 
+    if (strcmp(argv[0], "allow") == 0) {
+        uint8_t ids[SLE_TEAM_MAX_MEMBERS];
+        uint8_t count;
+        int ret;
+
+        if (argc == 1) {
+            if (cli->node->cfg.member_filter_enabled == 0U) {
+                sle_team_cli_puts(cli, "allow=all");
+            } else {
+                sle_team_cli_printf(cli, "allow=only count=%u", cli->node->cfg.allowed_member_count);
+                for (i = 0; i < (int)cli->node->cfg.allowed_member_count; i++) {
+                    sle_team_cli_printf(cli, "allow member=%u", cli->node->cfg.allowed_member_ids[i]);
+                }
+            }
+            return;
+        }
+
+        if (strcmp(argv[1], "all") == 0) {
+            ret = sle_team_node_allow_all_members(cli->node);
+            sle_team_cli_printf(cli, "allow all ret=%d", ret);
+            return;
+        }
+
+        if (strcmp(argv[1], "only") == 0) {
+            if (argc < 3 || argc - 2 > (int)SLE_TEAM_MAX_MEMBERS) {
+                sle_team_cli_puts(cli, "usage: allow only <id...>");
+                return;
+            }
+            count = 0U;
+            for (i = 2; i < argc; i++) {
+                if (parse_u32(argv[i], 1U, 254U, &v[0]) != 0) {
+                    sle_team_cli_puts(cli, "bad member id");
+                    return;
+                }
+                ids[count++] = (uint8_t)v[0];
+            }
+            ret = sle_team_node_set_allowed_members(cli->node, ids, count);
+            sle_team_cli_printf(cli, "allow only count=%u ret=%d", count, ret);
+            return;
+        }
+
+        if (strcmp(argv[1], "add") == 0 || strcmp(argv[1], "del") == 0) {
+            if (argc < 3 || parse_u32(argv[2], 1U, 254U, &v[0]) != 0) {
+                sle_team_cli_puts(cli, "usage: allow add|del <id>");
+                return;
+            }
+            ret = strcmp(argv[1], "add") == 0 ?
+                sle_team_node_add_allowed_member(cli->node, (uint8_t)v[0]) :
+                sle_team_node_remove_allowed_member(cli->node, (uint8_t)v[0]);
+            sle_team_cli_printf(cli, "allow %s member=%u ret=%d", argv[1], (uint8_t)v[0], ret);
+            return;
+        }
+
+        sle_team_cli_puts(cli, "usage: allow [all|only <id...>|add <id>|del <id>]");
+        return;
+    }
+
     if (strcmp(argv[0], "state") == 0) {
-        sle_team_cli_printf(cli, "team=%u self=%u leader=%u role=%u state=%u joined=%u seq=%u",
+        sle_team_cli_printf(cli, "team=%u self=%u leader=%u role=%u state=%u joined=%u seq=%u allow=%s allow_count=%u",
             cli->node->cfg.team_id, cli->node->cfg.self_id, cli->node->cfg.leader_id,
-            cli->node->cfg.role, cli->node->state, cli->node->joined, cli->node->next_seq);
+            cli->node->cfg.role, cli->node->state, cli->node->joined, cli->node->next_seq,
+            cli->node->cfg.member_filter_enabled != 0U ? "only" : "all",
+            cli->node->cfg.allowed_member_count);
         return;
     }
 

@@ -4,7 +4,7 @@
 
 当前版本：
 
-- `v1.2.3`
+- `v1.2.4`
 
 当前重点不是 WebUI 或 GNSS 业务完整实现，而是先把下面这些基础能力打稳：
 
@@ -44,6 +44,7 @@
 - `Mesh Packet -> GROUP_DATA -> App Packet` 十六进制解析器
 - 域名上位机使用 Vite/TypeScript，WS63 板端使用 C 端 SSR
 - 两端共享 `webui/shared/console-pages.json` 中的名称、入口、标签和配色
+- 串口模式可以配置 leader 成员准入白名单，避免同队号同信道时误收无关 member
 
 详细接入计划见 [docs/webui-plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/webui-plan.md)。
 
@@ -92,6 +93,36 @@ scripts/ws63_build_team_vm.sh member
 
 WS63 样例现在同时编入 SLE UART server/client 代码，并强制打开 `SUPPORT_SLE_PERIPHERAL` 与 `SUPPORT_SLE_CENTRAL`。
 因此后续切角色主要是应用层默认角色和节点 ID 的配置差异，不再维护两份业务代码。
+
+## 队伍匹配和成员准入
+
+当前组包逻辑遵循 `docs/protocol/` 中的结构：
+
+```text
+Mesh Packet -> GROUP_DATA(channel_hash, cipher_mac) -> App Packet(team_id, src_id, dst_id, ...)
+```
+
+当前真实参与匹配的字段是：
+
+- `channel_hash`：无线信道/队伍口令的轻量散列。
+- `team_id`：队伍号。
+- `dst_id`：目标节点，或 `255` 广播。
+- `leader_id`：member 本地配置的目标 leader ID。
+- `src_id`：发送方节点 ID。
+
+如果现场有两个 leader 的 `team_id`、`leader_id`、`channel_hash` 完全一样，member 在发现阶段仍可能连到先发现的那个 leader。为降低这个风险，当前版本增加了 leader 侧成员准入：
+
+```text
+allow
+allow all
+allow only 2
+allow add 3
+allow del 3
+```
+
+leader 收到非白名单 member 的 `HELLO / HEARTBEAT / POS_REPORT` 会直接拒绝，不会 ACK、不会 CONFIG、不会登记到 nodes。member 侧也会拒绝 `src_id` 不是本地 `leader_id` 的包。
+
+注意：当前 `allow` 配置是运行时 RAM 配置，断电重启会恢复默认 `allow all`。后续如果要做真正配对，需要把白名单或 pairing key 写入 WS63 持久化配置，并用 `cipher_mac` 做真实认证。
 
 ## 快速编译验证
 

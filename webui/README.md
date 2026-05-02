@@ -13,7 +13,7 @@
 
 - 总览：队伍状态、节点列表、消息流、发送测试包
 - 数据包：输入十六进制包，按 `Mesh Packet -> GROUP_DATA -> App Packet` 解码
-- 设置：板端部署和域名部署的接口说明
+- 设置：连接方式、成员准入、板端部署和域名部署的接口说明
 
 ## 构建
 
@@ -30,7 +30,7 @@ webui/dist/
 
 当前产物很小，适合作为嵌入式静态资源：
 
-- JS gzip 约 8.4 KB
+- JS gzip 约 9.7 KB
 - CSS gzip 约 2.0 KB
 
 注意：当前 WS63 稳定板端控制台不是直接烧录这份 Vite `dist`。为了省 RAM 并兼容 iOS/微信浏览器，板端继续使用 `xc/ws63_team_network/src/ws63_team_network_app.c` 的无 JS SSR 页面。共享内容由下面命令生成到 C 头文件：
@@ -94,7 +94,10 @@ WiFi 入口不限定 leader。两种方式都可以落地：
   "joined": true,
   "nextSeq": 67,
   "uptimeS": 205,
-  "transport": "ws63-http"
+  "transport": "ws63-http",
+  "memberFilterEnabled": true,
+  "allowedMemberCount": 1,
+  "allowedMembers": [2]
 }
 ```
 
@@ -170,9 +173,18 @@ WiFi 入口不限定 leader。两种方式都可以落地：
 }
 ```
 
+## 成员准入配置
+
+域名 WebUI 的“成员准入”面板当前是落地功能，但写入路径限定为串口模式：
+
+- `allow all`：leader 接收所有 member。
+- `allow only 2`：leader 只接收 member 2。
+- `allow add 3` / `allow del 3`：运行时增删白名单。
+
+WiFi HTTP 当前能在 `/api/status` 里查看 `memberFilterEnabled`、`allowedMemberCount`、`allowedMembers`，但还没有 POST 配置写入接口。不要把 WiFi 面板理解成已经持久化配置；现阶段配置断电会丢失。
+
 ## 下一步
 
-- 在 WS63 固件里加一个轻量 HTTP server。
-- 把 `g_team_node` 和最近事件环形缓冲区导出为上述 JSON。
-- 把 `POST /api/send` 转成已有的 `sle_team_node_send_*()` 调用。
-- 如果板端资源空间紧张，可以把 `dist` 里的文件 gzip 后内嵌。
+- 给 WS63 HTTP 增加 `POST /api/send` 和轻量配置接口。
+- 把成员准入、team/channel/self/leader 配置持久化到板端存储。
+- 后续用 `cipher_mac` 或 pairing key 做真实队伍认证。

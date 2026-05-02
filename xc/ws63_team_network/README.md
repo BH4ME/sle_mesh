@@ -260,6 +260,9 @@ leader 上常用：
 members
 state
 config 2
+allow
+allow only 2
+allow all
 ```
 
 member 上常用：
@@ -269,6 +272,38 @@ state
 hello 1
 pos 1 39908456 116397128 100 90 88 1 9
 ```
+
+### 成员准入
+
+leader 默认 `allow all`。如果现场可能有多个队长，或者只想让指定 member 入网，可以在 leader 串口执行：
+
+```text
+allow only 2
+```
+
+此后 leader 只接受 member 2 的 `HELLO / HEARTBEAT / POS_REPORT`。其他 member 会被拒绝，串口会看到类似：
+
+```text
+[team] member rejected by allowlist
+```
+
+常用命令：
+
+```text
+allow
+allow all
+allow only 2 3
+allow add 4
+allow del 4
+```
+
+`state` 会带上当前准入状态：
+
+```text
+team=1 self=1 leader=1 role=1 state=3 joined=1 seq=12 allow=only allow_count=1
+```
+
+当前准入配置只在 RAM 中生效，板子断电或复位后恢复默认 `allow all`。需要长期固定队伍时，下一步要把配置写入持久化存储。
 
 ## 预期日志
 

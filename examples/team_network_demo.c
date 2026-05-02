@@ -1,5 +1,6 @@
 #include "sle_team_node.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -105,6 +106,24 @@ int main(void)
 
     (void)sle_team_node_init(&leader, &leader_cfg, &leader_ops);
     (void)sle_team_node_init(&member, &member_cfg, &member_ops);
+
+    {
+        uint8_t only_member_3 = 3U;
+
+        assert(sle_team_node_set_allowed_members(&leader, &only_member_3, 1U) == SLE_TEAM_OK);
+        member_rt.now_s = 3U;
+        sle_team_node_tick(&member);
+        relay_last_packet(&member_rt, &leader);
+        assert(sle_team_node_find_member(&leader, 2U) == NULL);
+        assert(member.joined == 0U);
+
+        assert(sle_team_node_add_allowed_member(&leader, 2U) == SLE_TEAM_OK);
+        assert(sle_team_node_send_hello(&member, 1U) == SLE_TEAM_OK);
+        relay_last_packet(&member_rt, &leader);
+        relay_last_packet(&leader_rt, &member);
+        relay_last_packet(&leader_rt, &member);
+        assert(sle_team_node_find_member(&leader, 2U) != NULL);
+    }
 
     member_rt.now_s = 3U;
     sle_team_node_tick(&member);

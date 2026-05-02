@@ -20,7 +20,7 @@ import {
   type ConnectionConfig,
 } from "./api/client";
 import { decodePacketHex, formatCoordinate } from "./protocol/codec";
-import type { SendCommand, TeamEvent, TeamNode, TeamStatus } from "./protocol/types";
+import type { AllowMembersCommand, SendCommand, TeamEvent, TeamNode, TeamStatus } from "./protocol/types";
 import consolePages from "../shared/console-pages.json";
 import "./styles/app.css";
 
@@ -292,6 +292,7 @@ function renderPackets(): string {
 function renderSettings(): string {
   return `
     ${renderConnectionPanel("full")}
+    ${renderAllowPanel()}
     <section class="panel settings-panel">
       <div class="panel-head">
         <h2>部署</h2>
@@ -324,6 +325,46 @@ POST /api/send  (下一步接入)
   "longitudeE6": 116397128,
   "batteryPercent": 88
 }</pre>
+    </section>
+  `;
+}
+
+function renderAllowPanel(): string {
+  const status = state.status;
+  const allowMode = status?.memberFilterEnabled ? "only" : "all";
+  const allowMembers = status?.allowedMembers?.length
+    ? status.allowedMembers.join(" ")
+    : status?.allowedMemberCount
+      ? `${status.allowedMemberCount} 个成员，串口刷新可展开 ID`
+      : "";
+  const serialOnly = state.connection.mode === "serial" ? "" : `<div class="note">成员准入写入目前走板子串口 CLI；WiFi HTTP 页面先做状态查看。</div>`;
+  return `
+    <section class="panel settings-panel">
+      <div class="panel-head">
+        <h2>成员准入</h2>
+        <span class="mode-badge">${allowMode === "all" ? "allow all" : "allow only"}</span>
+      </div>
+      <div class="allow-summary">
+        <div><span>Team</span><strong>${status?.teamId ?? "--"}</strong></div>
+        <div><span>Leader</span><strong>${status?.leaderId ?? "--"}</strong></div>
+        <div><span>Self</span><strong>${status?.selfId ?? "--"}</strong></div>
+        <div><span>Allowed</span><strong>${escapeHtml(allowMembers || "all")}</strong></div>
+      </div>
+      <form class="allow-form" data-form="allow">
+        <div class="segmented" role="tablist" aria-label="Member allow mode">
+          <label class="segment"><input type="radio" name="allowMode" value="all" ${allowMode === "all" ? "checked" : ""} /><span>全部成员</span></label>
+          <label class="segment"><input type="radio" name="allowMode" value="only" ${allowMode === "only" ? "checked" : ""} /><span>只允许列表</span></label>
+        </div>
+        <label>Member ID 列表
+          <input name="memberIds" type="text" inputmode="numeric" placeholder="例如 2 或 2 3 4" value="${escapeHtml(status?.allowedMembers?.join(" ") ?? "")}" />
+        </label>
+        <div class="connection-actions">
+          <button class="primary-button" type="submit">${icon(Plug, 17)}应用准入</button>
+          <button class="text-button" type="button" data-action="allow-add">添加</button>
+          <button class="text-button" type="button" data-action="allow-del">删除</button>
+        </div>
+        ${serialOnly}
+      </form>
     </section>
   `;
 }
@@ -370,6 +411,27 @@ function readNumber(form: FormData, key: string): number | undefined {
   const value = form.get(key);
   if (typeof value !== "string" || value.trim() === "") return undefined;
   return Number(value);
+}
+
+function readMemberIds(raw: string): number[] {
+  return raw
+    .split(/[\s,，]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((value) => Number.isInteger(value) && value >= 1 && value <= 254);
+}
+
+async function applyAllow(command: AllowMembersCommand): Promise<void> {
+  try {
+    const eventResult = await api.configureAllow(command);
+    state.events.unshift(eventResult);
+    state.error = undefined;
+    await refresh();
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : "allow config failed";
+    renderShell();
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -467,6 +529,25 @@ function bindEvents(): void {
     api = createTeamApi();
     state.error = undefined;
     void refresh();
+  });
+  document.querySelector<HTMLFormElement>("[data-form='allow']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    const mode = String(form.get("allowMode")) === "only" ? "only" : "all";
+    const memberIds = readMemberIds(String(form.get("memberIds") ?? ""));
+    void applyAllow({ mode, memberIds });
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='allow-add']")?.addEventListener("click", () => {
+    const input = document.querySelector<HTMLInputElement>("input[name='memberIds']");
+    const memberIds = readMemberIds(input?.value ?? "");
+    void applyAllow({ mode: "add", memberIds: memberIds.slice(0, 1) });
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='allow-del']")?.addEventListener("click", () => {
+    const input = document.querySelector<HTMLInputElement>("input[name='memberIds']");
+    const memberIds = readMemberIds(input?.value ?? "");
+    void applyAllow({ mode: "del", memberIds: memberIds.slice(0, 1) });
   });
   document.querySelector<HTMLButtonElement>("[data-action='serial-connect']")?.addEventListener("click", () => {
     void connectSerialPlaceholder();

@@ -152,6 +152,7 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
     char *out, size_t out_len)
 {
     sle_team_json_writer_t writer;
+    uint8_t i;
 
     if (node == NULL || out == NULL || out_len == 0U) {
         return SLE_TEAM_ERR_ARG;
@@ -164,10 +165,16 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
 
     json_append(&writer,
         "{\"teamId\":%u,\"selfId\":%u,\"leaderId\":%u,\"role\":\"%s\",\"state\":\"%s\","
-        "\"joined\":%s,\"nextSeq\":%u,\"uptimeS\":%lu,\"transport\":\"%s\"}",
+        "\"joined\":%s,\"nextSeq\":%u,\"uptimeS\":%lu,\"transport\":\"%s\","
+        "\"memberFilterEnabled\":%s,\"allowedMemberCount\":%u,\"allowedMembers\":[",
         node->cfg.team_id, node->cfg.self_id, node->cfg.leader_id, sle_team_web_role_name((uint8_t)node->cfg.role),
         sle_team_web_state_name((uint8_t)node->state), node->joined != 0U ? "true" : "false", node->next_seq,
-        (unsigned long)uptime_s, transport != NULL ? transport : "ws63-http");
+        (unsigned long)uptime_s, transport != NULL ? transport : "ws63-http",
+        node->cfg.member_filter_enabled != 0U ? "true" : "false", node->cfg.allowed_member_count);
+    for (i = 0U; i < node->cfg.allowed_member_count && i < SLE_TEAM_MAX_MEMBERS; i++) {
+        json_append(&writer, "%s%u", i == 0U ? "" : ",", node->cfg.allowed_member_ids[i]);
+    }
+    json_append(&writer, "]}");
     return writer.truncated != 0 ? SLE_TEAM_ERR_BUF : (int)writer.used;
 }
 

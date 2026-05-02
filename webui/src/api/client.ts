@@ -1,10 +1,11 @@
-import type { SendCommand, TeamEvent, TeamNode, TeamStatus } from "../protocol/types";
+import type { AllowMembersCommand, SendCommand, TeamEvent, TeamNode, TeamStatus } from "../protocol/types";
 
 export interface TeamApi {
   getStatus(): Promise<TeamStatus>;
   getNodes(): Promise<TeamNode[]>;
   getEvents(): Promise<TeamEvent[]>;
   send(command: SendCommand): Promise<TeamEvent>;
+  configureAllow(command: AllowMembersCommand): Promise<TeamEvent>;
 }
 
 export type ConnectionMode = "wifi" | "serial";
@@ -80,6 +81,10 @@ export class HttpTeamApi implements TeamApi {
       body: JSON.stringify(command),
     });
   }
+
+  configureAllow(_command: AllowMembersCommand): Promise<TeamEvent> {
+    return Promise.reject(new Error("WiFi HTTP 暂未提供配置写入接口，请切到串口模式执行成员准入配置"));
+  }
 }
 
 type SerialPortLike = {
@@ -112,6 +117,7 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
   );
   if (!match) return undefined;
   const state = Number(match[5]);
+  const allowMatch = line.match(/allow=(all|only)\s+allow_count=(\d+)/);
   return {
     teamId: Number(match[1]),
     selfId: Number(match[2]),
@@ -122,6 +128,9 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
     nextSeq: Number(match[7]),
     uptimeS: 0,
     transport: "serial",
+    memberFilterEnabled: allowMatch?.[1] === "only",
+    allowedMemberCount: allowMatch ? Number(allowMatch[2]) : 0,
+    allowedMembers: [],
   };
 }
 
@@ -153,6 +162,19 @@ function sendCommandToCli(command: SendCommand): string {
     return `alert ${command.dstId} ${command.lostMemberId ?? 0} ${command.reason ?? 0} ${command.latitudeE6 ?? 0} ${command.longitudeE6 ?? 0} ${command.lastReportS ?? 0}`;
   }
   return `config ${command.dstId}`;
+}
+
+function allowCommandToCli(command: AllowMembersCommand): string {
+  if (command.mode === "all") {
+    return "allow all";
+  }
+  const ids = (command.memberIds ?? []).map((id) => Math.trunc(id)).filter((id) => id >= 1 && id <= 254);
+  if (command.mode === "only") {
+    if (ids.length === 0) throw new Error("allow only 需要至少一个 member id");
+    return `allow only ${ids.join(" ")}`;
+  }
+  if (ids.length !== 1) throw new Error("allow add/del 每次只处理一个 member id");
+  return `allow ${command.mode} ${ids[0]}`;
 }
 
 function appTypeFromText(text: string): TeamEvent["type"] {
@@ -266,6 +288,14 @@ export class SerialTeamApi implements TeamApi {
     const lines = await this.runCli("state");
     const status = lines.map(cliStateToStatus).find(Boolean);
     if (!status) throw new Error("串口没有返回 state，确认板子串口 CLI 已启动");
+    if (status.memberFilterEnabled) {
+      const allowLines = await this.runCli("allow");
+      status.allowedMembers = allowLines
+        .map((line) => line.match(/allow member=(\d+)/)?.[1])
+        .filter((value): value is string => value !== undefined)
+        .map(Number);
+      status.allowedMemberCount = status.allowedMembers.length;
+    }
     return status;
   }
 
@@ -285,6 +315,13 @@ export class SerialTeamApi implements TeamApi {
     const cli = sendCommandToCli(command);
     await this.runCli(cli, 700);
     const latest = [...this.lastLines].reverse().find((line) => line.includes("[sle-tx-")) ?? `[cli-tx] ${cli}`;
+    return serialLineToEvent(latest, Date.now());
+  }
+
+  async configureAllow(command: AllowMembersCommand): Promise<TeamEvent> {
+    const cli = allowCommandToCli(command);
+    await this.runCli(cli, 500);
+    const latest = [...this.lastLines].reverse().find((line) => line.includes("allow ")) ?? `[cli-tx] ${cli}`;
     return serialLineToEvent(latest, Date.now());
   }
 }

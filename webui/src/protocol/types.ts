@@ -24,6 +24,9 @@ export interface TeamStatus {
   nextSeq: number;
   uptimeS: number;
   transport: "ws63-http" | "hosted-http" | "serial";
+  memberFilterEnabled?: boolean;
+  allowedMemberCount?: number;
+  allowedMembers?: number[];
 }
 
 export interface TeamNode {
@@ -95,4 +98,9 @@ export interface SendCommand {
   lostMemberId?: number;
   reason?: number;
   lastReportS?: number;
+}
+
+export interface AllowMembersCommand {
+  mode: "all" | "only" | "add" | "del";
+  memberIds?: number[];
 }

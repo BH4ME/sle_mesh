@@ -2,7 +2,7 @@
 
 当前版本：
 
-- `v1.2.2`
+- `v1.2.4`
 
 ## 版本目录
 
@@ -12,9 +12,9 @@
 
 当前版本目录：
 
-- [versions/v1.2.2/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2)
+- [versions/v1.2.4/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.4)
 
-## v1.2.2 内容
+## v1.2.4 内容
 
 当前版本包含：
 
@@ -24,6 +24,8 @@
 - `HELLO / HEARTBEAT / POS_REPORT / ALERT / CONFIG / ACK`
 - `leader/member` 组网状态机
 - 串口 CLI 控制
+- leader 成员准入白名单
+- member 侧 leader 源 ID 过滤
 
 ## 版本规则建议
 
@@ -34,7 +36,7 @@
 
 ## 当前兼容性说明
 
-`v1.2.2` 不保证与 MeshCore 官方节点直接互通。
+`v1.2.4` 不保证与 MeshCore 官方节点直接互通。
 
 它采用的是：
 

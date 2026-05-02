@@ -329,6 +329,12 @@ h2 {
   padding: 16px;
 }
 
+.allow-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
 .connection-form.compact {
   grid-template-columns: 260px minmax(0, 1fr) auto;
   align-items: end;
@@ -352,7 +358,7 @@ h2 {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px;
   padding: 4px;
   background: #eef4ee;
@@ -540,6 +546,32 @@ pre {
   padding: 16px;
 }
 
+.allow-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+
+.allow-summary div {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px;
+  background: #f7faf6;
+  border: 1px solid #e4eae2;
+  border-radius: 8px;
+}
+
+.allow-summary span {
+  color: #637269;
+  font-size: 12px;
+}
+
+.allow-summary strong {
+  overflow-wrap: anywhere;
+}
+
 .deploy-grid div {
   display: grid;
   gap: 10px;
@@ -586,6 +618,7 @@ code {
   .summary-grid,
   .two-column,
   .deploy-grid,
+  .allow-summary,
   .connection-form.compact {
     grid-template-columns: 1fr;
   }

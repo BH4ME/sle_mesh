@@ -126,6 +126,111 @@ static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
     }
 }
 
+uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t i;
+
+    if (node == NULL) {
+        return 0U;
+    }
+    if (node->cfg.role != SLE_TEAM_ROLE_LEADER || node->cfg.member_filter_enabled == 0U) {
+        return 1U;
+    }
+    for (i = 0U; i < node->cfg.allowed_member_count && i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->cfg.allowed_member_ids[i] == member_id) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+int sle_team_node_allow_all_members(sle_team_node_t *node)
+{
+    if (node == NULL) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    node->cfg.member_filter_enabled = 0U;
+    node->cfg.allowed_member_count = 0U;
+    (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
+    return SLE_TEAM_OK;
+}
+
+int sle_team_node_set_allowed_members(sle_team_node_t *node, const uint8_t *member_ids, uint8_t count)
+{
+    uint8_t i;
+    uint8_t j;
+    uint8_t unique_ids[SLE_TEAM_MAX_MEMBERS];
+    uint8_t unique_count = 0U;
+
+    if (node == NULL || (count > 0U && member_ids == NULL) || count > SLE_TEAM_MAX_MEMBERS) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    for (i = 0U; i < count; i++) {
+        if (member_ids[i] == 0U || member_ids[i] == SLE_TEAM_BROADCAST_ID) {
+            return SLE_TEAM_ERR_ARG;
+        }
+        for (j = 0U; j < unique_count; j++) {
+            if (unique_ids[j] == member_ids[i]) {
+                break;
+            }
+        }
+        if (j == unique_count) {
+            unique_ids[unique_count++] = member_ids[i];
+        }
+    }
+    node->cfg.member_filter_enabled = 1U;
+    node->cfg.allowed_member_count = unique_count;
+    (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
+    (void)memcpy(node->cfg.allowed_member_ids, unique_ids, unique_count);
+    return SLE_TEAM_OK;
+}
+
+int sle_team_node_add_allowed_member(sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t i;
+
+    if (node == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    if (node->cfg.member_filter_enabled == 0U) {
+        node->cfg.member_filter_enabled = 1U;
+        node->cfg.allowed_member_count = 0U;
+        (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
+    }
+    for (i = 0U; i < node->cfg.allowed_member_count; i++) {
+        if (node->cfg.allowed_member_ids[i] == member_id) {
+            return SLE_TEAM_OK;
+        }
+    }
+    if (node->cfg.allowed_member_count >= SLE_TEAM_MAX_MEMBERS) {
+        return SLE_TEAM_ERR_BUF;
+    }
+    node->cfg.allowed_member_ids[node->cfg.allowed_member_count++] = member_id;
+    return SLE_TEAM_OK;
+}
+
+int sle_team_node_remove_allowed_member(sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t i;
+    uint8_t j;
+
+    if (node == NULL) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    for (i = 0U; i < node->cfg.allowed_member_count; i++) {
+        if (node->cfg.allowed_member_ids[i] != member_id) {
+            continue;
+        }
+        for (j = i; j + 1U < node->cfg.allowed_member_count; j++) {
+            node->cfg.allowed_member_ids[j] = node->cfg.allowed_member_ids[j + 1U];
+        }
+        node->cfg.allowed_member_count--;
+        node->cfg.allowed_member_ids[node->cfg.allowed_member_count] = 0U;
+        return SLE_TEAM_OK;
+    }
+    return SLE_TEAM_OK;
+}
+
 static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
     const sle_team_hello_body_t *hello;
@@ -136,6 +241,10 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     }
 
     hello = (const sle_team_hello_body_t *)app->body;
+    if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
+        sle_team_log(node, "member rejected by allowlist");
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
     member = sle_team_get_member_slot(node, app->src_id, 1U);
     if (member == NULL) {
         return SLE_TEAM_ERR_BUF;
@@ -199,6 +308,10 @@ static int sle_team_handle_heartbeat(sle_team_node_t *node, const sle_team_app_p
     }
 
     hb = (const sle_team_heartbeat_body_t *)app->body;
+    if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
+        sle_team_log(node, "heartbeat rejected by allowlist");
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
     member = sle_team_get_member_slot(node, app->src_id, 1U);
     if (member == NULL) {
         return SLE_TEAM_ERR_BUF;
@@ -222,6 +335,10 @@ static int sle_team_handle_position(sle_team_node_t *node, const sle_team_app_pa
     }
 
     pos = (const sle_team_pos_body_t *)app->body;
+    if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
+        sle_team_log(node, "position rejected by allowlist");
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
     member = sle_team_get_member_slot(node, app->src_id, 1U);
     if (member == NULL) {
         return SLE_TEAM_ERR_BUF;
@@ -336,6 +453,10 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (app_packet.dst_id != node->cfg.self_id && app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && app_packet.src_id != node->cfg.leader_id) {
+        sle_team_log(node, "packet rejected by leader id");
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
 
