@@ -12,6 +12,12 @@
 #include "tcxo.h"
 #include "uart.h"
 
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+#include "lwip/netifapi.h"
+#include "wifi_hotspot.h"
+#include "wifi_hotspot_config.h"
+#endif
+
 #include "sle_errcode.h"
 #if defined(CONFIG_SLE_TEAM_NODE_IS_LEADER)
 #include "sle_device_discovery.h"
@@ -74,6 +80,24 @@
 #define CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S 10
 #endif
 
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+#ifndef CONFIG_SLE_TEAM_WIFI_AP_SSID
+#define CONFIG_SLE_TEAM_WIFI_AP_SSID "SLE-TEAM-WS63"
+#endif
+
+#ifndef CONFIG_SLE_TEAM_WIFI_AP_PSK
+#define CONFIG_SLE_TEAM_WIFI_AP_PSK "123456789"
+#endif
+
+#ifndef CONFIG_SLE_TEAM_WIFI_AP_CHANNEL
+#define CONFIG_SLE_TEAM_WIFI_AP_CHANNEL 6
+#endif
+
+#ifndef CONFIG_SLE_TEAM_WIFI_AP_IP_LAST
+#define CONFIG_SLE_TEAM_WIFI_AP_IP_LAST 1
+#endif
+#endif
+
 #define SLE_TEAM_APP_TASK_STACK_SIZE 0x1800
 #define SLE_TEAM_APP_TASK_PRIO 28
 #define SLE_TEAM_UART_BAUDRATE 115200
@@ -81,6 +105,10 @@
 #define SLE_TEAM_CLI_LINE_SIZE 192
 #define SLE_TEAM_CLI_QUEUE_LEN 4
 #define SLE_TEAM_CLI_QUEUE_TIMEOUT_MS 200
+
+#define SLE_TEAM_WIFI_AP_TASK_STACK_SIZE 0x1000
+#define SLE_TEAM_WIFI_AP_TASK_PRIO 13
+#define SLE_TEAM_WIFI_IFNAME_MAX_SIZE 16
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -107,6 +135,13 @@ static void team_print(const char *text)
 {
     osal_printk("[team] %s\r\n", text);
 }
+
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+static void team_wifi_print(const char *text)
+{
+    osal_printk("[team-wifi] %s\r\n", text);
+}
+#endif
 
 static uint32_t team_now_s(void *user_ctx)
 {
@@ -149,6 +184,96 @@ static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
     unused(user_ctx);
     osal_printk("[team] alert member=%u reason=%u\r\n", member_id, reason);
 }
+
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+static int team_wifi_ap_start(void)
+{
+    softap_config_stru ap_config = {0};
+    softap_config_advance_stru advance_config = {0};
+    char ifname[SLE_TEAM_WIFI_IFNAME_MAX_SIZE + 1] = "ap0";
+    struct netif *netif_p = NULL;
+    ip4_addr_t gw;
+    ip4_addr_t ipaddr;
+    ip4_addr_t netmask;
+
+    IP4_ADDR(&ipaddr, 192, 168, 43, CONFIG_SLE_TEAM_WIFI_AP_IP_LAST);
+    IP4_ADDR(&netmask, 255, 255, 255, 0);
+    IP4_ADDR(&gw, 192, 168, 43, CONFIG_SLE_TEAM_WIFI_AP_IP_LAST);
+
+    (void)snprintf((char *)ap_config.ssid, sizeof(ap_config.ssid), "%s", CONFIG_SLE_TEAM_WIFI_AP_SSID);
+    (void)snprintf((char *)ap_config.pre_shared_key, sizeof(ap_config.pre_shared_key), "%s",
+        CONFIG_SLE_TEAM_WIFI_AP_PSK);
+    ap_config.security_type = 3;
+    ap_config.channel_num = CONFIG_SLE_TEAM_WIFI_AP_CHANNEL;
+    ap_config.wifi_psk_type = 0;
+
+    advance_config.beacon_interval = 100;
+    advance_config.dtim_period = 2;
+    advance_config.gi = 0;
+    advance_config.group_rekey = 86400;
+    advance_config.protocol_mode = 4;
+    advance_config.hidden_ssid_flag = 1;
+
+    if (wifi_set_softap_config_advance(&advance_config) != 0) {
+        team_wifi_print("softap advance config failed");
+        return -1;
+    }
+    if (wifi_softap_enable(&ap_config) != 0) {
+        team_wifi_print("softap enable failed");
+        return -1;
+    }
+
+    netif_p = netif_find(ifname);
+    if (netif_p == NULL) {
+        team_wifi_print("softap netif ap0 not found");
+        (void)wifi_softap_disable();
+        return -1;
+    }
+    if (netifapi_netif_set_addr(netif_p, &ipaddr, &netmask, &gw) != 0) {
+        team_wifi_print("softap set ip failed");
+        (void)wifi_softap_disable();
+        return -1;
+    }
+    if (netifapi_dhcps_start(netif_p, NULL, 0) != 0) {
+        team_wifi_print("softap dhcp start failed");
+        (void)wifi_softap_disable();
+        return -1;
+    }
+
+    osal_printk("[team-wifi] softap started ssid=%s ip=192.168.43.%u channel=%u\r\n",
+        CONFIG_SLE_TEAM_WIFI_AP_SSID,
+        CONFIG_SLE_TEAM_WIFI_AP_IP_LAST,
+        CONFIG_SLE_TEAM_WIFI_AP_CHANNEL);
+    return 0;
+}
+
+static void *team_wifi_ap_task(const char *arg)
+{
+    unused(arg);
+
+    while (wifi_is_wifi_inited() == 0) {
+        osal_msleep(100);
+    }
+    team_wifi_print("wifi init ready");
+    if (team_wifi_ap_start() != 0) {
+        team_wifi_print("softap start failed");
+    }
+    return NULL;
+}
+
+static void team_wifi_ap_entry(void)
+{
+    osal_task *task = NULL;
+
+    osal_kthread_lock();
+    task = osal_kthread_create((osal_kthread_handler)team_wifi_ap_task, NULL, "TeamWifiApTask",
+        SLE_TEAM_WIFI_AP_TASK_STACK_SIZE);
+    if (task != NULL) {
+        osal_kthread_set_priority(task, SLE_TEAM_WIFI_AP_TASK_PRIO);
+    }
+    osal_kthread_unlock();
+}
+#endif
 
 static void team_uart_pins_init(void)
 {
@@ -407,6 +532,10 @@ static void *team_network_task(const char *arg)
 static void team_network_entry(void)
 {
     osal_task *task = NULL;
+
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
+    team_wifi_ap_entry();
+#endif
 
     osal_kthread_lock();
     task = osal_kthread_create((osal_kthread_handler)team_network_task, NULL, "TeamNetworkTask",

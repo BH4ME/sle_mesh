@@ -63,6 +63,36 @@ config SLE_TEAM_HEARTBEAT_TIMEOUT_S
     default 10
     range 1 300
 
+config SLE_TEAM_WIFI_AP_ENABLE
+    bool "Enable WiFi SoftAP coexistence smoke test"
+    default n
+    help
+        Start a local WiFi SoftAP while the SLE team network is running.
+        This is only the coexistence smoke test; HTTP/WebUI comes after
+        SLE traffic is verified to keep working.
+
+config SLE_TEAM_WIFI_AP_SSID
+    string "WiFi SoftAP SSID"
+    default "SLE-TEAM-WS63"
+    depends on SLE_TEAM_WIFI_AP_ENABLE
+
+config SLE_TEAM_WIFI_AP_PSK
+    string "WiFi SoftAP password"
+    default "123456789"
+    depends on SLE_TEAM_WIFI_AP_ENABLE
+
+config SLE_TEAM_WIFI_AP_CHANNEL
+    int "WiFi SoftAP channel"
+    default 6
+    range 1 13
+    depends on SLE_TEAM_WIFI_AP_ENABLE
+
+config SLE_TEAM_WIFI_AP_IP_LAST
+    int "WiFi SoftAP IP last octet"
+    default 1
+    range 1 254
+    depends on SLE_TEAM_WIFI_AP_ENABLE
+
 config SUPPORT_SLE_PERIPHERAL
     bool
     default y if SLE_TEAM_NODE_IS_LEADER
