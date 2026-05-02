@@ -57,9 +57,9 @@
 
 手机调试时要注意：WS63 SoftAP 没有外网，iOS/部分浏览器会自动切回蜂窝数据，右上角如果显示 `5G` 而不是 WiFi 图标，页面请求会出现 `Network request failed`。这不是 WS63 HTTP 服务必然崩溃，而是手机没有稳定走 WS63 的 WiFi 路由。
 
-`v1.2.3` 的板端页面已经做了抗抖处理：接口失败时保留最后一次成功数据，不再把瞬时失败刷成整页红色错误。当前页面采用手动刷新为主：打开页面后会拉一次 status，之后用页面里的 `status`、`nodes`、`events` 按钮刷新数据。Nodes/Events 为空数组 `[]` 表示 leader 当前还没有 member 加入。
+`v1.2.3` 的当前可用基线是 `ssr=v3`：板端直接渲染 `/`、`/nodes`、`/events` 三个 HTML 页面，并使用带 `Content-Length` 的完整 HTTP 响应，避免 iOS/微信内置浏览器对流式响应一闪而过。页面底部会显示 `page=... ssr=v3`，用于现场确认固件版本。
 
-当前现场基线只确认 `status` 正常；`nodes/events` 仍不稳定，不能标记为通过。后续要继续修 nodes/events 页面请求和 member 入网数据展示。
+当前现场已经确认 `status`、`nodes`、`events` 页面均可打开。Nodes/Events 显示空数组 `[]` 表示 leader 当前还没有 member 加入，不代表页面失败。JSON API 仍保留给上位机或调试使用。
 
 如果刷新页面时偶尔失败，优先看两点：
 

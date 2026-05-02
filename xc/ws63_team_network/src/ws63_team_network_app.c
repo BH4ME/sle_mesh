@@ -2,6 +2,7 @@
 #include "sle_team_web_api.h"
 
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -123,6 +124,7 @@
 #define SLE_TEAM_HTTP_BACKLOG 2
 #define SLE_TEAM_HTTP_REQ_BUF_SIZE 192
 #define SLE_TEAM_HTTP_JSON_BUF_SIZE 1024
+#define SLE_TEAM_HTTP_HTML_BUF_SIZE 3072
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -144,6 +146,7 @@ static sle_team_web_event_log_t g_team_events;
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 static char g_team_http_req_buf[SLE_TEAM_HTTP_REQ_BUF_SIZE];
 static char g_team_http_json_buf[SLE_TEAM_HTTP_JSON_BUF_SIZE];
+static char g_team_http_html_buf[SLE_TEAM_HTTP_HTML_BUF_SIZE];
 static volatile int g_team_http_listen_fd = -1;
 static volatile int g_team_http_last_errno = 0;
 static volatile uint32_t g_team_http_accept_count = 0;
@@ -389,44 +392,50 @@ static void team_http_send_response(int fd, const char *status, const char *cont
     }
 }
 
-static void team_http_send_response_chunks(int fd, const char *status, const char *content_type,
-    const char * const *chunks, size_t chunk_count)
+static void team_http_append_str(char *buf, size_t buf_size, size_t *used, const char *text)
 {
-    char header[192];
-    size_t body_len = 0U;
-    int header_len;
-    size_t i;
+    size_t text_len;
 
-    for (i = 0; i < chunk_count; i++) {
-        body_len += strlen(chunks[i]);
+    if (*used >= buf_size) {
+        return;
     }
 
-    header_len = snprintf(header, sizeof(header),
-        "HTTP/1.1 %s\r\n"
-        "Content-Type: %s\r\n"
-        "Content-Length: %u\r\n"
-        "Connection: close\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "Cache-Control: no-store\r\n"
-        "\r\n",
-        status, content_type, (unsigned int)body_len);
-    if (header_len > 0) {
-        int send_ret = team_http_send_all(fd, header, (size_t)header_len);
-        osal_printk("[team-wifi] http header sent fd=%d len=%d ret=%d\r\n", fd, header_len, send_ret);
+    text_len = strlen(text);
+    if (text_len >= buf_size - *used) {
+        text_len = buf_size - *used - 1U;
     }
 
-    for (i = 0; i < chunk_count; i++) {
-        size_t len = strlen(chunks[i]);
-        int send_ret = team_http_send_all(fd, chunks[i], len);
-        osal_printk("[team-wifi] http chunk sent fd=%d idx=%u len=%u ret=%d\r\n",
-            fd, (unsigned int)i, (unsigned int)len, send_ret);
-        if (send_ret != 0) {
-            break;
-        }
+    if (text_len > 0U) {
+        (void)memcpy_s(buf + *used, buf_size - *used, text, text_len);
+        *used += text_len;
+        buf[*used] = '\0';
     }
 }
 
-static void team_http_send_console(int fd)
+static void team_http_append_fmt(char *buf, size_t buf_size, size_t *used, const char *fmt, ...)
+{
+    va_list ap;
+    int len;
+
+    if (*used >= buf_size) {
+        return;
+    }
+
+    va_start(ap, fmt);
+    len = vsnprintf(buf + *used, buf_size - *used, fmt, ap);
+    va_end(ap);
+    if (len <= 0) {
+        return;
+    }
+    if (len >= (int)(buf_size - *used)) {
+        *used = buf_size - 1U;
+        buf[*used] = '\0';
+        return;
+    }
+    *used += (size_t)len;
+}
+
+static void team_http_append_html_shell_start(char *buf, size_t buf_size, size_t *used, const char *active)
 {
     static const char * const chunks[] = {
         "<!doctype html><html><head><meta charset=\"utf-8\">"
@@ -440,37 +449,130 @@ static void team_http_send_console(int fd)
         ".row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #edf0f3}",
         ".row:last-child{border-bottom:0}.k{color:#68707d}.v{font-weight:600;text-align:right;word-break:break-word}"
         "pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;line-height:1.45}",
-        ".ok{color:#087443}.bad{color:#b42318}.warn{color:#9a5b00}.bar{display:flex;gap:8px;margin-top:10px}"
-        "button{font:inherit;border:1px solid #c9d0da;border-radius:6px;background:white;color:#182230;padding:8px 10px}",
+        ".ok{color:#087443}.bad{color:#b42318}.warn{color:#9a5b00}.bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}"
+        ".tag{font-size:12px;color:#68707d;margin-top:8px}"
+        "a{font:inherit;border:1px solid #c9d0da;border-radius:6px;background:white;color:#182230;padding:8px 10px;text-decoration:none}"
+        "a.on{background:#182230;color:#fff;border-color:#182230}",
         "</style></head><body><header><h1>SLE Team WS63</h1>"
-        "<div class=\"sub\">192.168.43.1 local console</div></header><main>",
-        "<section class=\"card\" id=\"status\"><div class=\"row\"><span class=\"k\">HTTP</span>"
-        "<span class=\"v\">loading</span></div></section>",
-        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Nodes</h2>"
-        "<pre id=\"nodes\">loading</pre></section>",
-        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Events</h2>"
-        "<pre id=\"events\">loading</pre>",
-        "<div class=\"bar\"><button onclick=\"loadStatus()\">status</button><button onclick=\"loadNodes()\">nodes</button>"
-        "<button onclick=\"loadEvents()\">events</button></div></section></main><script>",
-        "function esc(x){return String(x).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}"
-        "function row(k,v,c){return '<div class=\"row\"><span class=\"k\">'+k+'</span><span class=\"v '+(c||'')+'\">'+esc(v)+'</span></div>'}",
-        "async function get(p){let r=await fetch(p+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error(r.status);return r.json()}"
-        "var lastStatus='',lastNodes='',lastEvents='';"
-        "async function loadStatus(){try{let s=await get('/api/status');",
-        "document.getElementById('status').innerHTML=row('State',s.state,s.state==='online'?'ok':'bad')+"
-        "row('Role',s.role)+row('Self',s.selfId)+row('Leader',s.leaderId)+row('Joined',s.joined)+",
-        "row('Seq',s.nextSeq)+row('Uptime',s.uptimeS+'s')+row('Transport',s.transport)+row('Link','ok','ok');"
-        "lastStatus=document.getElementById('status').innerHTML}",
-        "catch(e){document.getElementById('status').innerHTML=lastStatus||row('HTTP','tap status','warn')}}",
-        "async function loadNodes(){try{lastNodes=JSON.stringify(await get('/api/nodes'),null,2);document.getElementById('nodes').textContent=lastNodes}"
-        "catch(e){document.getElementById('nodes').textContent=lastNodes||'tap nodes'}}",
-        "async function loadEvents(){try{lastEvents=JSON.stringify(await get('/api/events'),null,2);document.getElementById('events').textContent=lastEvents}"
-        "catch(e){document.getElementById('events').textContent=lastEvents||'tap events'}}",
-        "loadStatus();</script></body></html>"
+        "<div class=\"sub\">192.168.43.1 local console</div></header><main>"
     };
+    size_t i;
 
-    team_http_send_response_chunks(fd, "200 OK", "text/html; charset=utf-8",
-        chunks, sizeof(chunks) / sizeof(chunks[0]));
+    buf[0] = '\0';
+    *used = 0U;
+    for (i = 0; i < sizeof(chunks) / sizeof(chunks[0]); i++) {
+        team_http_append_str(buf, buf_size, used, chunks[i]);
+    }
+    team_http_append_fmt(buf, buf_size, used,
+        "<div class=\"bar\"><a class=\"%s\" href=\"/\">status</a><a class=\"%s\" href=\"/nodes\">nodes</a>"
+        "<a class=\"%s\" href=\"/events\">events</a><a href=\"/api/status\">json</a></div>",
+        strcmp(active, "status") == 0 ? "on" : "",
+        strcmp(active, "nodes") == 0 ? "on" : "",
+        strcmp(active, "events") == 0 ? "on" : "");
+    team_http_append_fmt(buf, buf_size, used, "<div class=\"tag\">page=%s ssr=v3</div>", active);
+}
+
+static void team_http_append_html_end(char *buf, size_t buf_size, size_t *used)
+{
+    team_http_append_str(buf, buf_size, used, "</main></body></html>");
+}
+
+static void team_http_send_status_page(int fd)
+{
+    size_t used;
+
+    team_http_append_html_shell_start(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "status");
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "<section class=\"card\">");
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">State</span><span class=\"v ok\">%s</span></div>",
+        sle_team_web_state_name((uint8_t)g_team_node.state));
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Role</span><span class=\"v\">%s</span></div>",
+        sle_team_web_role_name((uint8_t)g_team_node.cfg.role));
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Self</span><span class=\"v\">%u</span></div>",
+        g_team_node.cfg.self_id);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Leader</span><span class=\"v\">%u</span></div>",
+        g_team_node.cfg.leader_id);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Joined</span><span class=\"v\">%s</span></div>",
+        g_team_node.joined != 0U ? "true" : "false");
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Seq</span><span class=\"v\">%u</span></div>",
+        g_team_node.next_seq);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Uptime</span><span class=\"v\">%lus</span></div>",
+        (unsigned long)team_now_s(NULL));
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Transport</span><span class=\"v\">ws63-softap</span></div>"
+        "<div class=\"row\"><span class=\"k\">Link</span><span class=\"v ok\">ok</span></div>"
+        "</section>");
+    team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
+    team_http_send_response(fd, "200 OK", "text/html; charset=utf-8", g_team_http_html_buf);
+}
+
+static void team_http_send_nodes_page(int fd)
+{
+    uint8_t i;
+    uint8_t wrote = 0U;
+    size_t used;
+
+    team_http_append_html_shell_start(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "nodes");
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Nodes</h2>");
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &g_team_node.members[i];
+        if (member->online == 0U) {
+            continue;
+        }
+        wrote = 1U;
+        team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<div class=\"row\"><span class=\"k\">Node</span><span class=\"v\">%u</span></div>",
+            member->member_id);
+        team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<div class=\"row\"><span class=\"k\">Battery</span><span class=\"v\">%u%%</span></div>",
+            member->battery_percent);
+        team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<div class=\"row\"><span class=\"k\">RSSI</span><span class=\"v\">%d</span></div>",
+            member->last_rssi_dbm);
+        team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<div class=\"row\"><span class=\"k\">Seq</span><span class=\"v\">%u</span></div>",
+            member->last_seq);
+    }
+    if (wrote == 0U) {
+        team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<pre>[]\nNo member joined leader yet.</pre>");
+    }
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "</section>");
+    team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
+    team_http_send_response(fd, "200 OK", "text/html; charset=utf-8", g_team_http_html_buf);
+}
+
+static void team_http_send_events_page(int fd)
+{
+    uint8_t i;
+    size_t used;
+
+    team_http_append_html_shell_start(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "events");
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Events</h2>");
+    if (g_team_events.count == 0U) {
+        team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<pre>[]\nNo team events yet.</pre>");
+    }
+    for (i = 0U; i < g_team_events.count; i++) {
+        uint8_t index = (uint8_t)((g_team_events.head + SLE_TEAM_WEB_EVENT_COUNT - 1U - i) %
+            SLE_TEAM_WEB_EVENT_COUNT);
+        const sle_team_web_event_t *event = &g_team_events.events[index];
+        team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+            "<div class=\"row\"><span class=\"k\">%lu %s</span><span class=\"v\">%u-%u #%u</span></div>",
+            (unsigned long)event->time_s, sle_team_web_msg_type_name(event->app_msg_type),
+            event->src_id, event->dst_id, event->seq);
+    }
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "</section>");
+    team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
+    team_http_send_response(fd, "200 OK", "text/html; charset=utf-8", g_team_http_html_buf);
 }
 
 static void team_http_handle_client(int fd)
@@ -487,22 +589,33 @@ static void team_http_handle_client(int fd)
     osal_printk("[team-wifi] http recv fd=%d len=%d line=%s\r\n", fd, ret, g_team_http_req_buf);
 
     if (strncmp(g_team_http_req_buf, "GET /api/status", 15) == 0) {
+        osal_printk("[team-wifi] http route api=status\r\n");
         ret = sle_team_web_write_status_json(&g_team_node, team_now_s(NULL), "ws63-softap", g_team_http_json_buf,
             sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
             ret < 0 ? "{\"error\":\"status\"}" : g_team_http_json_buf);
     } else if (strncmp(g_team_http_req_buf, "GET /api/nodes", 14) == 0) {
+        osal_printk("[team-wifi] http route api=nodes\r\n");
         ret = sle_team_web_write_nodes_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
             ret < 0 ? "{\"error\":\"nodes\"}" : g_team_http_json_buf);
     } else if (strncmp(g_team_http_req_buf, "GET /api/events", 15) == 0) {
+        osal_printk("[team-wifi] http route api=events\r\n");
         ret = sle_team_web_write_events_json(&g_team_events, g_team_http_json_buf, sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
             ret < 0 ? "{\"error\":\"events\"}" : g_team_http_json_buf);
+    } else if (strncmp(g_team_http_req_buf, "GET /nodes", 10) == 0) {
+        osal_printk("[team-wifi] http route page=nodes\r\n");
+        team_http_send_nodes_page(fd);
+    } else if (strncmp(g_team_http_req_buf, "GET /events", 11) == 0) {
+        osal_printk("[team-wifi] http route page=events\r\n");
+        team_http_send_events_page(fd);
     } else if (strncmp(g_team_http_req_buf, "GET /favicon.ico", 16) == 0) {
+        osal_printk("[team-wifi] http route favicon\r\n");
         team_http_send_response(fd, "204 No Content", "text/plain", "");
     } else {
-        team_http_send_console(fd);
+        osal_printk("[team-wifi] http route page=status\r\n");
+        team_http_send_status_page(fd);
     }
 }
 
