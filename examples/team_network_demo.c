@@ -125,6 +125,41 @@ int main(void)
         assert(sle_team_node_find_member(&leader, 2U) != NULL);
     }
 
+    (void)sle_team_node_allow_all_members(&leader);
+    (void)memset(leader.members, 0, sizeof(leader.members));
+    (void)memset(leader.pending_members, 0, sizeof(leader.pending_members));
+    member.joined = 0U;
+    member.state = SLE_TEAM_NET_DISCOVERING;
+    member.last_hello_s = 0U;
+    leader_rt.last_tx_len = 0U;
+    member_rt.last_tx_len = 0U;
+
+    assert(sle_team_node_pairing_start(&leader) == SLE_TEAM_OK);
+    member_rt.now_s = 9U;
+    leader_rt.now_s = 9U;
+    sle_team_node_tick(&member);
+    relay_last_packet(&member_rt, &leader);
+    assert(sle_team_node_find_member(&leader, 2U) == NULL);
+    assert(leader.pending_members[0].active != 0U);
+    assert(leader.pending_members[0].member_id == 2U);
+    assert(member.joined == 0U);
+
+    assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.joined != 0U);
+    assert(leader.cfg.member_filter_enabled != 0U);
+    assert(sle_team_node_is_member_allowed(&leader, 2U) != 0U);
+
+    assert(sle_team_node_member_leave(&member) == SLE_TEAM_OK);
+    assert(member.joined == 0U);
+    assert(member.state == SLE_TEAM_NET_DISCOVERING);
+    assert(sle_team_node_member_select_leader(&member, 4U, 1U, 0x22U) == SLE_TEAM_OK);
+    assert(member.cfg.team_id == 4U);
+    assert(member.cfg.leader_id == 1U);
+    assert(member.cfg.channel_hash == 0x22U);
+    assert(member.joined == 0U);
+
     member_rt.now_s = 3U;
     sle_team_node_tick(&member);
     relay_last_packet(&member_rt, &leader);

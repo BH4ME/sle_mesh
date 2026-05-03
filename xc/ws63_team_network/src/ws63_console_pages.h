@@ -8,7 +8,7 @@
 #define WS63_CONSOLE_BOARD_SUBTITLE "192.168.43.1 local console"
 #define WS63_CONSOLE_HOSTED_URL "https://sleweb.mecho.top"
 #define WS63_CONSOLE_DEFAULT_DEVICE_API "http://192.168.43.1"
-#define WS63_CONSOLE_BOARD_VERSION "ssr=v3"
+#define WS63_CONSOLE_BOARD_VERSION "ssr=v5"
 
 #define WS63_CONSOLE_TAB_STATUS_LABEL "status"
 #define WS63_CONSOLE_TAB_STATUS_HREF "/"

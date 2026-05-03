@@ -117,6 +117,7 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
   );
   if (!match) return undefined;
   const state = Number(match[5]);
+  const pairingMatch = line.match(/pairing=(\d+)/);
   const allowMatch = line.match(/allow=(all|only)\s+allow_count=(\d+)/);
   return {
     teamId: Number(match[1]),
@@ -128,6 +129,7 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
     nextSeq: Number(match[7]),
     uptimeS: 0,
     transport: "serial",
+    pairingEnabled: pairingMatch ? Number(pairingMatch[1]) !== 0 : undefined,
     memberFilterEnabled: allowMatch?.[1] === "only",
     allowedMemberCount: allowMatch ? Number(allowMatch[2]) : 0,
     allowedMembers: [],
@@ -145,7 +147,7 @@ function cliMemberToNode(line: string): TeamNode | undefined {
     online: Number(match[3]) !== 0,
     batteryPercent: Number(match[4]),
     fixStatus: Number(match[5]),
-    lastRssiDbm: Number(match[6]),
+    lastRssiDbm: Number(match[6]) === 127 ? null : Number(match[6]),
     lastSeq: Number(match[7]),
     lastSeenS: Number(match[8]),
   };
@@ -153,7 +155,7 @@ function cliMemberToNode(line: string): TeamNode | undefined {
 
 function sendCommandToCli(command: SendCommand): string {
   if (command.type === "heartbeat") {
-    return `hb ${command.dstId} ${command.batteryPercent ?? 100} ${command.rssiDbm ?? -50} ${command.fixStatus ?? 1}`;
+    return `hb ${command.dstId} ${command.batteryPercent ?? 100} ${command.rssiDbm ?? 127} ${command.fixStatus ?? 1}`;
   }
   if (command.type === "position") {
     return `pos ${command.dstId} ${command.latitudeE6 ?? 0} ${command.longitudeE6 ?? 0} ${command.speedCms ?? 0} ${command.headingDeg ?? 0} ${command.batteryPercent ?? 100} ${command.fixStatus ?? 0} ${command.satCount ?? 0}`;

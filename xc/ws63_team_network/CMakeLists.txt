@@ -14,17 +14,17 @@ if(NOT DEFINED SLE_MESH_ROOT)
 endif()
 
 set(SLE_TEAM_SDK_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../..)
-set(SLE_TEAM_UART_SERVER_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server)
-set(SLE_TEAM_UART_CLIENT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_client)
+set(SLE_TEAM_UART_SERVER_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_server)
+set(SLE_TEAM_UART_CLIENT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_client)
 
 set(SOURCES_LIST
     ${SLE_MESH_ROOT}/src/sle_team_packet.c
     ${SLE_MESH_ROOT}/src/sle_team_node.c
     ${SLE_MESH_ROOT}/src/sle_team_cli.c
     ${SLE_MESH_ROOT}/src/sle_team_web_api.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server/sle_uart_server_adv.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_server/sle_uart_server.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../sle_uart/sle_uart_client/sle_uart_client.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_server/sle_uart_server_adv.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_server/sle_uart_server.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_client/sle_uart_client.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ws63_team_network_app.c
 )
 

@@ -24,6 +24,7 @@ export interface TeamStatus {
   nextSeq: number;
   uptimeS: number;
   transport: "ws63-http" | "hosted-http" | "serial";
+  pairingEnabled?: boolean;
   memberFilterEnabled?: boolean;
   allowedMemberCount?: number;
   allowedMembers?: number[];
@@ -35,7 +36,7 @@ export interface TeamNode {
   online: boolean;
   batteryPercent: number;
   fixStatus: number;
-  lastRssiDbm: number;
+  lastRssiDbm: number | null;
   lastSeq: number;
   lastSeenS: number;
   latitudeE6?: number;

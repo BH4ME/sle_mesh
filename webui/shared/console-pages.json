@@ -5,7 +5,7 @@
   "boardSubtitle": "192.168.43.1 local console",
   "hostedConsoleUrl": "https://sleweb.mecho.top",
   "defaultDeviceApiUrl": "http://192.168.43.1",
-  "boardVersion": "ssr=v3",
+  "boardVersion": "ssr=v5",
   "tabs": [
     { "id": "status", "label": "status", "href": "/" },
     { "id": "nodes", "label": "nodes", "href": "/nodes" },

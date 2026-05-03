@@ -72,6 +72,17 @@ static void json_append_escaped(sle_team_json_writer_t *writer, const char *text
     json_append(writer, "\"");
 }
 
+static void json_append_mac_fields(sle_team_json_writer_t *writer, const uint8_t mac[6], uint8_t mac_ready)
+{
+    if (mac_ready == 0U || mac == NULL) {
+        json_append(writer, "\"macReady\":false,\"macSuffix\":\"\"");
+        return;
+    }
+    json_append(writer,
+        "\"macReady\":true,\"mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\",\"macSuffix\":\"%02X%02X\"",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], mac[4], mac[5]);
+}
+
 const char *sle_team_web_role_name(uint8_t role)
 {
     return role == (uint8_t)SLE_TEAM_ROLE_LEADER ? "leader" : "member";
@@ -164,17 +175,59 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
     out[0] = '\0';
 
     json_append(&writer,
-        "{\"teamId\":%u,\"selfId\":%u,\"leaderId\":%u,\"role\":\"%s\",\"state\":\"%s\","
+        "{\"teamId\":%u,\"selfId\":%u,\"leaderId\":%u,",
+        node->cfg.team_id, node->cfg.self_id, node->cfg.leader_id);
+    json_append_mac_fields(&writer, node->cfg.self_mac, node->cfg.self_mac_ready);
+    json_append(&writer,
+        ",\"role\":\"%s\",\"state\":\"%s\","
         "\"joined\":%s,\"nextSeq\":%u,\"uptimeS\":%lu,\"transport\":\"%s\","
-        "\"memberFilterEnabled\":%s,\"allowedMemberCount\":%u,\"allowedMembers\":[",
-        node->cfg.team_id, node->cfg.self_id, node->cfg.leader_id, sle_team_web_role_name((uint8_t)node->cfg.role),
+        "\"pairingEnabled\":%s,\"memberFilterEnabled\":%s,\"allowedMemberCount\":%u,\"allowedMembers\":[",
+        sle_team_web_role_name((uint8_t)node->cfg.role),
         sle_team_web_state_name((uint8_t)node->state), node->joined != 0U ? "true" : "false", node->next_seq,
         (unsigned long)uptime_s, transport != NULL ? transport : "ws63-http",
+        node->cfg.pairing_enabled != 0U ? "true" : "false",
         node->cfg.member_filter_enabled != 0U ? "true" : "false", node->cfg.allowed_member_count);
     for (i = 0U; i < node->cfg.allowed_member_count && i < SLE_TEAM_MAX_MEMBERS; i++) {
         json_append(&writer, "%s%u", i == 0U ? "" : ",", node->cfg.allowed_member_ids[i]);
     }
     json_append(&writer, "]}");
+    return writer.truncated != 0 ? SLE_TEAM_ERR_BUF : (int)writer.used;
+}
+
+int sle_team_web_write_pending_json(const sle_team_node_t *node, char *out, size_t out_len)
+{
+    sle_team_json_writer_t writer;
+    uint8_t i;
+    uint8_t wrote = 0U;
+
+    if (node == NULL || out == NULL || out_len == 0U) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    writer.buf = out;
+    writer.len = out_len;
+    writer.used = 0U;
+    writer.truncated = 0;
+    out[0] = '\0';
+
+    json_append(&writer, "[");
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_pending_member_t *member = &node->pending_members[i];
+        if (member->active == 0U) {
+            continue;
+        }
+        if (wrote != 0U) {
+            json_append(&writer, ",");
+        }
+        json_append(&writer,
+            "{\"id\":%u,\"role\":\"%s\",\"batteryPercent\":%u,",
+            member->member_id, sle_team_web_role_name(member->role), member->battery_percent);
+        json_append_mac_fields(&writer, member->mac, member->mac_ready);
+        json_append(&writer,
+            ",\"lastSeenS\":%lu}",
+            (unsigned long)member->last_seen_s);
+        wrote = 1U;
+    }
+    json_append(&writer, "]");
     return writer.truncated != 0 ? SLE_TEAM_ERR_BUF : (int)writer.used;
 }
 
@@ -203,11 +256,17 @@ int sle_team_web_write_nodes_json(const sle_team_node_t *node, char *out, size_t
             json_append(&writer, ",");
         }
         json_append(&writer,
-            "{\"id\":%u,\"role\":\"%s\",\"online\":%s,\"batteryPercent\":%u,\"fixStatus\":%u,"
-            "\"lastRssiDbm\":%d,\"lastSeq\":%u,\"lastSeenS\":%lu}",
+            "{\"id\":%u,\"role\":\"%s\",\"online\":%s,\"batteryPercent\":%u,\"fixStatus\":%u,",
             member->member_id, sle_team_web_role_name(member->role), member->online != 0U ? "true" : "false",
-            member->battery_percent, member->fix_status, member->last_rssi_dbm, member->last_seq,
-            (unsigned long)member->last_seen_s);
+            member->battery_percent, member->fix_status);
+        json_append_mac_fields(&writer, member->mac, member->mac_ready);
+        if (member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN) {
+            json_append(&writer, ",\"lastRssiDbm\":null");
+        } else {
+            json_append(&writer, ",\"lastRssiDbm\":%d", member->last_rssi_dbm);
+        }
+        json_append(&writer, ",\"lastSeq\":%u,\"lastSeenS\":%lu}",
+            member->last_seq, (unsigned long)member->last_seen_s);
         wrote = 1U;
     }
     json_append(&writer, "]");

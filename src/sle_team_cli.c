@@ -115,6 +115,10 @@ void sle_team_cli_print_help(sle_team_cli_t *cli)
     sle_team_cli_puts(cli, "  ack [dst] [ack_seq] [acked_type] [status]");
     sle_team_cli_puts(cli, "  members");
     sle_team_cli_puts(cli, "  allow [all|only <id...>|add <id>|del <id>]");
+    sle_team_cli_puts(cli, "  pairing [start|stop|approve <id>|pending]");
+    sle_team_cli_puts(cli, "  join <team> <leader> <channel>");
+    sle_team_cli_puts(cli, "  leave");
+    sle_team_cli_puts(cli, "  led help");
     sle_team_cli_puts(cli, "  state");
 }
 
@@ -320,10 +324,71 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
         return;
     }
 
+    if (strcmp(argv[0], "pairing") == 0) {
+        int ret;
+
+        if (argc < 2 || strcmp(argv[1], "pending") == 0) {
+            for (i = 0; i < (int)SLE_TEAM_MAX_MEMBERS; i++) {
+                const sle_team_pending_member_t *pending = &cli->node->pending_members[i];
+                if (pending->active != 0U) {
+                    sle_team_cli_printf(cli, "pending member=%u role=%u battery=%u mac=%02X%02X ready=%u last_seen=%lu",
+                        pending->member_id, pending->role, pending->battery_percent,
+                        pending->mac[4], pending->mac[5], pending->mac_ready,
+                        (unsigned long)pending->last_seen_s);
+                }
+            }
+            return;
+        }
+        if (strcmp(argv[1], "start") == 0) {
+            ret = sle_team_node_pairing_start(cli->node);
+            sle_team_cli_printf(cli, "pairing start ret=%d", ret);
+            return;
+        }
+        if (strcmp(argv[1], "stop") == 0) {
+            ret = sle_team_node_pairing_stop(cli->node);
+            sle_team_cli_printf(cli, "pairing stop ret=%d", ret);
+            return;
+        }
+        if (strcmp(argv[1], "approve") == 0) {
+            if (argc < 3 || parse_u32(argv[2], 1U, 254U, &v[0]) != 0) {
+                sle_team_cli_puts(cli, "usage: pairing approve <id>");
+                return;
+            }
+            ret = sle_team_node_pairing_approve(cli->node, (uint8_t)v[0]);
+            sle_team_cli_printf(cli, "pairing approve member=%u ret=%d", (uint8_t)v[0], ret);
+            return;
+        }
+        sle_team_cli_puts(cli, "usage: pairing [start|stop|approve <id>|pending]");
+        return;
+    }
+
+    if (strcmp(argv[0], "join") == 0) {
+        int ret;
+
+        if (argc < 4 || parse_u32(argv[1], 1U, 254U, &v[0]) != 0 ||
+            parse_u32(argv[2], 1U, 254U, &v[1]) != 0 ||
+            parse_u32(argv[3], 0U, 255U, &v[2]) != 0) {
+            sle_team_cli_puts(cli, "usage: join <team> <leader> <channel>");
+            return;
+        }
+        ret = sle_team_node_member_select_leader(cli->node, (uint8_t)v[0], (uint8_t)v[1], (uint8_t)v[2]);
+        sle_team_cli_printf(cli, "join team=%u leader=%u channel=%u ret=%d",
+            (uint8_t)v[0], (uint8_t)v[1], (uint8_t)v[2], ret);
+        return;
+    }
+
+    if (strcmp(argv[0], "leave") == 0) {
+        int ret = sle_team_node_member_leave(cli->node);
+        sle_team_cli_printf(cli, "leave ret=%d", ret);
+        return;
+    }
+
     if (strcmp(argv[0], "state") == 0) {
-        sle_team_cli_printf(cli, "team=%u self=%u leader=%u role=%u state=%u joined=%u seq=%u allow=%s allow_count=%u",
+        sle_team_cli_printf(cli,
+            "team=%u self=%u leader=%u role=%u state=%u joined=%u seq=%u pairing=%u allow=%s allow_count=%u",
             cli->node->cfg.team_id, cli->node->cfg.self_id, cli->node->cfg.leader_id,
             cli->node->cfg.role, cli->node->state, cli->node->joined, cli->node->next_seq,
+            cli->node->cfg.pairing_enabled,
             cli->node->cfg.member_filter_enabled != 0U ? "only" : "all",
             cli->node->cfg.allowed_member_count);
         return;

@@ -197,6 +197,7 @@ function renderNode(node: TeamNode): string {
     node.latitudeE6 !== undefined && node.longitudeE6 !== undefined
       ? `${formatCoordinate(node.latitudeE6)}, ${formatCoordinate(node.longitudeE6)}`
       : "no position";
+  const rssiText = node.lastRssiDbm === null || node.lastRssiDbm === 127 ? "RSSI NA" : `${node.lastRssiDbm} dBm`;
   return `
     <article class="node-row">
       <div class="node-main">
@@ -208,7 +209,7 @@ function renderNode(node: TeamNode): string {
       </div>
       <div class="node-stats">
         <span>${icon(Battery, 15)}${percent(node.batteryPercent)}</span>
-        <span>${node.lastRssiDbm} dBm</span>
+        <span>${rssiText}</span>
         <span>seq ${node.lastSeq}</span>
         <span class="${node.online ? "online" : "offline"}">${node.online ? "online" : "offline"}</span>
       </div>

@@ -12,6 +12,7 @@ extern "C" {
 #define SLE_TEAM_MAX_PATH_SIZE 64U
 #define SLE_TEAM_MAX_PAYLOAD_SIZE 184U
 #define SLE_TEAM_MAX_PACKET_SIZE (1U + 4U + 1U + SLE_TEAM_MAX_PATH_SIZE + SLE_TEAM_MAX_PAYLOAD_SIZE)
+#define SLE_TEAM_RSSI_UNKNOWN 127
 
 typedef enum {
     SLE_TEAM_ROUTE_TRANSPORT_FLOOD = 0x00,
@@ -94,6 +95,8 @@ typedef struct {
     uint8_t device_id;
     uint8_t role;
     uint8_t battery_percent;
+    uint8_t mac[6];
+    uint8_t mac_ready;
     uint8_t reserved;
 } sle_team_hello_body_t;
 

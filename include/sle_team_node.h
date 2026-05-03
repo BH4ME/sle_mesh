@@ -37,16 +37,29 @@ typedef struct {
     uint8_t battery_percent;
     uint8_t online;
     uint8_t fix_status;
+    uint8_t mac[6];
+    uint8_t mac_ready;
     int8_t last_rssi_dbm;
     uint16_t last_seq;
     uint32_t last_seen_s;
 } sle_team_member_record_t;
+
+typedef struct {
+    uint8_t member_id;
+    uint8_t role;
+    uint8_t battery_percent;
+    uint8_t active;
+    uint8_t mac[6];
+    uint8_t mac_ready;
+    uint32_t last_seen_s;
+} sle_team_pending_member_t;
 
 typedef struct sle_team_node sle_team_node_t;
 
 typedef int (*sle_team_send_fn)(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_id,
     const uint8_t *buf, uint16_t len);
 typedef uint32_t (*sle_team_now_fn)(void *user_ctx);
+typedef int8_t (*sle_team_rssi_fn)(void *user_ctx);
 typedef void (*sle_team_log_fn)(void *user_ctx, const char *text);
 
 typedef void (*sle_team_joined_cb)(void *user_ctx, uint8_t member_id);
@@ -56,6 +69,7 @@ typedef void (*sle_team_alert_cb)(void *user_ctx, uint8_t member_id, uint8_t rea
 typedef struct {
     sle_team_send_fn send;
     sle_team_now_fn now_s;
+    sle_team_rssi_fn rssi_dbm;
     sle_team_log_fn log;
     sle_team_joined_cb on_joined;
     sle_team_position_cb on_position;
@@ -67,8 +81,11 @@ typedef struct {
     uint8_t team_id;
     uint8_t self_id;
     uint8_t leader_id;
+    uint8_t self_mac[6];
+    uint8_t self_mac_ready;
     sle_team_node_role_t role;
     uint8_t channel_hash;
+    uint8_t pairing_enabled;
     uint8_t member_filter_enabled;
     uint8_t allowed_member_count;
     uint8_t allowed_member_ids[SLE_TEAM_MAX_MEMBERS];
@@ -87,8 +104,10 @@ struct sle_team_node {
     uint32_t last_hello_s;
     uint32_t last_heartbeat_s;
     uint32_t last_config_s;
+    uint32_t last_leader_seen_s;
     uint8_t joined;
     sle_team_member_record_t members[SLE_TEAM_MAX_MEMBERS];
+    sle_team_pending_member_t pending_members[SLE_TEAM_MAX_MEMBERS];
 };
 
 int sle_team_node_init(sle_team_node_t *node, const sle_team_node_cfg_t *cfg, const sle_team_node_ops_t *ops);
@@ -110,6 +129,12 @@ int sle_team_node_allow_all_members(sle_team_node_t *node);
 int sle_team_node_set_allowed_members(sle_team_node_t *node, const uint8_t *member_ids, uint8_t count);
 int sle_team_node_add_allowed_member(sle_team_node_t *node, uint8_t member_id);
 int sle_team_node_remove_allowed_member(sle_team_node_t *node, uint8_t member_id);
+int sle_team_node_pairing_start(sle_team_node_t *node);
+int sle_team_node_pairing_stop(sle_team_node_t *node);
+int sle_team_node_pairing_approve(sle_team_node_t *node, uint8_t member_id);
+int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, uint8_t leader_id,
+    uint8_t channel_hash);
+int sle_team_node_member_leave(sle_team_node_t *node);
 
 #ifdef __cplusplus
 }

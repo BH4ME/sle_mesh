@@ -45,6 +45,7 @@ void sle_team_web_event_push(sle_team_web_event_log_t *log, uint32_t time_s,
 int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_s, const char *transport,
     char *out, size_t out_len);
 int sle_team_web_write_nodes_json(const sle_team_node_t *node, char *out, size_t out_len);
+int sle_team_web_write_pending_json(const sle_team_node_t *node, char *out, size_t out_len);
 int sle_team_web_write_events_json(const sle_team_web_event_log_t *log, char *out, size_t out_len);
 
 const char *sle_team_web_role_name(uint8_t role);

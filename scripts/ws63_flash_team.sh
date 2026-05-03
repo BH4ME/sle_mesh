@@ -10,6 +10,7 @@ usage() {
 Usage:
   scripts/ws63_flash_team.sh leader [port]
   scripts/ws63_flash_team.sh member [port]
+  scripts/ws63_flash_team.sh unified [port]
 
 Defaults:
   leader port: /dev/tty.usbserial-10
@@ -28,13 +29,18 @@ role="${1:-}"
 case "$role" in
   leader)
     default_port="/dev/tty.usbserial-10"
-    firmware="$FW_ROOT/team_network_leader_unified_sle/ws63-liteos-app_leader_all.fwpkg"
+    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
     fallback_firmware="$FW_ROOT/team_network_leader_serial_led/ws63-liteos-app_leader_all.fwpkg"
     ;;
   member)
     default_port="/dev/tty.usbserial-110"
-    firmware="$FW_ROOT/team_network_member_unified_sle/ws63-liteos-app_member_all.fwpkg"
+    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
     fallback_firmware="$FW_ROOT/team_network_member_serial_led/ws63-liteos-app_member_all.fwpkg"
+    ;;
+  unified)
+    default_port="${2:-/dev/tty.usbserial-10}"
+    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
+    fallback_firmware="$firmware"
     ;;
   -h|--help|"")
     usage
