@@ -34,6 +34,7 @@
 #include "sle_team_packet.h"
 #include "sle_ssap_server.h"
 #include "sle_uart_server.h"
+#include "sle_uart_server_adv.h"
 #include "sle_ssap_client.h"
 #include "sle_uart_client.h"
 
@@ -645,6 +646,20 @@ static void team_identity_init_from_wifi_mac(void)
         g_team_rt.self_mac[3], g_team_rt.self_mac[4], g_team_rt.self_mac[5],
         g_team_rt.softap_ssid,
         g_team_rt.route_id);
+}
+
+static void team_sle_prepare_local_addr(void)
+{
+    uint8_t sle_addr[6];
+
+    if (g_team_rt.self_mac_ready == 0U) {
+        return;
+    }
+    (void)memcpy_s(sle_addr, sizeof(sle_addr), g_team_rt.self_mac, sizeof(g_team_rt.self_mac));
+    sle_addr[0] = (uint8_t)((sle_addr[0] | 0x02U) & 0xFEU);
+    sle_uart_server_adv_set_local_addr(sle_addr);
+    osal_printk("[team] sle local addr=%02X:%02X:%02X:%02X:%02X:%02X\r\n",
+        sle_addr[0], sle_addr[1], sle_addr[2], sle_addr[3], sle_addr[4], sle_addr[5]);
 }
 
 static void team_wifi_print_status(void)
@@ -2047,6 +2062,7 @@ static int team_sle_start(void)
         return SLE_TEAM_OK;
     }
 
+    team_sle_prepare_local_addr();
     if (sle_uart_server_init(team_server_read_cb, team_server_write_cb) == ERRCODE_SLE_SUCCESS) {
         g_team_rt.sle_started = 1U;
         team_print("member sle server ready");
@@ -2273,8 +2289,10 @@ static void *team_network_task(const char *arg)
                 (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER && sle_uart_client_is_ready() == 0U)) {
                 team_led_post_seek_throttled();
             }
-            if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER && sle_uart_client_is_ready() == 0U) {
-                team_leader_rescan_if_needed("tick_not_ready");
+            if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER &&
+                (g_team_node.cfg.pairing_enabled != 0U || sle_uart_client_connected_count() == 0U)) {
+                team_leader_rescan_if_needed(g_team_node.cfg.pairing_enabled != 0U ?
+                    "pairing_window" : "no_member");
             }
             team_request_sle_rssi();
             sle_team_node_tick(&g_team_node);

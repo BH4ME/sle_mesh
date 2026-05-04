@@ -4,7 +4,7 @@
 
 当前版本：
 
-- `v1.2.9`
+- `v1.2.10`
 
 当前重点不是 WebUI 或 GNSS 业务完整实现，而是先把下面这些基础能力打稳：
 
@@ -174,6 +174,8 @@ leader 收到非白名单 member 的 `HELLO / HEARTBEAT / POS_REPORT` 会直接�
 leader 配队窗口打开后，未在白名单内的 member `HELLO` 不会立刻入队，而是进入 pending。leader 执行 `pairing approve <id>` 或在内置 WebUI 点 approve 后，该 member 才会收到 `ACK/CONFIG` 并加入。
 
 `v1.2.9` 起，SLE 连接方向按官方 `sle_uart_1_vs_8` 思路调整：leader 作为 central/client 持续扫描并连接多个 member，member 作为 peripheral/server 广播并等待 leader 连接。leader 收到 member 上行包后会绑定 `member_id -> conn_id`，单播下行优先按 conn 精确发送，广播下行才发给所有连接。
+
+`v1.2.10` 修复双 member 现场测试时“先配置谁就只能看到谁”的问题。根因是官方 server/peripheral 样例给所有 member 使用了同一个固定 SLE 本机地址，leader 会把两块板当成同一个远端设备。现在 member 会用本机 WiFi MAC 派生唯一 SLE 地址；2026-05-04 实测 `C7E9` 和 `E7F1` 两块 member 可同时被 leader 扫描、连接，并分别绑定到 `conn_id:0` 和 `conn_id:1`。
 
 注意：当前 `allow/pairing/join` 配置是运行时 RAM 配置，断电重启会恢复默认构建配置。后续如果要做真正配对，需要把白名单、leader 绑定或 pairing key 写入 WS63 持久化配置，并用 `cipher_mac` 做真实认证。
 

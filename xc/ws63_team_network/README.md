@@ -203,7 +203,8 @@ pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
 ## 已知限制
 
 - `v1.2.9` 起连接方向改成官方 1vs8 样例方向：leader 扫描并连接多个 member，member 广播等待连接。
-- pairing window open 时 leader 会持续扫描；需要现场串口确认两个 member 能否同时连接并进入 pending。
+- `v1.2.10` 起 member 不再使用官方样例里的固定 SLE 广播地址，而是按本机 WiFi MAC 派生唯一 SLE 地址，避免两块统一固件 member 被 leader 当成同一个远端设备。
+- 2026-05-04 现场确认：`C7E9` 和 `E7F1` 两块 member 可同时连接 leader，leader 分别收到 `HELLO 233->154` 与 `HELLO 241->154`，并绑定到 `conn_id:0`、`conn_id:1`。
 - 还没有扩到 20 个 member，仍保持当前 `SLE_TEAM_MAX_MEMBERS`。
 - 当前不是完整“扫描附近 leader 并选择”的发现系统，member 需要填写 leader MAC 后四位。
 - 当前配队不是加密认证，`cipher_mac` 仍未用于真实鉴权。

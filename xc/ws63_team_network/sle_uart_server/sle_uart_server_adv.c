@@ -41,9 +41,18 @@
 #define SLE_ADV_DATA_LEN_MAX                      251
 /* 广播名称 */
 static uint8_t sle_local_name[NAME_MAX_LENGTH] = "sle_uart_server";
+static uint8_t g_sle_uart_local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 #define SLE_SERVER_INIT_DELAY_MS    1000
 #define sample_at_log_print(fmt, args...) osal_printk(fmt, ##args)
 #define SLE_UART_SERVER_LOG "[sle uart server]"
+
+void sle_uart_server_adv_set_local_addr(const uint8_t addr[SLE_ADDR_LEN])
+{
+    if (addr == NULL) {
+        return;
+    }
+    (void)memcpy_s(g_sle_uart_local_addr, sizeof(g_sle_uart_local_addr), addr, SLE_ADDR_LEN);
+}
 
 static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
 {
@@ -131,7 +140,6 @@ static int sle_set_default_announce_param(void)
     errno_t ret;
     sle_announce_param_t param = {0};
     uint8_t index;
-    unsigned char local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
     param.announce_mode = SLE_ANNOUNCE_MODE_CONNECTABLE_SCANABLE;
     param.announce_handle = SLE_ADV_HANDLE_DEFAULT;
     param.announce_gt_role = SLE_ANNOUNCE_ROLE_T_CAN_NEGO;
@@ -145,7 +153,7 @@ static int sle_set_default_announce_param(void)
     param.conn_supervision_timeout = SLE_CONN_SUPERVISION_TIMEOUT_DEFAULT;
     param.announce_tx_power = 18;
     param.own_addr.type = 0;
-    ret = memcpy_s(param.own_addr.addr, SLE_ADDR_LEN, local_addr, SLE_ADDR_LEN);
+    ret = memcpy_s(param.own_addr.addr, SLE_ADDR_LEN, g_sle_uart_local_addr, SLE_ADDR_LEN);
     if (ret != EOK) {
         sample_at_log_print("%s sle_set_default_announce_param data memcpy fail\r\n", SLE_UART_SERVER_LOG);
         return 0;

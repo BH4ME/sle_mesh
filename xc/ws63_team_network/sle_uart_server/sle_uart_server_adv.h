@@ -43,6 +43,7 @@ typedef enum sle_adv_data {
 } sle_adv_data_type;
 
 errcode_t sle_dev_register_cbks(void);
+void sle_uart_server_adv_set_local_addr(const uint8_t addr[SLE_ADDR_LEN]);
 errcode_t sle_uart_server_adv_init(void);
 errcode_t sle_uart_server_adv_restart(void);
 
