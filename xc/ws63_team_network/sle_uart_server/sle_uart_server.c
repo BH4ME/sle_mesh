@@ -21,6 +21,9 @@
 #define BT_INDEX_4              4
 #define BT_INDEX_0              0
 #define UART_BUFF_LENGTH        0x100
+#define SLE_UART_SERVER_MAX_CONNECTIONS 8
+#define SLE_UART_MEMBER_ID_MAX 254U
+#define SLE_UART_BROADCAST_ID 0xFFU
 
 /* 广播ID */
 #define SLE_ADV_HANDLE_DEFAULT  1
@@ -28,10 +31,16 @@
 static char g_sle_uuid_app_uuid[UUID_LEN_2] = { 0x12, 0x34 };
 /* server notify property uuid for test */
 static char g_sle_property_value[OCTET_BIT_LEN] = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
-/* sle connect acb handle */
-static uint16_t g_sle_conn_hdl = 0;
-static uint8_t g_sle_connected = 0;
-static int8_t g_sle_last_rssi = SLE_TEAM_RSSI_UNKNOWN;
+typedef struct {
+    uint8_t active;
+    uint16_t conn_id;
+    uint8_t member_id;
+    int8_t rssi;
+    sle_addr_t addr;
+} sle_uart_server_conn_t;
+
+static sle_uart_server_conn_t g_sle_conns[SLE_UART_SERVER_MAX_CONNECTIONS];
+static uint8_t g_sle_conn_count = 0;
 /* sle server handle */
 static uint8_t g_server_id = 0;
 /* sle service handle */
@@ -52,20 +61,138 @@ static uint8_t g_sle_uart_base[] = { 0x37, 0xBE, 0xA8, 0x80, 0xFC, 0x70, 0x11, 0
 
 uint16_t get_connect_id(void)
 {
-    return g_sle_conn_hdl;
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active != 0U) {
+            return g_sle_conns[i].conn_id;
+        }
+    }
+    return 0;
 }
 
 int8_t sle_uart_server_get_last_rssi(void)
 {
-    return g_sle_last_rssi;
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active != 0U) {
+            return g_sle_conns[i].rssi;
+        }
+    }
+    return SLE_TEAM_RSSI_UNKNOWN;
 }
 
 errcode_t sle_uart_server_read_remote_rssi(void)
 {
-    if (g_sle_connected == 0) {
+    uint8_t requested = 0U;
+
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        errcode_t ret = sle_read_remote_device_rssi(g_sle_conns[i].conn_id);
+        if (ret == ERRCODE_SLE_SUCCESS) {
+            requested = 1U;
+        }
+    }
+    if (requested == 0U) {
         return ERRCODE_SLE_FAIL;
     }
-    return sle_read_remote_device_rssi(g_sle_conn_hdl);
+    return ERRCODE_SLE_SUCCESS;
+}
+
+static sle_uart_server_conn_t *sle_uart_server_find_conn(uint16_t conn_id)
+{
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active != 0U && g_sle_conns[i].conn_id == conn_id) {
+            return &g_sle_conns[i];
+        }
+    }
+    return NULL;
+}
+
+static sle_uart_server_conn_t *sle_uart_server_alloc_conn(uint16_t conn_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+    if (conn != NULL) {
+        return conn;
+    }
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            g_sle_conns[i].active = 1U;
+            g_sle_conns[i].conn_id = conn_id;
+            g_sle_conns[i].member_id = 0U;
+            g_sle_conns[i].rssi = SLE_TEAM_RSSI_UNKNOWN;
+            g_sle_conn_count++;
+            return &g_sle_conns[i];
+        }
+    }
+    return NULL;
+}
+
+static sle_uart_server_conn_t *sle_uart_server_find_conn_slot_by_member(uint8_t member_id)
+{
+    if (member_id == 0U || member_id == SLE_UART_BROADCAST_ID) {
+        return NULL;
+    }
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active != 0U && g_sle_conns[i].member_id == member_id) {
+            return &g_sle_conns[i];
+        }
+    }
+    return NULL;
+}
+
+uint16_t sle_uart_server_find_conn_by_member(uint8_t member_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn_slot_by_member(member_id);
+    return conn == NULL ? 0U : conn->conn_id;
+}
+
+uint8_t sle_uart_server_find_conn_by_member_ex(uint8_t member_id, uint16_t *conn_id)
+{
+    sle_uart_server_conn_t *conn;
+
+    if (conn_id == NULL) {
+        return 0U;
+    }
+    conn = sle_uart_server_find_conn_slot_by_member(member_id);
+    if (conn == NULL) {
+        return 0U;
+    }
+    *conn_id = conn->conn_id;
+    return 1U;
+}
+
+void sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id)
+{
+    sle_uart_server_conn_t *conn;
+
+    if (member_id == 0U || member_id > SLE_UART_MEMBER_ID_MAX) {
+        return;
+    }
+    conn = sle_uart_server_find_conn(conn_id);
+    if (conn == NULL) {
+        return;
+    }
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active != 0U && g_sle_conns[i].conn_id != conn_id &&
+            g_sle_conns[i].member_id == member_id) {
+            g_sle_conns[i].member_id = 0U;
+        }
+    }
+    conn->member_id = member_id;
+    sample_at_log_print("%s bind member:%u conn_id:%x\r\n", SLE_UART_SERVER_LOG, member_id, conn_id);
+}
+
+static void sle_uart_server_remove_conn(uint16_t conn_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+    if (conn == NULL) {
+        return;
+    }
+    (void)memset_s(conn, sizeof(*conn), 0, sizeof(*conn));
+    conn->rssi = SLE_TEAM_RSSI_UNKNOWN;
+    if (g_sle_conn_count > 0U) {
+        g_sle_conn_count--;
+    }
 }
 
 static void encode2byte_little(uint8_t *_ptr, uint16_t data)
@@ -265,7 +392,9 @@ static errcode_t sle_uart_server_add(void)
 /* device通过uuid向host发送数据：report */
 errcode_t sle_uart_server_send_report_by_uuid(const uint8_t *data, uint8_t len)
 {
-    errcode_t ret;
+    errcode_t first_fail = ERRCODE_SLE_FAIL;
+    uint8_t failed = 0U;
+    uint8_t sent = 0U;
     ssaps_ntf_ind_by_uuid_t param = {0};
     param.type = SSAP_PROPERTY_TYPE_VALUE;
     param.start_handle = g_service_handle;
@@ -282,30 +411,76 @@ errcode_t sle_uart_server_send_report_by_uuid(const uint8_t *data, uint8_t len)
         return ERRCODE_SLE_FAIL;
     }
     sle_uuid_setu2(SLE_UUID_SERVER_NTF_REPORT, &param.uuid);
-    ret = ssaps_notify_indicate_by_uuid(g_server_id, g_sle_conn_hdl, &param);
-    if (ret != ERRCODE_SLE_SUCCESS) {
-        sample_at_log_print("%s sle_uart_server_send_report_by_uuid,ssaps_notify_indicate_by_uuid fail :%x\r\n",
-            SLE_UART_SERVER_LOG, ret);
-        osal_vfree(param.value);
-        return ret;
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        errcode_t ret = ssaps_notify_indicate_by_uuid(g_server_id, g_sle_conns[i].conn_id, &param);
+        if (ret == ERRCODE_SLE_SUCCESS) {
+            sent = 1U;
+        } else if (failed == 0U) {
+            first_fail = ret;
+            failed = 1U;
+        }
     }
     osal_vfree(param.value);
+    if (sent == 0U) {
+        sample_at_log_print("%s send_report_by_uuid no successful links fail:%x\r\n",
+            SLE_UART_SERVER_LOG, first_fail);
+        return first_fail;
+    }
     return ERRCODE_SLE_SUCCESS;
+}
+
+static errcode_t sle_uart_server_send_report_to_conn(uint16_t conn_id, const uint8_t *data, uint16_t len)
+{
+    ssaps_ntf_ind_t param = {0};
+    uint8_t receive_buf[UART_BUFF_LENGTH] = { 0 }; /* max receive length. */
+
+    if (data == NULL || len == 0U || len > sizeof(receive_buf)) {
+        return ERRCODE_SLE_FAIL;
+    }
+    param.handle = g_property_handle;
+    param.type = SSAP_PROPERTY_TYPE_VALUE;
+    param.value = receive_buf;
+    param.value_len = len;
+    if (memcpy_s(param.value, sizeof(receive_buf), data, len) != EOK) {
+        return ERRCODE_SLE_FAIL;
+    }
+    return ssaps_notify_indicate(g_server_id, conn_id, &param);
+}
+
+errcode_t sle_uart_server_send_report_by_conn(uint16_t conn_id, const uint8_t *data, uint16_t len)
+{
+    if (sle_uart_server_find_conn(conn_id) == NULL) {
+        return ERRCODE_SLE_FAIL;
+    }
+    return sle_uart_server_send_report_to_conn(conn_id, data, len);
 }
 
 /* device通过handle向host发送数据：report */
 errcode_t sle_uart_server_send_report_by_handle(const uint8_t *data, uint16_t len)
 {
-    ssaps_ntf_ind_t param = {0};
-    uint8_t receive_buf[UART_BUFF_LENGTH] = { 0 }; /* max receive length. */
-    param.handle = g_property_handle;
-    param.type = SSAP_PROPERTY_TYPE_VALUE;
-    param.value = receive_buf;
-    param.value_len = len;
-    if (memcpy_s(param.value, param.value_len, data, len) != EOK) {
-        return ERRCODE_SLE_FAIL;
+    errcode_t first_fail = ERRCODE_SLE_FAIL;
+    uint8_t failed = 0U;
+    uint8_t sent = 0U;
+
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        errcode_t ret = sle_uart_server_send_report_to_conn(g_sle_conns[i].conn_id, data, len);
+        if (ret == ERRCODE_SLE_SUCCESS) {
+            sent = 1U;
+        } else if (failed == 0U) {
+            first_fail = ret;
+            failed = 1U;
+        }
     }
-    return ssaps_notify_indicate(g_server_id, g_sle_conn_hdl, &param);
+    if (sent == 0U) {
+        return first_fail;
+    }
+    return ERRCODE_SLE_SUCCESS;
 }
 
 static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
@@ -314,18 +489,29 @@ static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
     uint8_t sle_connect_state[] = "sle_dis_connect";
     sample_at_log_print("%s connect state changed callback conn_id:0x%02x, conn_state:0x%x, pair_state:0x%x, \
         disc_reason:0x%x\r\n", SLE_UART_SERVER_LOG,conn_id, conn_state, pair_state, disc_reason);
-    sample_at_log_print("%s connect state changed callback addr:%02x:**:**:**:%02x:%02x\r\n", SLE_UART_SERVER_LOG,
-        addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4]);
+    if (addr != NULL) {
+        sample_at_log_print("%s connect state changed callback addr:%02x:**:**:**:%02x:%02x\r\n",
+            SLE_UART_SERVER_LOG, addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4]);
+    }
     if (conn_state == SLE_ACB_STATE_CONNECTED) {
-        g_sle_conn_hdl = conn_id;
-        g_sle_connected = 1;
+        sle_uart_server_conn_t *conn = sle_uart_server_alloc_conn(conn_id);
+        if (conn == NULL) {
+            sample_at_log_print("%s connection table full conn_id:%x\r\n", SLE_UART_SERVER_LOG, conn_id);
+            if (addr != NULL) {
+                (void)sle_disconnect_remote_device(addr);
+            }
+        } else if (addr != NULL) {
+            (void)memcpy_s(&conn->addr, sizeof(conn->addr), addr, sizeof(*addr));
+        }
+        g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : 0U;
         (void)sle_read_remote_device_rssi(conn_id);
-    } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
-        g_sle_conn_hdl = 0;
-        g_sle_connected = 0;
-        g_sle_pair_hdl = 0;
-        g_sle_last_rssi = SLE_TEAM_RSSI_UNKNOWN;
         (void)sle_uart_server_adv_restart();
+        sample_at_log_print("%s connected count:%u\r\n", SLE_UART_SERVER_LOG, g_sle_conn_count);
+    } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
+        sle_uart_server_remove_conn(conn_id);
+        g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : 0U;
+        (void)sle_uart_server_adv_restart();
+        sample_at_log_print("%s disconnected count:%u\r\n", SLE_UART_SERVER_LOG, g_sle_conn_count);
         if (g_sle_uart_server_msg_queue != NULL) {
             g_sle_uart_server_msg_queue(sle_connect_state, sizeof(sle_connect_state));
         }
@@ -334,8 +520,9 @@ static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
 
 static void sle_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
 {
-    if (status == ERRCODE_SLE_SUCCESS && conn_id == g_sle_conn_hdl) {
-        g_sle_last_rssi = rssi;
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+    if (status == ERRCODE_SLE_SUCCESS && conn != NULL) {
+        conn->rssi = rssi;
         sample_at_log_print("%s rssi conn_id:%d rssi:%d\r\n", SLE_UART_SERVER_LOG, conn_id, rssi);
     }
 }
@@ -344,9 +531,14 @@ static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errc
 {
     sample_at_log_print("%s pair complete conn_id:%02x, status:%x\r\n", SLE_UART_SERVER_LOG,
         conn_id, status);
-    sample_at_log_print("%s pair complete addr:%02x:**:**:**:%02x:%02x\r\n", SLE_UART_SERVER_LOG,
-        addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4]);
-    g_sle_pair_hdl = conn_id + 1;
+    if (addr != NULL) {
+        sample_at_log_print("%s pair complete addr:%02x:**:**:**:%02x:%02x\r\n",
+            SLE_UART_SERVER_LOG, addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4]);
+    }
+    if (sle_uart_server_alloc_conn(conn_id) == NULL && addr != NULL) {
+        (void)sle_disconnect_remote_device(addr);
+    }
+    g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : (conn_id + 1U);
     ssap_exchange_info_t parameter = { 0 };
     parameter.mtu_size = 520;
     parameter.version = 1;
@@ -371,7 +563,23 @@ static errcode_t sle_conn_register_cbks(void)
 
 uint16_t sle_uart_client_is_connected(void)
 {
-    return g_sle_pair_hdl;
+    return g_sle_conn_count;
+}
+
+errcode_t sle_uart_server_disconnect_current(void)
+{
+    if (g_sle_conn_count == 0U) {
+        return ERRCODE_SUCC;
+    }
+    for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        errcode_t ret = sle_disconnect_remote_device(&g_sle_conns[i].addr);
+        sample_at_log_print("%s disconnect conn_id:%x ret:%x\r\n",
+            SLE_UART_SERVER_LOG, g_sle_conns[i].conn_id, ret);
+    }
+    return ERRCODE_SUCC;
 }
 
 /* 初始化uuid server */

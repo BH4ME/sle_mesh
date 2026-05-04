@@ -143,12 +143,21 @@ int main(void)
     assert(leader.pending_members[0].active != 0U);
     assert(leader.pending_members[0].member_id == 2U);
     assert(member.joined == 0U);
+    relay_last_packet(&member_rt, &leader);
+    assert(sle_team_node_find_member(&leader, 2U) == NULL);
+    assert(leader.pending_members[0].active != 0U);
 
     assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);
     relay_last_packet(&leader_rt, &member);
     relay_last_packet(&leader_rt, &member);
     assert(member.joined != 0U);
     assert(leader.cfg.member_filter_enabled != 0U);
+    assert(sle_team_node_is_member_allowed(&leader, 2U) != 0U);
+    assert(sle_team_node_pairing_start(&leader) == SLE_TEAM_OK);
+    assert(sle_team_node_send_hello(&member, 1U) == SLE_TEAM_OK);
+    relay_last_packet(&member_rt, &leader);
+    assert(sle_team_node_find_member(&leader, 2U) != NULL);
+    assert(leader.pending_members[0].active == 0U);
     assert(sle_team_node_is_member_allowed(&leader, 2U) != 0U);
 
     assert(sle_team_node_member_leave(&member) == SLE_TEAM_OK);

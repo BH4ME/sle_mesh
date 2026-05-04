@@ -15,7 +15,7 @@ member --HB/POS--> leader
 
 - 一个统一固件包，所有 WS63 都烧同一份 `.fwpkg`。
 - 开机默认 `unconfigured`，SLE 暂不启动；先启动 SoftAP、HTTP WebUI 和串口 CLI。
-- WebUI 或串口选择角色后，leader 启动 SLE UART server，member 启动 SLE UART client。
+- WebUI 或串口选择角色后，leader 启动 SLE UART client/central，member 启动 SLE UART server/peripheral。
 - WebUI 选择的角色、队伍号、leader MAC 后四位和 channel 会写入 WS63 NV flash；断电/复位后自动恢复。
 - WiFi SSID 和页面自标识使用 WiFi MAC 后四位，适合批量烧录：`SLE-TEAM-WS63-XXXX`、`UXXXX`、`LXXXX`、`MXXXX`。
 - SLE 收到二进制包后进入 `sle_team_node_on_packet`，周期任务调用 `sle_team_node_tick`。
@@ -91,7 +91,7 @@ member：
 优先使用局域网 Ubuntu 编译机：
 
 ```sh
-UBUNTU_HOST=192.168.6.130 \
+UBUNTU_HOST=192.168.6.5 \
 UBUNTU_USER=owen \
 UBUNTU_PASS='67215837' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
@@ -121,7 +121,9 @@ macOS 烧录优先使用 `/dev/tty.usbserial-*`，不要用 `/dev/cu.usbserial-*
 
 - 引脚：`GPIO2`
 - 极性：`active-high`
-- 空闲保持灭灯，只有真实 SLE TX/RX 事件触发闪烁。
+- 空闲保持灭灯；SLE 配队/扫描和真实协议 TX/RX 使用不同闪烁节奏。
+- pairing window 打开时 leader 会每秒极短闪一下，表示正在开放发现/配队。
+- leader pairing window open 或尚未连上 member 时会每秒极短闪一下，表示正在扫描 member。
 - `[sle-tx-ok]`：本板已把业务包交给 SLE driver，LED 快闪两下。
 - `[sle-tx-fail]`：本板尝试 SLE 发送失败，LED 不闪。
 - `[sle-rx]`：本板真实收到 SLE 业务包，LED 慢闪一下。
@@ -176,9 +178,9 @@ pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
 
 第一版仍是星型 SLE 连接：
 
-- leader = server / advertiser
-- member = client / seeker
-- member 主动连接 leader
+- leader = client / central / seeker
+- member = server / peripheral / advertiser
+- leader 主动连接 member
 - 业务包使用 MeshCore 风格外层包帧，后面可扩展成中继或 flood
 
 这样做的原因是先确保真实 WS63 SLE 收发、串口控制、状态机、板端 WebUI 都跑通，再做多跳。
@@ -200,7 +202,9 @@ pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
 
 ## 已知限制
 
+- `v1.2.9` 起连接方向改成官方 1vs8 样例方向：leader 扫描并连接多个 member，member 广播等待连接。
+- pairing window open 时 leader 会持续扫描；需要现场串口确认两个 member 能否同时连接并进入 pending。
 - 还没有扩到 20 个 member，仍保持当前 `SLE_TEAM_MAX_MEMBERS`。
 - 当前不是完整“扫描附近 leader 并选择”的发现系统，member 需要填写 leader MAC 后四位。
 - 当前配队不是加密认证，`cipher_mac` 仍未用于真实鉴权。
-- 角色和配队配置还没写入 flash，复位后需要重新选择。
+- 角色和配队配置已写入 flash；factory reset 会清除配置并重启。

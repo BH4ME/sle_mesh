@@ -212,6 +212,11 @@ static uint8_t sle_team_has_online_member(const sle_team_node_t *node)
     return 0U;
 }
 
+static uint8_t sle_team_node_has_member_record(const sle_team_node_t *node, uint8_t member_id)
+{
+    return sle_team_node_find_member(node, member_id) != NULL ? 1U : 0U;
+}
+
 uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t member_id)
 {
     uint8_t i;
@@ -342,14 +347,27 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
 
 int sle_team_node_pairing_approve(sle_team_node_t *node, uint8_t member_id)
 {
+    sle_team_pending_member_t *pending;
+    sle_team_member_record_t *member;
     int ret;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
         return SLE_TEAM_ERR_ARG;
     }
+    pending = sle_team_get_pending_slot(node, member_id, 0U);
     ret = sle_team_node_add_allowed_member(node, member_id);
     if (ret != SLE_TEAM_OK) {
         return ret;
+    }
+    if (pending != NULL) {
+        member = sle_team_get_member_slot(node, member_id, 1U);
+        if (member != NULL) {
+            member->role = pending->role;
+            member->battery_percent = pending->battery_percent;
+            member->mac_ready = pending->mac_ready;
+            (void)memcpy(member->mac, pending->mac, sizeof(member->mac));
+            member->last_seen_s = pending->last_seen_s;
+        }
     }
     sle_team_clear_pending_member(node, member_id);
     (void)sle_team_node_send_config(node, member_id);
@@ -408,6 +426,10 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
 
     hello = (const sle_team_hello_body_t *)app->body;
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
+        if (sle_team_node_has_member_record(node, app->src_id) != 0U) {
+            sle_team_log(node, "known member hello before allowlist sync");
+            return SLE_TEAM_OK;
+        }
         if (node->cfg.pairing_enabled != 0U) {
             pending = sle_team_get_pending_slot(node, app->src_id, 1U);
             if (pending != NULL) {
