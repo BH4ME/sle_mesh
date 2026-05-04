@@ -26,6 +26,7 @@
 
 请优先看这些文档：
 
+- [docs/field-notes-2026-05-04.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)
 - [docs/protocol/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/README.md)
 - [docs/protocol/packet-structure.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/packet-structure.md)
 - [docs/protocol/messages.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/messages.md)

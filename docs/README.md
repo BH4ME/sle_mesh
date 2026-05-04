@@ -4,6 +4,7 @@
 
 ## 当前有效文档
 
+- [field-notes-2026-05-04.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)：2026-05-04 现场更新、踩坑和验证记录
 - [protocol/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/README.md)：协议总览
 - [protocol/packet-structure.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/packet-structure.md)：包结构和字段含义
 - [protocol/messages.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/messages.md)：业务消息体

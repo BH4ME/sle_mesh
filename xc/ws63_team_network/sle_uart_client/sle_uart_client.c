@@ -18,8 +18,8 @@
 #include "sle_team_packet.h"
 #include "sle_uart_client.h"
 #define SLE_MTU_SIZE_DEFAULT            520
-#define SLE_SEEK_INTERVAL_DEFAULT       100
-#define SLE_SEEK_WINDOW_DEFAULT         100
+#define SLE_SEEK_INTERVAL_DEFAULT       400
+#define SLE_SEEK_WINDOW_DEFAULT         80
 #define UUID_16BIT_LEN                  2
 #define UUID_128BIT_LEN                 16
 #define SLE_UART_TASK_DELAY_MS          1000

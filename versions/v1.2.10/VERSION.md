@@ -78,3 +78,7 @@
 
 - 下一步做 per-member RSSI 展示和更清楚的 WebUI 连接状态。
 - 后续如果要扩到 20 个 member，再评估 SDK 实际连接上限；当前仍按 8 个连接表实现。
+
+详细现场记录：
+
+- [docs/field-notes-2026-05-04.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)
