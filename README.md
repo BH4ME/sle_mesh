@@ -177,6 +177,8 @@ leader 配队窗口打开后，未在白名单内的 member `HELLO` 不会立刻
 
 `v1.2.10` 修复双 member 现场测试时“先配置谁就只能看到谁”的问题。根因是官方 server/peripheral 样例给所有 member 使用了同一个固定 SLE 本机地址，leader 会把两块板当成同一个远端设备。现在 member 会用本机 WiFi MAC 派生唯一 SLE 地址；2026-05-04 实测 `C7E9` 和 `E7F1` 两块 member 可同时被 leader 扫描、连接，并分别绑定到 `conn_id:0` 和 `conn_id:1`。
 
+大成功记录：`v1.2.10` 是第一次现场确认两块统一固件 member 同时进入同一个 leader 的 SLE 队伍。验证范围包括双 member 同时广播、leader 同时扫描、双连接表绑定、未 approve 前进入 pending、approve 后两块都进入 `HEARTBEAT`。这是后续做 1 对 8、更多成员、户外手机配队的关键基线。
+
 注意：当前 `allow/pairing/join` 配置是运行时 RAM 配置，断电重启会恢复默认构建配置。后续如果要做真正配对，需要把白名单、leader 绑定或 pairing key 写入 WS63 持久化配置，并用 `cipher_mac` 做真实认证。
 
 ## 快速编译验证

@@ -2,6 +2,13 @@
 
 本版本记录 member SLE 地址唯一化修复，以及 2026-05-04 双 member 同时配队验证。
 
+大成功记录：
+
+- 这是第一次现场确认两块统一固件 member 同时进入同一个 leader 的 SLE 队伍。
+- leader 同时收到 `HELLO 233->154` 与 `HELLO 241->154`。
+- leader 同时维护 `conn_id:0` 和 `conn_id:1` 两条成员连接。
+- approve 后两块 member 都进入 `HEARTBEAT`，后续 1 对 8 可以以此作为关键基线。
+
 主要变更：
 
 - `src/sle_team_node.c`

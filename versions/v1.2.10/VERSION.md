@@ -7,6 +7,7 @@
 说明：
 
 - 统一固件继续由内置 WebUI/CLI 在运行时选择 leader/member。
+- 大成功记录：这是第一次现场确认两块统一固件 member 同时进入同一个 leader 的 SLE 队伍。验证范围覆盖双 member 同时广播、leader 同时扫描、双连接表绑定、未 approve 前进入 pending、approve 后两块都进入 `HEARTBEAT`。
 - LED 行为细化为三类：
   - 空闲灭灯。
   - leader pairing window open 时，每秒极短闪一下，表示正在开放发现/配队。
@@ -52,6 +53,13 @@
 - approve 后两块 member 都进入心跳：
   - `HEARTBEAT 233->154`
   - `HEARTBEAT 241->154`
+
+本次成功的意义：
+
+- 证明统一固件 + WebUI 运行时选角色的路线是可行的。
+- 证明 leader 按官方 1vs8 方向做 central/client、member 做 peripheral/server 的方向是可行的。
+- 证明 SLE 多连接表、`member_id -> conn_id` 绑定、按 member 精确下发这条链路可以支撑后续 1 对多。
+- 证明问题不是手机 WebUI 显示幻觉，而是底层固定 SLE 地址冲突；修复后串口能稳定看到两路真实业务包。
 
 配队语义：
 
