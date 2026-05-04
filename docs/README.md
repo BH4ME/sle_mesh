@@ -10,8 +10,15 @@
 - [protocol/messages.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/messages.md)：业务消息体
 - [protocol/terminal-cli.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/terminal-cli.md)：串口命令
 - [protocol/versioning.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/versioning.md)：版本规则
+- [webui-plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/webui-plan.md)：WebUI 同源化计划
 - [networking_skeleton.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/networking_skeleton.md)：组网骨架说明
 - [terminal_control_networking.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/terminal_control_networking.md)：串口控制说明
+
+## WS63 和 WebUI
+
+- [../xc/ws63_team_network/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network/README.md)：WS63 板端固件、烧录和 WebUI。
+- [../webui/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui/README.md)：域名上位机 WebUI。
+- [../versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录。
 
 ## 早期参考文档
 

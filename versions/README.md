@@ -1,6 +1,6 @@
 # Versions
 
-这个目录用于保存协议和代码版本记录。
+这个目录用于保存协议和代码版本记录。当前只记录版本说明和清单；详细现场问题统一放在 [docs/field-notes-2026-05-04.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)。
 
 当前版本：
 
@@ -18,7 +18,6 @@
 
 - `VERSION.md`：版本说明
 - `MANIFEST.md`：版本内容清单
-- `include/`：该版本头文件快照
-- `src/`：该版本源文件快照
-- `examples/`：该版本示例快照
-- `docs/`：该版本协议文档快照
+- `VERSION.md` 只写这个版本解决了什么。
+- `MANIFEST.md` 只写这个版本涉及哪些文件和怎么验证。
+- 不再在每个版本目录复制大量源码快照，避免版本目录膨胀。

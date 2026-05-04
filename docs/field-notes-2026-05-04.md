@@ -270,3 +270,24 @@ py -3.11 -m xf_burn_tools.burn_tools -p COM5 -b 115200 K:\codex\ws63-liteos-app_
 - 改善 Events 页面排版，把 `time_s`、`type`、`src->dst`、`seq` 分开显示，避免用户误读。
 - 增加“等待 approve”状态回复，让 member WebUI 能显示 leader 已看到自己但尚未批准。
 - 评估 8 个以上 member 的策略；如果 SDK 实测连接上限不够，再考虑轮询上报模型。
+
+## GitHub 分支整理建议
+
+当前有效主线：
+
+- `codex/webui-board-console-shared`
+
+已经并入当前主线、可作为历史版本记录而不必长期保留的旧实验分支：
+
+- `codex/webui-sleweb-domain`
+- `codex/ws63-blinky`
+- `codex/ws63-console-ssr-v3-stable`
+- `codex/ws63-status-ok-baseline`
+- `codex/ws63-webui-snapshot`
+- `codex/ws63-wifi-sle-coexist`
+
+整理原则：
+
+- GitHub 上保留 `main` 和当前主线分支。
+- 阶段性成功点写进 `versions/` 和 `docs/field-notes-2026-05-04.md`。
+- 不再依赖一堆旧 branch 记忆现场状态。

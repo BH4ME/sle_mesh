@@ -5,6 +5,11 @@
 *.map
 *.log
 .DS_Store
+*冲突副本*
+*Mac.lan*
 build/
 out/
 cmake-build-*/
+node_modules/
+dist/
+.vercel/
