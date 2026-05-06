@@ -153,6 +153,20 @@ int main(void)
     relay_last_packet(&leader_rt, &relay);
     assert(relay.joined != 0U);
     assert(relay.cfg.relay_enabled != 0U);
+    relay.last_leader_seen_s = 1U;
+    relay.cfg.heartbeat_timeout_s = 2U;
+    relay_rt.now_s = 6U;
+    sle_team_node_tick(&relay);
+    assert(relay.joined == 0U);
+    assert(relay.cfg.relay_allowed != 0U);
+    assert(relay.cfg.relay_enabled == 0U);
+    assert(relay.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+    relay.joined = 1U;
+    relay.state = SLE_TEAM_NET_ONLINE;
+    relay.last_leader_seen_s = relay_rt.now_s;
+    relay.upstream_parent_id = 3U;
+    relay.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
+    relay.upstream_parent_reselect_pending = 0U;
 
     assert(SLE_TEAM_MAX_MEMBERS >= 20U);
     for (uint8_t member_id = 2U; member_id <= 21U; member_id++) {
@@ -268,6 +282,17 @@ int main(void)
     assert(member.upstream_parent_state == SLE_TEAM_PARENT_CONNECTED);
     assert(member.upstream_parent_id == 3U);
     assert(member.upstream_parent_reselect_pending == 0U);
+    assert(member.cfg.relay_allowed == 0U);
+
+    /* Approve API default is non-relay; relay grant must be explicit and can be toggled later. */
+    assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);
+    assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.cfg.relay_allowed == 0U);
+    assert(sle_team_node_pairing_approve_with_relay(&leader, 2U, 1U) == SLE_TEAM_OK);
+    assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.cfg.relay_allowed != 0U);
 
     member.last_leader_seen_s = 1U;
     member.cfg.heartbeat_timeout_s = 2U;

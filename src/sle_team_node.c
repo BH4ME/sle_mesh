@@ -5,7 +5,7 @@
 static const uint8_t g_zero_cipher_mac[2] = {0x00, 0x00};
 #define SLE_TEAM_CONFIG_BODY_BASE_SIZE 8U
 
-static void sle_team_node_disable_member_relay(sle_team_node_t *node);
+static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t clear_permission);
 
 static uint32_t sle_team_now(const sle_team_node_t *node)
 {
@@ -124,7 +124,7 @@ static void sle_team_member_rejoin(sle_team_node_t *node)
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
-    sle_team_node_disable_member_relay(node);
+    sle_team_node_disable_member_relay(node, 0U);
     sle_team_clear_members(node);
     sle_team_log(node, "leader timeout, rejoining");
 }
@@ -286,13 +286,15 @@ static uint8_t sle_team_node_relay_tier_for_member(uint8_t member_id)
     return (uint8_t)(((uint8_t)(member_id - 1U) % 3U) + 1U);
 }
 
-static void sle_team_node_disable_member_relay(sle_team_node_t *node)
+static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t clear_permission)
 {
     if (node != NULL && node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
-        node->cfg.relay_allowed = 0U;
         node->cfg.relay_enabled = 0U;
-        node->cfg.relay_tier = 0U;
-        node->cfg.max_downstream = 0U;
+        if (clear_permission != 0U) {
+            node->cfg.relay_allowed = 0U;
+            node->cfg.relay_tier = 0U;
+            node->cfg.max_downstream = 0U;
+        }
     }
 }
 
@@ -396,6 +398,13 @@ int sle_team_node_remove_allowed_member(sle_team_node_t *node, uint8_t member_id
         }
         node->cfg.allowed_member_count--;
         node->cfg.allowed_member_ids[node->cfg.allowed_member_count] = 0U;
+        /* Revoke cached online membership state after explicit allowlist removal. */
+        for (j = 0U; j < SLE_TEAM_MAX_MEMBERS; j++) {
+            if (node->members[j].online != 0U && node->members[j].member_id == member_id) {
+                (void)memset(&node->members[j], 0, sizeof(node->members[j]));
+                break;
+            }
+        }
         return SLE_TEAM_OK;
     }
     return SLE_TEAM_OK;
@@ -486,7 +495,7 @@ int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, u
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
     sle_team_set_parent_state(node, 0U, SLE_TEAM_PARENT_DISCOVERING, 0U);
-    sle_team_node_disable_member_relay(node);
+    sle_team_node_disable_member_relay(node, 1U);
     sle_team_clear_members(node);
     return sle_team_node_send_hello(node, node->cfg.leader_id);
 }
@@ -503,7 +512,7 @@ int sle_team_node_member_leave(sle_team_node_t *node)
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
     sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_DISCOVERING, 0U);
-    sle_team_node_disable_member_relay(node);
+    sle_team_node_disable_member_relay(node, 1U);
     sle_team_clear_members(node);
     sle_team_log(node, "member left team");
     return SLE_TEAM_OK;
@@ -606,10 +615,7 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
         node->cfg.max_downstream = node->cfg.relay_allowed != 0U ? cfg_body->max_downstream : 0U;
         node->cfg.relay_enabled = (node->joined != 0U && node->cfg.relay_allowed != 0U) ? 1U : 0U;
     } else {
-        node->cfg.relay_allowed = 0U;
-        node->cfg.relay_enabled = 0U;
-        node->cfg.relay_tier = 0U;
-        node->cfg.max_downstream = 0U;
+        sle_team_node_disable_member_relay(node, 1U);
     }
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
         if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {

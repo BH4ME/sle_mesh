@@ -8,9 +8,12 @@
 
 - 统一固件：所有 WS63 烧同一个 `.fwpkg`，开机后通过板端 WebUI 或串口选择 `leader/member`。
 - 板端 WebUI：手机连接 `SLE-TEAM-WS63-XXXX`，打开 `http://192.168.43.1/`。
-- 当前拓扑：星型 SLE 网络，leader 主动扫描/连接 member。
-- 已验证：两块 member `MC7E9`、`ME7F1` 可同时进入 leader `L279A` 队伍，并进入 `HEARTBEAT`。
-- 最近调参：降低 leader SLE 扫描占空比，缓解 SLE 扫描/发送时 WiFi 页面卡住的问题。
+- 当前拓扑：分层 relay 路由（leader + 多级 member），leader 仍是唯一审批方。
+- 已实现：`1vs8` 物理直连约束下的 `1vs20` 逻辑成员管理。
+- 已实现：leader-controlled approve-to-relay 模型。member 先 `approve/join`，再按 leader 授权启用 relay。
+- 已实现：`member_id -> next_hop` 路由学习，ACK/CONFIG/业务包优先走 next-hop 定向转发。
+- 已实现：member 上行 parent 状态维护与断连后 reselection/rejoin（heartbeat timeout 与 upstream disconnect 触发）。
+- 已实现：next-hop 严格选路。若路由记录存在 `next_hop_id`，发包必须先验证 next-hop 连接可达；不可达时直接报 `NO_ROUTE`，不再回退到陈旧 `conn_id`。
 
 ## 快速入口
 
@@ -55,7 +58,7 @@ URL: http://192.168.43.1/
 - `GET /api/nodes`
 - `GET /api/events`
 - `GET /api/pending`
-- `GET /api/pairing?action=start|stop|approve&id=...`
+- `GET /api/pairing?action=start|stop|approve&id=...&relay=0|1`
 - `GET /api/member/select?team=...&leader=...&channel=...`
 - `GET /api/member/leave`
 - `GET /api/factory-reset`
@@ -101,10 +104,11 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
 
 ## 当前限制
 
-- 当前不是完整 Mesh，仍是 leader/member 星型网络。
-- 当前默认成员上限仍按 8 个连接表实现，尚未扩到 20 个。
+- 当前不是通用自组织 Mesh，仍是面向队伍模型的 leader-controlled 分层路由。
+- 逻辑成员上限是 20，但单跳物理连接仍受 SDK 直连能力限制（当前按 8 设计）。
 - member 选择 leader 仍需要填写 leader MAC 后四位，还不是自动扫描附近 leader 后选择。
 - `cipher_mac` 目前是协议预留字段，尚未做真实加密认证。
+- `/api/status` 已包含 relay/parent 细节字段；`/status` HTML 页面仍以基础状态为主。
 - 板端 WebUI 为保护 RAM 使用 C 端 SSR，不直接烧录 Vite 产物。
 
 ## License

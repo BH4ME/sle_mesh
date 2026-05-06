@@ -276,6 +276,8 @@ static int team_request_role_config(sle_team_node_role_t role, uint8_t leader_id
     uint8_t channel_hash, uint16_t leader_suffix, uint8_t save_nv);
 static void team_handle_role_request_once(void);
 static void team_register_connection_callbacks(void);
+static void team_upstream_parent_note(uint8_t parent_id, sle_team_parent_state_t state, const char *reason);
+static void team_upstream_parent_reset(const char *reason);
 
 static uint16_t team_nv_checksum(const sle_team_web_config_nv_t *cfg)
 {
@@ -815,6 +817,17 @@ static uint8_t team_route_is_relay_enabled(void)
         g_team_node.cfg.relay_allowed != 0U && g_team_node.cfg.relay_enabled != 0U);
 }
 
+static uint8_t team_member_reselection_active(void)
+{
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER) {
+        return 0U;
+    }
+    return (uint8_t)(g_team_node.joined == 0U &&
+        g_team_node.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING &&
+        g_team_node.upstream_parent_reselect_pending != 0U &&
+        g_team_node.cfg.relay_allowed != 0U);
+}
+
 static uint8_t team_sle_addr_equal(const sle_addr_t *left, const sle_addr_t *right)
 {
     if (left == NULL || right == NULL) {
@@ -910,6 +923,20 @@ static team_route_entry_t *team_route_entry_alloc(uint8_t member_id)
     return NULL;
 }
 
+static uint8_t team_route_conn_is_active(team_conn_dir_t dir, uint16_t conn_id)
+{
+    if (conn_id == 0U) {
+        return 0U;
+    }
+    if (dir == TEAM_CONN_DIR_DOWNSTREAM) {
+        return sle_uart_client_has_conn(conn_id);
+    }
+    if (dir == TEAM_CONN_DIR_UPSTREAM) {
+        return sle_uart_server_has_conn(conn_id);
+    }
+    return 0U;
+}
+
 static void team_route_note(uint8_t member_id, uint16_t conn_id, team_conn_dir_t dir, uint8_t next_hop_id)
 {
     team_route_entry_t *route;
@@ -934,16 +961,20 @@ static uint8_t team_route_find(uint8_t member_id, team_conn_dir_t dir, uint16_t 
     if (route == NULL || route->dir != dir || conn_id == NULL) {
         return 0U;
     }
-    if (route->next_hop_id != 0U) {
+    if (route->next_hop_id != 0U && route->next_hop_id != SLE_TEAM_BROADCAST_ID) {
         if (dir == TEAM_CONN_DIR_DOWNSTREAM) {
-            if (sle_uart_client_find_conn_by_member(route->next_hop_id, conn_id) != 0U) {
+            if (sle_uart_client_find_conn_by_member(route->next_hop_id, conn_id) != 0U &&
+                team_route_conn_is_active(dir, *conn_id) != 0U) {
                 return 1U;
             }
-        } else if (sle_uart_server_find_conn_by_member_ex(route->next_hop_id, conn_id) != 0U) {
+        } else if (sle_uart_server_find_conn_by_member_ex(route->next_hop_id, conn_id) != 0U &&
+            team_route_conn_is_active(dir, *conn_id) != 0U) {
             return 1U;
         }
+        /* next-hop route exists but is not currently reachable */
+        return 0U;
     }
-    if (route->conn_id != 0U) {
+    if (team_route_conn_is_active(dir, route->conn_id) != 0U) {
         *conn_id = route->conn_id;
         return 1U;
     }
@@ -1028,13 +1059,27 @@ static void team_conn_track_update(uint16_t conn_id, team_conn_dir_t dir, const 
 static void team_conn_track_note_packet(uint16_t conn_id, team_conn_dir_t dir, uint8_t route_id)
 {
     team_conn_track_t *track = team_conn_track_alloc(conn_id);
+    uint8_t route_bucket;
 
     if (track == NULL) {
         return;
     }
+    if (route_id == 0U || route_id == SLE_TEAM_BROADCAST_ID) {
+        return;
+    }
+    route_bucket = team_route_bucket_from_ids(route_id, g_team_node.cfg.leader_id);
     track->dir = dir;
+    if (dir == TEAM_CONN_DIR_UPSTREAM && g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER &&
+        track->route_id != 0U && track->route_id != g_team_node.cfg.leader_id) {
+        uint8_t current_bucket = team_route_bucket_from_ids(track->route_id, g_team_node.cfg.leader_id);
+
+        /* Preserve the real first-hop relay when a leader-origin packet is forwarded across the same link. */
+        if (route_bucket == 0U && current_bucket > 0U) {
+            return;
+        }
+    }
     track->route_id = route_id;
-    track->bucket = team_route_bucket_from_ids(route_id, g_team_node.cfg.leader_id);
+    track->bucket = route_bucket;
 }
 
 static team_conn_dir_t team_conn_guess_direction_from_addr(const sle_addr_t *addr)
@@ -1276,7 +1321,7 @@ static uint8_t team_client_seek_filter(const sle_seek_result_info_t *seek_result
         }
         return 0U;
     }
-    if (team_route_is_relay_enabled() == 0U || self_bucket >= 3U) {
+    if ((team_route_is_relay_enabled() == 0U && team_member_reselection_active() == 0U) || self_bucket >= 3U) {
         return 0U;
     }
     candidate_bucket = team_route_bucket_from_ids(candidate_id, g_team_node.cfg.leader_id);
@@ -1368,6 +1413,12 @@ static uint8_t team_member_current_next_hop_id(void)
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER) {
         return 0U;
     }
+    if (team_route_find(g_team_node.cfg.leader_id, TEAM_CONN_DIR_UPSTREAM, &conn_id) != 0U) {
+        track = team_conn_track_find(conn_id);
+        if (track != NULL && track->route_id != 0U) {
+            return track->route_id;
+        }
+    }
     conn_id = get_connect_id();
     track = team_conn_track_find(conn_id);
     if (track != NULL && track->route_id != 0U) {
@@ -1408,7 +1459,7 @@ static void team_joined(void *user_ctx, uint8_t member_id)
     }
     team_upstream_parent_note(next_hop_id, SLE_TEAM_PARENT_CONNECTED, "joined");
     ret = sle_team_node_send_route_update(&g_team_node, g_team_node.cfg.leader_id,
-        g_team_node.cfg.leader_id, 1U, next_hop_id);
+        g_team_node.cfg.leader_id, (uint8_t)SLE_TEAM_PARENT_CONNECTED, next_hop_id);
     osal_printk("[team] route update next_hop=%u ret=%d\r\n", next_hop_id, ret);
 }
 
@@ -1941,6 +1992,27 @@ static void team_http_send_status_page(int fd)
         "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_JOINED_LABEL
         "</span><span class=\"v\">%s</span></div>",
         g_team_node.joined != 0U ? "true" : "false");
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Relay Allowed</span><span class=\"v\">%s</span></div>",
+        g_team_node.cfg.relay_allowed != 0U ? "true" : "false");
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Relay Enabled</span><span class=\"v\">%s</span></div>",
+        g_team_node.cfg.relay_enabled != 0U ? "true" : "false");
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Relay Tier</span><span class=\"v\">%u</span></div>",
+        g_team_node.cfg.relay_tier);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Max Downstream</span><span class=\"v\">%u</span></div>",
+        g_team_node.cfg.max_downstream);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Upstream Parent</span><span class=\"v\">%u</span></div>",
+        g_team_node.upstream_parent_id);
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Parent State</span><span class=\"v\">%s</span></div>",
+        sle_team_web_parent_state_name((uint8_t)g_team_node.upstream_parent_state));
+    team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<div class=\"row\"><span class=\"k\">Parent Reselect Pending</span><span class=\"v\">%s</span></div>",
+        g_team_node.upstream_parent_reselect_pending != 0U ? "true" : "false");
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
         "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_SEQ_LABEL
         "</span><span class=\"v\">%u</span></div>",
