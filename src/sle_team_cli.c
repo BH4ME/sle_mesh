@@ -115,7 +115,7 @@ void sle_team_cli_print_help(sle_team_cli_t *cli)
     sle_team_cli_puts(cli, "  ack [dst] [ack_seq] [acked_type] [status]");
     sle_team_cli_puts(cli, "  members");
     sle_team_cli_puts(cli, "  allow [all|only <id...>|add <id>|del <id>]");
-    sle_team_cli_puts(cli, "  pairing [start|stop|approve <id>|pending]");
+    sle_team_cli_puts(cli, "  pairing [start|stop|approve <id> [relay|norelay]|pending]");
     sle_team_cli_puts(cli, "  join <team> <leader> <channel>");
     sle_team_cli_puts(cli, "  leave");
     sle_team_cli_puts(cli, "  led help");
@@ -256,12 +256,15 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
     }
 
     if (strcmp(argv[0], "members") == 0) {
-        for (i = 1; i <= (int)SLE_TEAM_MAX_MEMBERS; i++) {
-            member = sle_team_node_find_member(cli->node, (uint8_t)i);
-            if (member != NULL) {
-                sle_team_cli_printf(cli, "member=%u role=%u online=%u battery=%u fix=%u rssi=%d last_seq=%u last_seen=%lu",
+        for (i = 0; i < (int)SLE_TEAM_MAX_MEMBERS; i++) {
+            member = &cli->node->members[i];
+            if (member->online != 0U) {
+                sle_team_cli_printf(cli,
+                    "member=%u role=%u online=%u battery=%u fix=%u rssi=%d relay=%u tier=%u max_down=%u last_seq=%u last_seen=%lu",
                     member->member_id, member->role, member->online, member->battery_percent,
-                    member->fix_status, member->last_rssi_dbm, member->last_seq, (unsigned long)member->last_seen_s);
+                    member->fix_status, member->last_rssi_dbm, member->relay_allowed,
+                    member->relay_tier, member->max_downstream, member->last_seq,
+                    (unsigned long)member->last_seen_s);
             }
         }
         return;
@@ -350,15 +353,28 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
             return;
         }
         if (strcmp(argv[1], "approve") == 0) {
+            uint8_t relay_allowed = 0U;
+
             if (argc < 3 || parse_u32(argv[2], 1U, 254U, &v[0]) != 0) {
-                sle_team_cli_puts(cli, "usage: pairing approve <id>");
+                sle_team_cli_puts(cli, "usage: pairing approve <id> [relay|norelay]");
                 return;
             }
-            ret = sle_team_node_pairing_approve(cli->node, (uint8_t)v[0]);
-            sle_team_cli_printf(cli, "pairing approve member=%u ret=%d", (uint8_t)v[0], ret);
+            if (argc >= 4) {
+                if (strcmp(argv[3], "relay") == 0) {
+                    relay_allowed = 1U;
+                } else if (strcmp(argv[3], "norelay") == 0) {
+                    relay_allowed = 0U;
+                } else {
+                    sle_team_cli_puts(cli, "usage: pairing approve <id> [relay|norelay]");
+                    return;
+                }
+            }
+            ret = sle_team_node_pairing_approve_with_relay(cli->node, (uint8_t)v[0], relay_allowed);
+            sle_team_cli_printf(cli, "pairing approve member=%u relay=%u ret=%d",
+                (uint8_t)v[0], relay_allowed, ret);
             return;
         }
-        sle_team_cli_puts(cli, "usage: pairing [start|stop|approve <id>|pending]");
+        sle_team_cli_puts(cli, "usage: pairing [start|stop|approve <id> [relay|norelay]|pending]");
         return;
     }
 

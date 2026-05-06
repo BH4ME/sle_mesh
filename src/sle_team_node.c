@@ -3,6 +3,9 @@
 #include <string.h>
 
 static const uint8_t g_zero_cipher_mac[2] = {0x00, 0x00};
+#define SLE_TEAM_CONFIG_BODY_BASE_SIZE 8U
+
+static void sle_team_node_disable_member_relay(sle_team_node_t *node);
 
 static uint32_t sle_team_now(const sle_team_node_t *node)
 {
@@ -98,17 +101,30 @@ static void sle_team_note_leader_seen(sle_team_node_t *node)
     }
 }
 
+static void sle_team_set_parent_state(sle_team_node_t *node, uint8_t parent_id, sle_team_parent_state_t state,
+    uint8_t reselect_pending)
+{
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
+        return;
+    }
+    node->upstream_parent_id = parent_id;
+    node->upstream_parent_state = state;
+    node->upstream_parent_reselect_pending = reselect_pending;
+}
+
 static void sle_team_member_rejoin(sle_team_node_t *node)
 {
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
         return;
     }
+    sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_RESELECTING, 1U);
     node->joined = 0U;
     node->state = SLE_TEAM_NET_DISCOVERING;
     node->last_hello_s = 0U;
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    sle_team_node_disable_member_relay(node);
     sle_team_clear_members(node);
     sle_team_log(node, "leader timeout, rejoining");
 }
@@ -137,11 +153,23 @@ static int sle_team_send_app(sle_team_node_t *node, uint8_t dst_id, const uint8_
         dst_id, mesh_buf, (uint16_t)mesh_len);
 }
 
-static int sle_team_build_and_send(sle_team_node_t *node, uint8_t dst_id, uint8_t msg_type,
-    const uint8_t *body, uint16_t body_len)
+static int sle_team_send_encoded_packet(sle_team_node_t *node, uint8_t dst_id, const sle_team_app_packet_t *app_packet)
 {
     uint8_t app_buf[SLE_TEAM_MAX_PAYLOAD_SIZE];
     uint16_t app_len = 0U;
+
+    if (node == NULL || app_packet == NULL) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    if (sle_team_encode_app_packet(app_packet, app_buf, sizeof(app_buf), &app_len) != SLE_TEAM_OK) {
+        return SLE_TEAM_ERR_BUF;
+    }
+    return sle_team_send_app(node, dst_id, app_buf, app_len);
+}
+
+static int sle_team_build_and_send(sle_team_node_t *node, uint8_t dst_id, uint8_t msg_type,
+    const uint8_t *body, uint16_t body_len)
+{
     sle_team_app_packet_t app_packet;
 
     if (node == NULL) {
@@ -154,14 +182,47 @@ static int sle_team_build_and_send(sle_team_node_t *node, uint8_t dst_id, uint8_
     app_packet.team_id = node->cfg.team_id;
     app_packet.src_id = node->cfg.self_id;
     app_packet.dst_id = dst_id;
-    app_packet.ttl = 1U;
+    app_packet.ttl = node->cfg.default_ttl != 0U ? node->cfg.default_ttl : 1U;
     app_packet.body_len = body_len;
     app_packet.body = body;
+    return sle_team_send_encoded_packet(node, dst_id, &app_packet);
+}
 
-    if (sle_team_encode_app_packet(&app_packet, app_buf, sizeof(app_buf), &app_len) != SLE_TEAM_OK) {
-        return SLE_TEAM_ERR_BUF;
+static int sle_team_forward_packet(sle_team_node_t *node, const sle_team_app_packet_t *app)
+{
+    sle_team_app_packet_t forwarded;
+
+    if (node == NULL || app == NULL) {
+        return SLE_TEAM_ERR_ARG;
     }
-    return sle_team_send_app(node, dst_id, app_buf, app_len);
+    if (app->ttl <= 1U) {
+        sle_team_log(node, "relay ttl expired");
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
+
+    forwarded = *app;
+    forwarded.ttl = (uint8_t)(app->ttl - 1U);
+    return sle_team_send_encoded_packet(node, forwarded.dst_id, &forwarded);
+}
+
+static uint8_t sle_team_should_relay_packet(const sle_team_node_t *node, const sle_team_app_packet_t *app)
+{
+    if (node == NULL || app == NULL) {
+        return 0U;
+    }
+    if (node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U || node->cfg.relay_enabled == 0U) {
+        return 0U;
+    }
+    if (app->src_id == node->cfg.self_id || app->src_id == SLE_TEAM_BROADCAST_ID) {
+        return 0U;
+    }
+    if (app->dst_id == SLE_TEAM_BROADCAST_ID) {
+        return app->src_id == node->cfg.leader_id ? 1U : 0U;
+    }
+    if (app->src_id == node->cfg.leader_id) {
+        return 1U;
+    }
+    return app->dst_id == node->cfg.leader_id ? 1U : 0U;
 }
 
 static void sle_team_mark_joined(sle_team_node_t *node, uint8_t member_id)
@@ -215,6 +276,24 @@ static uint8_t sle_team_has_online_member(const sle_team_node_t *node)
 static uint8_t sle_team_node_has_member_record(const sle_team_node_t *node, uint8_t member_id)
 {
     return sle_team_node_find_member(node, member_id) != NULL ? 1U : 0U;
+}
+
+static uint8_t sle_team_node_relay_tier_for_member(uint8_t member_id)
+{
+    if (member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return 0U;
+    }
+    return (uint8_t)(((uint8_t)(member_id - 1U) % 3U) + 1U);
+}
+
+static void sle_team_node_disable_member_relay(sle_team_node_t *node)
+{
+    if (node != NULL && node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
+        node->cfg.relay_allowed = 0U;
+        node->cfg.relay_enabled = 0U;
+        node->cfg.relay_tier = 0U;
+        node->cfg.max_downstream = 0U;
+    }
 }
 
 uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t member_id)
@@ -347,6 +426,11 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
 
 int sle_team_node_pairing_approve(sle_team_node_t *node, uint8_t member_id)
 {
+    return sle_team_node_pairing_approve_with_relay(node, member_id, 0U);
+}
+
+int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t member_id, uint8_t relay_allowed)
+{
     sle_team_pending_member_t *pending;
     sle_team_member_record_t *member;
     int ret;
@@ -368,6 +452,13 @@ int sle_team_node_pairing_approve(sle_team_node_t *node, uint8_t member_id)
             (void)memcpy(member->mac, pending->mac, sizeof(member->mac));
             member->last_seen_s = pending->last_seen_s;
         }
+    } else {
+        member = sle_team_get_member_slot(node, member_id, 1U);
+    }
+    if (member != NULL) {
+        member->relay_allowed = relay_allowed != 0U ? 1U : 0U;
+        member->relay_tier = member->relay_allowed != 0U ? sle_team_node_relay_tier_for_member(member_id) : 0U;
+        member->max_downstream = member->relay_allowed != 0U ? SLE_TEAM_MAX_DIRECT_CONNECTIONS : 0U;
     }
     sle_team_clear_pending_member(node, member_id);
     (void)sle_team_node_send_config(node, member_id);
@@ -394,6 +485,8 @@ int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, u
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    sle_team_set_parent_state(node, 0U, SLE_TEAM_PARENT_DISCOVERING, 0U);
+    sle_team_node_disable_member_relay(node);
     sle_team_clear_members(node);
     return sle_team_node_send_hello(node, node->cfg.leader_id);
 }
@@ -409,6 +502,8 @@ int sle_team_node_member_leave(sle_team_node_t *node)
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_DISCOVERING, 0U);
+    sle_team_node_disable_member_relay(node);
     sle_team_clear_members(node);
     sle_team_log(node, "member left team");
     return SLE_TEAM_OK;
@@ -477,8 +572,15 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
 
     ack = (const sle_team_ack_body_t *)app->body;
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && ack->acked_msg_type == SLE_TEAM_APP_HELLO) {
+        if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {
+            node->upstream_parent_id = app->src_id;
+        }
         node->joined = 1U;
         node->state = SLE_TEAM_NET_ONLINE;
+        node->cfg.relay_enabled = node->cfg.relay_allowed != 0U ? 1U : 0U;
+        sle_team_set_parent_state(node,
+            node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
+            SLE_TEAM_PARENT_CONNECTED, 0U);
         sle_team_note_leader_seen(node);
         sle_team_mark_joined(node, node->cfg.self_id);
     }
@@ -489,7 +591,7 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
 {
     const sle_team_config_body_t *cfg_body;
 
-    if (node == NULL || app == NULL || app->body_len < sizeof(*cfg_body)) {
+    if (node == NULL || app == NULL || app->body_len < SLE_TEAM_CONFIG_BODY_BASE_SIZE) {
         return SLE_TEAM_ERR_FORMAT;
     }
 
@@ -498,6 +600,25 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
     node->cfg.warn_distance_m = cfg_body->warn_distance_m;
     node->cfg.lost_distance_m = cfg_body->lost_distance_m;
     node->cfg.heartbeat_timeout_s = cfg_body->heartbeat_timeout_s;
+    if (app->body_len >= sizeof(*cfg_body)) {
+        node->cfg.relay_allowed = cfg_body->relay_allowed != 0U ? 1U : 0U;
+        node->cfg.relay_tier = node->cfg.relay_allowed != 0U ? cfg_body->relay_tier : 0U;
+        node->cfg.max_downstream = node->cfg.relay_allowed != 0U ? cfg_body->max_downstream : 0U;
+        node->cfg.relay_enabled = (node->joined != 0U && node->cfg.relay_allowed != 0U) ? 1U : 0U;
+    } else {
+        node->cfg.relay_allowed = 0U;
+        node->cfg.relay_enabled = 0U;
+        node->cfg.relay_tier = 0U;
+        node->cfg.max_downstream = 0U;
+    }
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
+        if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {
+            node->upstream_parent_id = app->src_id;
+        }
+        sle_team_set_parent_state(node,
+            node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
+            SLE_TEAM_PARENT_CONNECTED, 0U);
+    }
     node->last_config_s = sle_team_now(node);
     sle_team_note_leader_seen(node);
     return SLE_TEAM_OK;
@@ -577,6 +698,35 @@ static int sle_team_handle_alert(sle_team_node_t *node, const sle_team_app_packe
     return SLE_TEAM_OK;
 }
 
+static int sle_team_handle_route_update(sle_team_node_t *node, const sle_team_app_packet_t *app)
+{
+    const sle_team_route_update_body_t *route_update;
+
+    if (node == NULL || app == NULL || app->body_len < sizeof(*route_update)) {
+        return SLE_TEAM_ERR_FORMAT;
+    }
+
+    route_update = (const sle_team_route_update_body_t *)app->body;
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && app->src_id == node->cfg.leader_id) {
+        sle_team_note_leader_seen(node);
+        if (route_update->next_hop_id != 0U && route_update->next_hop_id != SLE_TEAM_BROADCAST_ID) {
+            node->upstream_parent_id = route_update->next_hop_id;
+        } else if (route_update->parent_id != 0U && route_update->parent_id != SLE_TEAM_BROADCAST_ID) {
+            node->upstream_parent_id = route_update->parent_id;
+        } else if (node->upstream_parent_id == 0U && app->src_id != 0U &&
+            app->src_id != SLE_TEAM_BROADCAST_ID) {
+            node->upstream_parent_id = app->src_id;
+        }
+        sle_team_set_parent_state(node,
+            node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
+            SLE_TEAM_PARENT_CONNECTED, 0U);
+        if (route_update->parent_state != 0U) {
+            node->cfg.relay_enabled = node->cfg.relay_allowed != 0U ? 1U : 0U;
+        }
+    }
+    return SLE_TEAM_OK;
+}
+
 int sle_team_node_init(sle_team_node_t *node, const sle_team_node_cfg_t *cfg, const sle_team_node_ops_t *ops)
 {
     if (node == NULL || cfg == NULL || ops == NULL || ops->send == NULL) {
@@ -585,10 +735,23 @@ int sle_team_node_init(sle_team_node_t *node, const sle_team_node_cfg_t *cfg, co
 
     (void)memset(node, 0, sizeof(*node));
     node->cfg = *cfg;
+    if (node->cfg.default_ttl == 0U) {
+        node->cfg.default_ttl = 1U;
+    }
     node->ops = *ops;
     node->next_seq = 1U;
     node->state = (cfg->role == SLE_TEAM_ROLE_LEADER) ? SLE_TEAM_NET_ONLINE : SLE_TEAM_NET_DISCOVERING;
     node->joined = (cfg->role == SLE_TEAM_ROLE_LEADER) ? 1U : 0U;
+    node->upstream_parent_id = 0U;
+    node->upstream_parent_reselect_pending = 0U;
+    node->upstream_parent_state = (cfg->role == SLE_TEAM_ROLE_LEADER) ? SLE_TEAM_PARENT_IDLE :
+        SLE_TEAM_PARENT_DISCOVERING;
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
+        node->cfg.relay_allowed = 0U;
+        node->cfg.relay_enabled = 0U;
+        node->cfg.relay_tier = 0U;
+        node->cfg.max_downstream = 0U;
+    }
     node->last_leader_seen_s = (cfg->role == SLE_TEAM_ROLE_LEADER) ? 0U : sle_team_now(node);
     return SLE_TEAM_OK;
 }
@@ -669,8 +832,21 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
     if (app_packet.team_id != node->cfg.team_id) {
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
-    if (app_packet.dst_id != node->cfg.self_id && app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
-        return SLE_TEAM_ERR_UNSUPPORTED;
+    if (app_packet.dst_id != node->cfg.self_id) {
+        if (sle_team_should_relay_packet(node, &app_packet) != 0U) {
+            ret = sle_team_forward_packet(node, &app_packet);
+            if (ret == SLE_TEAM_OK) {
+                sle_team_log(node, "relay forwarded packet");
+                if (app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
+                    return SLE_TEAM_OK;
+                }
+            } else {
+                return ret;
+            }
+        }
+        if (app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
+            return SLE_TEAM_ERR_UNSUPPORTED;
+        }
     }
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && app_packet.src_id != node->cfg.leader_id) {
         sle_team_log(node, "packet rejected by leader id");
@@ -690,6 +866,8 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
             return sle_team_handle_position(node, &app_packet);
         case SLE_TEAM_APP_ALERT:
             return sle_team_handle_alert(node, &app_packet);
+        case SLE_TEAM_APP_ROUTE_UPDATE:
+            return sle_team_handle_route_update(node, &app_packet);
         default:
             sle_team_log(node, "unsupported app msg");
             return SLE_TEAM_ERR_UNSUPPORTED;
@@ -748,6 +926,7 @@ int sle_team_node_send_alert(sle_team_node_t *node, uint8_t dst_id, const sle_te
 int sle_team_node_send_config(sle_team_node_t *node, uint8_t dst_id)
 {
     sle_team_config_body_t cfg_body;
+    const sle_team_member_record_t *member;
 
     if (node == NULL) {
         return SLE_TEAM_ERR_ARG;
@@ -757,6 +936,22 @@ int sle_team_node_send_config(sle_team_node_t *node, uint8_t dst_id)
     cfg_body.warn_distance_m = node->cfg.warn_distance_m;
     cfg_body.lost_distance_m = node->cfg.lost_distance_m;
     cfg_body.heartbeat_timeout_s = node->cfg.heartbeat_timeout_s;
+    cfg_body.relay_allowed = 0U;
+    cfg_body.relay_tier = 0U;
+    cfg_body.max_downstream = 0U;
+    cfg_body.reserved = 0U;
+    if (node->cfg.role == SLE_TEAM_ROLE_LEADER) {
+        member = sle_team_node_find_member(node, dst_id);
+        if (member != NULL && member->relay_allowed != 0U) {
+            cfg_body.relay_allowed = 1U;
+            cfg_body.relay_tier = member->relay_tier;
+            cfg_body.max_downstream = member->max_downstream;
+        }
+    } else {
+        cfg_body.relay_allowed = node->cfg.relay_allowed;
+        cfg_body.relay_tier = node->cfg.relay_tier;
+        cfg_body.max_downstream = node->cfg.max_downstream;
+    }
     return sle_team_build_and_send(node, dst_id, SLE_TEAM_APP_CONFIG, (const uint8_t *)&cfg_body, sizeof(cfg_body));
 }
 
@@ -773,6 +968,23 @@ int sle_team_node_send_ack(sle_team_node_t *node, uint8_t dst_id, uint16_t ack_s
     ack.acked_msg_type = acked_msg_type;
     ack.status_code = status_code;
     return sle_team_build_and_send(node, dst_id, SLE_TEAM_APP_ACK, (const uint8_t *)&ack, sizeof(ack));
+}
+
+int sle_team_node_send_route_update(sle_team_node_t *node, uint8_t dst_id, uint8_t parent_id,
+    uint8_t parent_state, uint8_t next_hop_id)
+{
+    sle_team_route_update_body_t route_update;
+
+    if (node == NULL) {
+        return SLE_TEAM_ERR_ARG;
+    }
+
+    route_update.parent_id = parent_id;
+    route_update.next_hop_id = next_hop_id != 0U ? next_hop_id : parent_id;
+    route_update.parent_state = parent_state;
+    route_update.reserved = 0U;
+    return sle_team_build_and_send(node, dst_id, SLE_TEAM_APP_ROUTE_UPDATE, (const uint8_t *)&route_update,
+        sizeof(route_update));
 }
 
 const sle_team_member_record_t *sle_team_node_find_member(const sle_team_node_t *node, uint8_t member_id)

@@ -9,9 +9,20 @@
 #ifndef SLE_UART_CLIENT_H
 #define SLE_UART_CLIENT_H
 
+#include "sle_connection_manager.h"
+#include "sle_device_discovery.h"
 #include "sle_ssap_client.h"
 
+typedef uint8_t (*sle_uart_client_seek_filter_cb)(const sle_seek_result_info_t *seek_result_data, void *user_ctx);
+
 void sle_uart_client_init(ssapc_notification_callback notification_cb, ssapc_indication_callback indication_cb);
+void sle_uart_client_set_seek_filter(sle_uart_client_seek_filter_cb seek_filter, void *user_ctx);
+uint8_t sle_uart_client_has_conn(uint16_t conn_id);
+uint8_t sle_uart_client_is_pending_remote_addr(const sle_addr_t *addr);
+void sle_uart_client_handle_connect_state_changed(uint16_t conn_id, const sle_addr_t *addr,
+    sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
+void sle_uart_client_handle_pair_complete(uint16_t conn_id, const sle_addr_t *addr, errcode_t status);
+void sle_uart_client_handle_read_rssi(uint16_t conn_id, int8_t rssi, errcode_t status);
 
 void sle_uart_start_scan(void);
 

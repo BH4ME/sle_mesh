@@ -48,6 +48,7 @@ typedef enum {
     SLE_TEAM_APP_ALERT = 0x04,
     SLE_TEAM_APP_CONFIG = 0x05,
     SLE_TEAM_APP_ACK = 0x06,
+    SLE_TEAM_APP_ROUTE_UPDATE = 0x07,
 } sle_team_app_msg_type_t;
 
 typedef enum {
@@ -132,6 +133,10 @@ typedef struct {
     uint16_t warn_distance_m;
     uint16_t lost_distance_m;
     uint16_t heartbeat_timeout_s;
+    uint8_t relay_allowed;
+    uint8_t relay_tier;
+    uint8_t max_downstream;
+    uint8_t reserved;
 } sle_team_config_body_t;
 
 typedef struct {
@@ -139,6 +144,13 @@ typedef struct {
     uint8_t acked_msg_type;
     uint8_t status_code;
 } sle_team_ack_body_t;
+
+typedef struct {
+    uint8_t parent_id;
+    uint8_t next_hop_id;
+    uint8_t parent_state;
+    uint8_t reserved;
+} sle_team_route_update_body_t;
 
 uint8_t sle_team_make_header(uint8_t version, uint8_t payload_type, uint8_t route_type);
 uint8_t sle_team_make_path_length(uint8_t hop_count, uint8_t path_hash_size);
@@ -163,6 +175,8 @@ int sle_team_build_config(uint8_t team_id, uint8_t src_id, uint8_t dst_id, uint1
     const sle_team_config_body_t *body, uint8_t *out_buf, size_t out_buf_len, uint16_t *out_len);
 int sle_team_build_ack(uint8_t team_id, uint8_t src_id, uint8_t dst_id, uint16_t seq,
     const sle_team_ack_body_t *body, uint8_t *out_buf, size_t out_buf_len, uint16_t *out_len);
+int sle_team_build_route_update(uint8_t team_id, uint8_t src_id, uint8_t dst_id, uint16_t seq,
+    const sle_team_route_update_body_t *body, uint8_t *out_buf, size_t out_buf_len, uint16_t *out_len);
 
 int sle_team_wrap_mesh_group_data(const uint8_t channel_hash, const uint8_t cipher_mac[2],
     const uint8_t *app_payload, uint16_t app_payload_len, sle_team_route_type_t route_type,

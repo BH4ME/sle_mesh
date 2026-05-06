@@ -50,6 +50,7 @@ int sle_team_web_write_events_json(const sle_team_web_event_log_t *log, char *ou
 
 const char *sle_team_web_role_name(uint8_t role);
 const char *sle_team_web_state_name(uint8_t state);
+const char *sle_team_web_parent_state_name(uint8_t state);
 const char *sle_team_web_msg_type_name(uint8_t app_msg_type);
 
 #ifdef __cplusplus

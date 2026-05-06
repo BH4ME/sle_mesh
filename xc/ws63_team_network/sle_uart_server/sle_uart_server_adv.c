@@ -42,6 +42,7 @@
 /* 广播名称 */
 static uint8_t sle_local_name[NAME_MAX_LENGTH] = "sle_uart_server";
 static uint8_t g_sle_uart_local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
+static uint8_t g_sle_uart_route_id = 0U;
 #define SLE_SERVER_INIT_DELAY_MS    1000
 #define sample_at_log_print(fmt, args...) osal_printk(fmt, ##args)
 #define SLE_UART_SERVER_LOG "[sle uart server]"
@@ -52,6 +53,15 @@ void sle_uart_server_adv_set_local_addr(const uint8_t addr[SLE_ADDR_LEN])
         return;
     }
     (void)memcpy_s(g_sle_uart_local_addr, sizeof(g_sle_uart_local_addr), addr, SLE_ADDR_LEN);
+}
+
+void sle_uart_server_adv_set_route_id(uint8_t route_id)
+{
+    if (route_id == 0U || route_id == 0xFFU) {
+        g_sle_uart_route_id = 0U;
+        return;
+    }
+    g_sle_uart_route_id = route_id;
 }
 
 static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
@@ -75,6 +85,19 @@ static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
         return 0;
     }
     return (uint16_t)index + local_name_len;
+}
+
+static uint16_t sle_set_adv_route_hint(uint8_t *adv_data, uint16_t max_len)
+{
+    if (adv_data == NULL || max_len < 5U || g_sle_uart_route_id == 0U) {
+        return 0U;
+    }
+    adv_data[0] = 4U;
+    adv_data[1] = SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA;
+    adv_data[2] = SLE_TEAM_ADV_ROUTE_MAGIC_0;
+    adv_data[3] = SLE_TEAM_ADV_ROUTE_MAGIC_1;
+    adv_data[4] = g_sle_uart_route_id;
+    return 5U;
 }
 
 static uint16_t sle_set_adv_data(uint8_t *adv_data)
@@ -129,6 +152,8 @@ static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
         return 0;
     }
     idx += scan_rsp_data_len;
+
+    idx += sle_set_adv_route_hint(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx);
 
     /* set local name */
     idx += sle_set_adv_local_name(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx);

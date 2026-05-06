@@ -103,6 +103,21 @@ const char *sle_team_web_state_name(uint8_t state)
     }
 }
 
+const char *sle_team_web_parent_state_name(uint8_t state)
+{
+    switch (state) {
+        case SLE_TEAM_PARENT_DISCOVERING:
+            return "discovering";
+        case SLE_TEAM_PARENT_CONNECTED:
+            return "connected";
+        case SLE_TEAM_PARENT_RESELECTING:
+            return "reselecting";
+        case SLE_TEAM_PARENT_IDLE:
+        default:
+            return "idle";
+    }
+}
+
 const char *sle_team_web_msg_type_name(uint8_t app_msg_type)
 {
     switch (app_msg_type) {
@@ -118,6 +133,8 @@ const char *sle_team_web_msg_type_name(uint8_t app_msg_type)
             return "CONFIG";
         case SLE_TEAM_APP_ACK:
             return "ACK";
+        case SLE_TEAM_APP_ROUTE_UPDATE:
+            return "ROUTE_UPDATE";
         default:
             return "UNKNOWN";
     }
@@ -180,10 +197,19 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
     json_append_mac_fields(&writer, node->cfg.self_mac, node->cfg.self_mac_ready);
     json_append(&writer,
         ",\"role\":\"%s\",\"state\":\"%s\","
-        "\"joined\":%s,\"nextSeq\":%u,\"uptimeS\":%lu,\"transport\":\"%s\","
+        "\"joined\":%s,\"relayAllowed\":%s,\"relayEnabled\":%s,\"relayTier\":%u,\"maxDownstream\":%u,"
+        "\"upstreamParentId\":%u,\"upstreamParentState\":\"%s\",\"upstreamParentReselectPending\":%s,"
+        "\"nextSeq\":%u,\"uptimeS\":%lu,\"transport\":\"%s\","
         "\"pairingEnabled\":%s,\"memberFilterEnabled\":%s,\"allowedMemberCount\":%u,\"allowedMembers\":[",
         sle_team_web_role_name((uint8_t)node->cfg.role),
-        sle_team_web_state_name((uint8_t)node->state), node->joined != 0U ? "true" : "false", node->next_seq,
+        sle_team_web_state_name((uint8_t)node->state), node->joined != 0U ? "true" : "false",
+        node->cfg.relay_allowed != 0U ? "true" : "false",
+        node->cfg.relay_enabled != 0U ? "true" : "false",
+        node->cfg.relay_tier, node->cfg.max_downstream,
+        node->upstream_parent_id,
+        sle_team_web_parent_state_name((uint8_t)node->upstream_parent_state),
+        node->upstream_parent_reselect_pending != 0U ? "true" : "false",
+        node->next_seq,
         (unsigned long)uptime_s, transport != NULL ? transport : "ws63-http",
         node->cfg.pairing_enabled != 0U ? "true" : "false",
         node->cfg.member_filter_enabled != 0U ? "true" : "false", node->cfg.allowed_member_count);
@@ -265,7 +291,9 @@ int sle_team_web_write_nodes_json(const sle_team_node_t *node, char *out, size_t
         } else {
             json_append(&writer, ",\"lastRssiDbm\":%d", member->last_rssi_dbm);
         }
-        json_append(&writer, ",\"lastSeq\":%u,\"lastSeenS\":%lu}",
+        json_append(&writer,
+            ",\"relayAllowed\":%s,\"relayTier\":%u,\"maxDownstream\":%u,\"lastSeq\":%u,\"lastSeenS\":%lu}",
+            member->relay_allowed != 0U ? "true" : "false", member->relay_tier, member->max_downstream,
             member->last_seq, (unsigned long)member->last_seen_s);
         wrote = 1U;
     }

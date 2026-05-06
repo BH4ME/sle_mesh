@@ -36,10 +36,11 @@
 
 static ssapc_find_service_result_t g_sle_uart_find_service_result = { 0 };
 static sle_announce_seek_callbacks_t g_sle_uart_seek_cbk = { 0 };
-static sle_connection_callbacks_t g_sle_uart_connect_cbk = { 0 };
 static ssapc_callbacks_t g_sle_uart_ssapc_cbk = { 0 };
 static sle_addr_t g_sle_uart_remote_addr = { 0 };
 ssapc_write_param_t g_sle_uart_send_param = { 0 };
+static sle_uart_client_seek_filter_cb g_sle_uart_seek_filter = NULL;
+static void *g_sle_uart_seek_filter_user_ctx = NULL;
 
 typedef struct {
     uint8_t active;
@@ -53,6 +54,22 @@ static sle_uart_client_conn_t g_sle_uart_conns[SLE_UART_CLIENT_MAX_CON];
 static uint8_t g_sle_uart_conn_num = 0;
 static uint16_t g_sle_uart_last_conn_id = 0;
 static uint8_t g_sle_uart_discovery_ready = 0U;
+
+static uint8_t sle_uart_client_buffer_contains(const uint8_t *buf, size_t buf_len,
+    const char *needle, size_t needle_len)
+{
+    size_t i;
+
+    if (buf == NULL || needle == NULL || needle_len == 0U || buf_len < needle_len) {
+        return 0U;
+    }
+    for (i = 0U; i + needle_len <= buf_len; i++) {
+        if (memcmp(buf + i, needle, needle_len) == 0) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
 
 static uint8_t sle_uart_client_addr_equal(const sle_addr_t *left, const sle_addr_t *right)
 {
@@ -122,6 +139,25 @@ static void sle_uart_client_remove_conn(uint16_t conn_id)
 uint16_t get_g_sle_uart_conn_id(void)
 {
     return g_sle_uart_last_conn_id;
+}
+
+uint8_t sle_uart_client_has_conn(uint16_t conn_id)
+{
+    return sle_uart_client_find_conn(conn_id) != NULL ? 1U : 0U;
+}
+
+uint8_t sle_uart_client_is_pending_remote_addr(const sle_addr_t *addr)
+{
+    if (addr == NULL) {
+        return 0U;
+    }
+    return (uint8_t)(memcmp(&g_sle_uart_remote_addr, addr, sizeof(g_sle_uart_remote_addr)) == 0);
+}
+
+void sle_uart_client_set_seek_filter(sle_uart_client_seek_filter_cb seek_filter, void *user_ctx)
+{
+    g_sle_uart_seek_filter = seek_filter;
+    g_sle_uart_seek_filter_user_ctx = user_ctx;
 }
 
 uint8_t sle_uart_client_is_ready(void)
@@ -208,10 +244,18 @@ static void sle_uart_client_sample_seek_enable_cbk(errcode_t status)
 
 static void sle_uart_client_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_data)
 {
+    static const char server_name[] = SLE_UART_SERVER_NAME;
+    size_t server_name_len = sizeof(SLE_UART_SERVER_NAME) - 1U;
+
     if (seek_result_data == NULL) {
         osal_printk("status error\r\n");
     } else if (g_sle_uart_conn_num < SLE_UART_CLIENT_MAX_CON &&
-        strstr((const char *)seek_result_data->data, SLE_UART_SERVER_NAME) != NULL) {
+        sle_uart_client_buffer_contains(seek_result_data->data, seek_result_data->data_length,
+            server_name, server_name_len) != 0U) {
+        if (g_sle_uart_seek_filter != NULL &&
+            g_sle_uart_seek_filter(seek_result_data, g_sle_uart_seek_filter_user_ctx) == 0U) {
+            return;
+        }
         if (sle_uart_client_find_conn_by_addr(&seek_result_data->addr) != NULL) {
             return;
         }
@@ -241,9 +285,8 @@ static void sle_uart_client_sample_seek_cbk_register(void)
     sle_announce_seek_register_callbacks(&g_sle_uart_seek_cbk);
 }
 
-static void sle_uart_client_sample_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
-                                                             sle_acb_state_t conn_state, sle_pair_state_t pair_state,
-                                                             sle_disc_reason_t disc_reason)
+void sle_uart_client_handle_connect_state_changed(uint16_t conn_id, const sle_addr_t *addr,
+    sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason)
 {
     osal_printk("%s conn state changed disc_reason:0x%x\r\n", SLE_UART_CLIENT_LOG, disc_reason);
     if (conn_state == SLE_ACB_STATE_CONNECTED) {
@@ -279,16 +322,17 @@ static void sle_uart_client_sample_connect_state_changed_cbk(uint16_t conn_id, c
     }
 }
 
-static void sle_uart_client_sample_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
+void sle_uart_client_handle_read_rssi(uint16_t conn_id, int8_t rssi, errcode_t status)
 {
     sle_uart_client_conn_t *conn = sle_uart_client_find_conn(conn_id);
+
     if (status == ERRCODE_SLE_SUCCESS && conn != NULL) {
         conn->rssi = rssi;
         osal_printk("%s rssi conn_id:%d rssi:%d\r\n", SLE_UART_CLIENT_LOG, conn_id, rssi);
     }
 }
 
-void  sle_uart_client_sample_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
+void sle_uart_client_handle_pair_complete(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
 {
     if (addr != NULL) {
         osal_printk("%s pair complete conn_id:%d, addr:%02x***%02x%02x\n", SLE_UART_CLIENT_LOG, conn_id,
@@ -302,14 +346,6 @@ void  sle_uart_client_sample_pair_complete_cbk(uint16_t conn_id, const sle_addr_
         info.version = 1;
         ssapc_exchange_info_req(0, conn_id, &info);
     }
-}
-
-static void sle_uart_client_sample_connect_cbk_register(void)
-{
-    g_sle_uart_connect_cbk.connect_state_changed_cb = sle_uart_client_sample_connect_state_changed_cbk;
-    g_sle_uart_connect_cbk.pair_complete_cb =  sle_uart_client_sample_pair_complete_cbk;
-    g_sle_uart_connect_cbk.read_rssi_cb = sle_uart_client_sample_read_rssi_cbk;
-    sle_connection_register_callbacks(&g_sle_uart_connect_cbk);
 }
 
 static void sle_uart_client_sample_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exchange_info_t *param,
@@ -386,7 +422,6 @@ void sle_uart_client_init(ssapc_notification_callback notification_cb, ssapc_ind
     (void)osal_msleep(5000); /* 延时5s，等待SLE初始化完毕 */
     osal_printk("[SLE Client] try enable.\r\n");
     sle_uart_client_sample_seek_cbk_register();
-    sle_uart_client_sample_connect_cbk_register();
     sle_uart_client_sample_ssapc_cbk_register(notification_cb, indication_cb);
     if (enable_sle() != ERRCODE_SUCC) {
         osal_printk("[SLE Client] sle enbale fail !\r\n");

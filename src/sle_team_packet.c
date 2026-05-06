@@ -291,6 +291,16 @@ int sle_team_build_ack(uint8_t team_id, uint8_t src_id, uint8_t dst_id, uint16_t
         (const uint8_t *)body, (uint16_t)sizeof(*body), out_buf, out_buf_len, out_len);
 }
 
+int sle_team_build_route_update(uint8_t team_id, uint8_t src_id, uint8_t dst_id, uint16_t seq,
+    const sle_team_route_update_body_t *body, uint8_t *out_buf, size_t out_buf_len, uint16_t *out_len)
+{
+    if (body == NULL) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    return sle_team_build_fixed_body(SLE_TEAM_APP_ROUTE_UPDATE, team_id, src_id, dst_id, seq,
+        (const uint8_t *)body, (uint16_t)sizeof(*body), out_buf, out_buf_len, out_len);
+}
+
 int sle_team_wrap_mesh_group_data(const uint8_t channel_hash, const uint8_t cipher_mac[2],
     const uint8_t *app_payload, uint16_t app_payload_len, sle_team_route_type_t route_type,
     sle_team_mesh_packet_t *packet)
