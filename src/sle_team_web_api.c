@@ -177,7 +177,7 @@ void sle_team_web_event_push(sle_team_web_event_log_t *log, uint32_t time_s,
 }
 
 int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_s, const char *transport,
-    char *out, size_t out_len)
+    const sle_team_web_route_metrics_t *route_metrics, char *out, size_t out_len)
 {
     sle_team_json_writer_t writer;
     uint8_t i;
@@ -216,7 +216,36 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
     for (i = 0U; i < node->cfg.allowed_member_count && i < SLE_TEAM_MAX_MEMBERS; i++) {
         json_append(&writer, "%s%u", i == 0U ? "" : ",", node->cfg.allowed_member_ids[i]);
     }
-    json_append(&writer, "]}");
+    json_append(&writer, "]");
+    if (route_metrics != NULL) {
+        json_append(&writer,
+            ",\"routeMetrics\":{\"active\":%u,\"direct\":%u,\"relayed\":%u,"
+            "\"unreachable\":%u,\"stale\":%u,\"converged\":%s,"
+            "\"relayTarget\":%u,\"relayOnline\":%u,"
+            "\"epoch\":%lu,\"lastChangeS\":%lu,\"lastConvergedS\":%lu,"
+            "\"routeHintSentTotal\":%lu,\"routeHintFailedTotal\":%lu,"
+            "\"routeHintCooldownSkippedTotal\":%lu,\"routeHintLastActivityS\":%lu,"
+            "\"routeUpdateRxTotal\":%lu,\"routeReparentTotal\":%lu,\"routeReparentLastS\":%lu}",
+            route_metrics->active_count,
+            route_metrics->direct_count,
+            route_metrics->relayed_count,
+            route_metrics->unreachable_count,
+            route_metrics->stale_count,
+            route_metrics->converged != 0U ? "true" : "false",
+            route_metrics->relay_target_count,
+            route_metrics->relay_online_count,
+            (unsigned long)route_metrics->epoch,
+            (unsigned long)route_metrics->last_change_s,
+            (unsigned long)route_metrics->last_converged_s,
+            (unsigned long)route_metrics->hint_sent_total,
+            (unsigned long)route_metrics->hint_failed_total,
+            (unsigned long)route_metrics->hint_cooldown_skipped_total,
+            (unsigned long)route_metrics->hint_last_activity_s,
+            (unsigned long)route_metrics->route_update_rx_total,
+            (unsigned long)route_metrics->route_reparent_total,
+            (unsigned long)route_metrics->route_reparent_last_s);
+    }
+    json_append(&writer, "}");
     return writer.truncated != 0 ? SLE_TEAM_ERR_BUF : (int)writer.used;
 }
 

@@ -1,9 +1,17 @@
 # Versions
 
-这个目录用于保存协议和代码版本记录。当前只记录版本说明和清单；详细现场问题统一放在 [docs/field-notes-2026-05-04.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)。
+这个目录用于保存协议和代码版本记录。详细阶段说明统一在 `docs/v0`、`docs/v1`、`docs/v2`。
 
 当前版本：
 
+- [v2.0.0-alpha10](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha10/VERSION.md)
+- [v2.0.0-alpha9](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha9/VERSION.md)
+- [v2.0.0-alpha8](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha8/VERSION.md)
+- [v2.0.0-alpha7](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha7/VERSION.md)
+- [v2.0.0-alpha6](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha6/VERSION.md)
+- [v2.0.0-alpha5](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha5/VERSION.md)
+- [v2.0.0-alpha4](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha4/VERSION.md)
+- [v2.0.0-alpha3](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha3/VERSION.md)
 - [v2.0.0-alpha2](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha2/VERSION.md)
 - [v2.0.0-alpha1](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha1/VERSION.md)
 - [v1.2.10](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.10/VERSION.md)

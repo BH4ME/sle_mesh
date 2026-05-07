@@ -37,13 +37,34 @@ typedef struct {
     uint8_t count;
 } sle_team_web_event_log_t;
 
+typedef struct {
+    uint8_t active_count;
+    uint8_t direct_count;
+    uint8_t relayed_count;
+    uint8_t unreachable_count;
+    uint8_t stale_count;
+    uint8_t converged;
+    uint8_t relay_target_count;
+    uint8_t relay_online_count;
+    uint32_t epoch;
+    uint32_t last_change_s;
+    uint32_t last_converged_s;
+    uint32_t hint_sent_total;
+    uint32_t hint_failed_total;
+    uint32_t hint_cooldown_skipped_total;
+    uint32_t hint_last_activity_s;
+    uint32_t route_update_rx_total;
+    uint32_t route_reparent_total;
+    uint32_t route_reparent_last_s;
+} sle_team_web_route_metrics_t;
+
 void sle_team_web_event_log_init(sle_team_web_event_log_t *log);
 void sle_team_web_event_push(sle_team_web_event_log_t *log, uint32_t time_s,
     sle_team_web_event_direction_t direction, uint8_t app_msg_type, uint8_t src_id, uint8_t dst_id, uint16_t seq,
     const char *summary);
 
 int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_s, const char *transport,
-    char *out, size_t out_len);
+    const sle_team_web_route_metrics_t *route_metrics, char *out, size_t out_len);
 int sle_team_web_write_nodes_json(const sle_team_node_t *node, char *out, size_t out_len);
 int sle_team_web_write_pending_json(const sle_team_node_t *node, char *out, size_t out_len);
 int sle_team_web_write_events_json(const sle_team_web_event_log_t *log, char *out, size_t out_len);

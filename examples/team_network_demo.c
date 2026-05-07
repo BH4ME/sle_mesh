@@ -1,4 +1,5 @@
 #include "sle_team_node.h"
+#include "sle_team_web_api.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -325,6 +326,41 @@ int main(void)
     relay_last_packet(&leader_rt, &relay);
     relay_last_packet(&relay_rt, &member);
     assert(member.cfg.report_interval_s == leader.cfg.report_interval_s);
+
+    {
+        char status_json[1024];
+        sle_team_web_route_metrics_t web_metrics = {0};
+        int status_len;
+
+        web_metrics.active_count = 3U;
+        web_metrics.direct_count = 1U;
+        web_metrics.relayed_count = 2U;
+        web_metrics.unreachable_count = 0U;
+        web_metrics.stale_count = 0U;
+        web_metrics.converged = 1U;
+        web_metrics.relay_target_count = 2U;
+        web_metrics.relay_online_count = 2U;
+        web_metrics.epoch = 9U;
+        web_metrics.last_change_s = 120U;
+        web_metrics.last_converged_s = 123U;
+        web_metrics.hint_sent_total = 7U;
+        web_metrics.hint_failed_total = 1U;
+        web_metrics.hint_cooldown_skipped_total = 4U;
+        web_metrics.hint_last_activity_s = 126U;
+        web_metrics.route_update_rx_total = 19U;
+        web_metrics.route_reparent_total = 3U;
+        web_metrics.route_reparent_last_s = 125U;
+        status_len = sle_team_web_write_status_json(&leader, 126U, "unit-test", &web_metrics,
+            status_json, sizeof(status_json));
+        assert(status_len > 0);
+        assert(strstr(status_json, "\"routeHintSentTotal\":7") != NULL);
+        assert(strstr(status_json, "\"routeHintFailedTotal\":1") != NULL);
+        assert(strstr(status_json, "\"routeHintCooldownSkippedTotal\":4") != NULL);
+        assert(strstr(status_json, "\"routeHintLastActivityS\":126") != NULL);
+        assert(strstr(status_json, "\"routeUpdateRxTotal\":19") != NULL);
+        assert(strstr(status_json, "\"routeReparentTotal\":3") != NULL);
+        assert(strstr(status_json, "\"routeReparentLastS\":125") != NULL);
+    }
 
     return 0;
 }
