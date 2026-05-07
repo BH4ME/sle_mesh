@@ -424,9 +424,30 @@ int sle_team_node_pairing_start(sle_team_node_t *node)
 
 int sle_team_node_pairing_stop(sle_team_node_t *node)
 {
+    uint8_t pending_ids[SLE_TEAM_MAX_MEMBERS];
+    uint8_t pending_count = 0U;
+    uint8_t i;
+
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
         return SLE_TEAM_ERR_ARG;
     }
+
+    /*
+     * Keep CLI/WebUI behavior consistent in V2: when pairing closes, pending
+     * members are promoted to approved members by default (without relay grant).
+     * WebUI can still pre-approve with explicit relay policy before stop.
+     */
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->pending_members[i].active == 0U || node->pending_members[i].member_id == 0U ||
+            node->pending_members[i].member_id == SLE_TEAM_BROADCAST_ID) {
+            continue;
+        }
+        pending_ids[pending_count++] = node->pending_members[i].member_id;
+    }
+    for (i = 0U; i < pending_count; i++) {
+        (void)sle_team_node_pairing_approve_with_relay(node, pending_ids[i], 0U);
+    }
+
     node->cfg.pairing_enabled = 0U;
     (void)memset(node->pending_members, 0, sizeof(node->pending_members));
     sle_team_log(node, "pairing stopped");
