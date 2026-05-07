@@ -53,6 +53,8 @@ void sle_uart_server_handle_connect_state_changed(uint16_t conn_id, const sle_ad
 void sle_uart_server_handle_pair_complete(uint16_t conn_id, const sle_addr_t *addr, errcode_t status);
 void sle_uart_server_handle_read_rssi(uint16_t conn_id, int8_t rssi, errcode_t status);
 
+uint16_t sle_uart_server_connected_count(void);
+/* Backward-compatible alias, kept for existing call sites. */
 uint16_t sle_uart_client_is_connected(void);
 int8_t sle_uart_server_get_last_rssi(void);
 errcode_t sle_uart_server_read_remote_rssi(void);

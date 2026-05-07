@@ -1363,7 +1363,7 @@ static void team_request_sle_rssi(void)
         ret = sle_uart_client_read_remote_rssi();
     } else {
         ret = ERRCODE_SLE_FAIL;
-        if (sle_uart_client_is_connected() == 0U) {
+        if (sle_uart_server_connected_count() == 0U) {
             ret = ERRCODE_SLE_FAIL;
         } else {
             ret = sle_uart_server_read_remote_rssi();
@@ -2653,7 +2653,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
     }
 
     if (team_route_is_relay_enabled() == 0U) {
-        if (sle_uart_client_is_connected() == 0U) {
+        if (sle_uart_server_connected_count() == 0U) {
             osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NOT_READY\r\n",
                 dst_id, SLE_TEAM_ERR_UNSUPPORTED);
             return SLE_TEAM_ERR_UNSUPPORTED;
@@ -2732,7 +2732,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         return SLE_TEAM_OK;
     }
 
-    if (sle_uart_client_is_connected() == 0U) {
+    if (sle_uart_server_connected_count() == 0U) {
         osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NOT_READY\r\n",
             dst_id, SLE_TEAM_ERR_UNSUPPORTED);
         return SLE_TEAM_ERR_UNSUPPORTED;
@@ -2905,7 +2905,7 @@ static void team_relay_start_client_if_ready(void)
     if (g_team_node.joined == 0U || g_team_node.cfg.relay_allowed == 0U) {
         return;
     }
-    if (sle_uart_client_is_connected() == 0U) {
+    if (sle_uart_server_connected_count() == 0U) {
         return;
     }
 

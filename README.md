@@ -15,6 +15,20 @@
 - 已实现：member 上行 parent 状态维护与断连后 reselection/rejoin（heartbeat timeout 与 upstream disconnect 触发）。
 - 已实现：next-hop 严格选路。若路由记录存在 `next_hop_id`，发包必须先验证 next-hop 连接可达；不可达时直接报 `NO_ROUTE`，不再回退到陈旧 `conn_id`。
 
+## V1 组网流程（当前分支基线）
+
+- 模式：手动 relay 授权 + relay 主动寻找 leaf。
+- 操作入口：只在 leader 的 `/pairing` 页面审批成员。
+- 审批动作：
+  - `approve no-relay`：成员作为 leaf 入网，仅业务通信，不承担中继。
+  - `approve relay`：成员被授权为 relay，可主动扫描并连接下一层 leaf。
+- 连接方向：
+  - leader 是唯一审批方。
+  - relay 侧主动扫描并吸纳 leaf；leaf 侧不手动挑选 relay。
+- 路由行为：
+  - 使用 `member_id -> next_hop` 路由学习与定向转发。
+  - next-hop 不可达时直接 `NO_ROUTE`，避免陈旧连接回退。
+
 ## 快速入口
 
 - [现场更新和踩坑记录](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)

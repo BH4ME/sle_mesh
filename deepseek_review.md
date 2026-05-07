@@ -1,7 +1,7 @@
-# GPT-5.4 Review Record
+# DeepSeek Review Record
 
 - Date: 2026-05-06
-- Reviewer: GPT-5.4
+- Reviewer: DeepSeek
 - Reviewed commit: `21382a4` (`Implement hierarchical relay routing`)
 - Scope:
   - `src/sle_team_node.c`
@@ -62,3 +62,10 @@ Status update:
 ## Residual test gap
 
 - Host-side demo coverage is good for packet/state transitions, but there is still no full local compile of `xc/ws63_team_network/src/ws63_team_network_app.c` in this environment because vendor WS63 headers are unavailable here.
+
+## Follow-up (2026-05-07)
+
+- Addressed naming ambiguity called out in feedback:
+  - Added `sle_uart_server_connected_count()` in `sle_uart_server.c/.h`.
+  - Kept `sle_uart_client_is_connected()` as compatibility alias.
+  - Updated app call sites to use `sle_uart_server_connected_count()` for member upstream readiness checks.

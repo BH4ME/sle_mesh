@@ -551,9 +551,14 @@ void sle_uart_server_handle_pair_complete(uint16_t conn_id, const sle_addr_t *ad
     ssaps_set_info(g_server_id, &parameter);
 }
 
-uint16_t sle_uart_client_is_connected(void)
+uint16_t sle_uart_server_connected_count(void)
 {
     return g_sle_conn_count;
+}
+
+uint16_t sle_uart_client_is_connected(void)
+{
+    return sle_uart_server_connected_count();
 }
 
 errcode_t sle_uart_server_disconnect_current(void)
