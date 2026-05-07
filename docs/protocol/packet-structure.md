@@ -4,7 +4,7 @@
 
 ```mermaid
 mindmap
-  root((sle_mesh v1.2.2))
+  root((sle_mesh v1.2.10))
     Mesh Packet
       header
         version 2bit
@@ -26,7 +26,7 @@ mindmap
       cipher_mac
         reserved only
       app_packet
-        plaintext in v1.2.2
+        plaintext app payload
     App Packet
       msg_type
       flags
@@ -90,7 +90,7 @@ header = ((version & 0x03) << 6) |
 
 - `version`：外层协议版本，当前为 `0`
 - `payload_type`：payload 类型，当前主要使用 `GROUP_DATA = 0x06`
-- `route_type`：路由方式，当前常用 `DIRECT` 和 `FLOOD`
+- `route_type`：路由方式，当前常用 `DIRECT` 和 `FLOOD`（relay 转发仍复用该层封装）
 
 ### transport(opt)
 
@@ -130,7 +130,7 @@ hash_size |           hop_count
 path_bytes = path_hash_size * hop_count
 ```
 
-单跳场景下通常为空。
+当前实现主要通过连接路由表做转发，`path` 字段通常为空。
 
 ### payload
 
@@ -188,9 +188,21 @@ offset 10+: body          variable
 - `team_id`：队伍编号
 - `src_id`：源节点 ID
 - `dst_id`：目标节点 ID，广播为 `0xFF`
-- `ttl`：跳数控制，当前单跳场景保留
+- `ttl`：跳数控制，多跳 relay 转发时会递减，`ttl<=1` 时丢弃
 - `body_len`：body 长度，小端
 - `body`：具体业务体
+
+当前消息类型（`app_msg_type`）：
+
+```text
+0x01 HELLO
+0x02 HEARTBEAT
+0x03 POS_REPORT
+0x04 ALERT
+0x05 CONFIG
+0x06 ACK
+0x07 ROUTE_UPDATE
+```
 
 ## 示例包
 
@@ -215,7 +227,8 @@ offset 10+: body          variable
 
 ## 加密状态
 
-当前没有真正加密。
+当前应用层没有端到端加密；`cipher_mac` 仍是占位字段。
+是否有空口链路加密取决于 SLE 底层安全配对配置（SDK 层）。
 
 当前实际结构是：
 

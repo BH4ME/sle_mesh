@@ -157,6 +157,9 @@
 #define TEAM_CONN_TRACK_MAX 16U
 #define TEAM_PENDING_CONN_MAX SLE_TEAM_MAX_DIRECT_CONNECTIONS
 #define TEAM_ROUTE_ENTRY_MAX SLE_TEAM_MAX_MEMBERS
+#define SLE_TEAM_PAIRING_ROTATE_INTERVAL_S 6U
+#define SLE_TEAM_PAIRING_KEEP_CONNECTED 4U
+#define SLE_TEAM_AUTO_RELAY_MAX 3U
 #define SLE_TEAM_NV_KEY_WEB_CONFIG 0x5001
 #define SLE_TEAM_NV_CONFIG_MAGIC 0x534C4554U
 #define SLE_TEAM_NV_CONFIG_VERSION 1U
@@ -235,6 +238,8 @@ typedef struct {
     uint16_t role_request_leader_suffix;
     int role_request_last_ret;
     uint32_t member_rescan_last_s;
+    uint32_t pairing_rotate_last_s;
+    uint8_t pairing_rotate_index;
 } sle_team_ws63_runtime_t;
 
 typedef struct {
@@ -278,6 +283,8 @@ static void team_handle_role_request_once(void);
 static void team_register_connection_callbacks(void);
 static void team_upstream_parent_note(uint8_t parent_id, sle_team_parent_state_t state, const char *reason);
 static void team_upstream_parent_reset(const char *reason);
+static void team_leader_pairing_rotate_connections(void);
+static void team_leader_auto_approve_pending(void);
 
 static uint16_t team_nv_checksum(const sle_team_web_config_nv_t *cfg)
 {
@@ -1399,6 +1406,106 @@ static void team_leader_rescan_if_needed(const char *reason)
     sle_uart_client_force_rescan();
 }
 
+static uint8_t team_member_is_pending_or_online(uint8_t member_id)
+{
+    uint8_t i;
+
+    if (member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return 0U;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (g_team_node.pending_members[i].active != 0U && g_team_node.pending_members[i].member_id == member_id) {
+            return 1U;
+        }
+        if (g_team_node.members[i].online != 0U && g_team_node.members[i].member_id == member_id) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+static void team_leader_pairing_rotate_connections(void)
+{
+    uint32_t now_s;
+    uint16_t conn_ids[SLE_TEAM_MAX_DIRECT_CONNECTIONS];
+    uint8_t conn_count;
+    uint8_t keep_count = 0U;
+    uint8_t i;
+
+    if (g_team_rt.role_configured == 0U || g_team_rt.sle_started == 0U ||
+        g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER || g_team_node.cfg.pairing_enabled == 0U) {
+        return;
+    }
+    now_s = team_now_s(NULL);
+    if (g_team_rt.pairing_rotate_last_s != 0U &&
+        (now_s - g_team_rt.pairing_rotate_last_s) < SLE_TEAM_PAIRING_ROTATE_INTERVAL_S) {
+        return;
+    }
+    g_team_rt.pairing_rotate_last_s = now_s;
+    conn_count = sle_uart_client_get_active_conns(conn_ids, (uint8_t)SLE_TEAM_MAX_DIRECT_CONNECTIONS);
+    if (conn_count <= SLE_TEAM_PAIRING_KEEP_CONNECTED) {
+        return;
+    }
+    for (i = 0U; i < conn_count; i++) {
+        uint8_t member_id = 0U;
+
+        if (sle_uart_client_get_conn_member(conn_ids[i], &member_id) != 0U &&
+            team_member_is_pending_or_online(member_id) != 0U) {
+            keep_count++;
+        }
+    }
+    for (i = 0U; i < conn_count && (conn_count - keep_count) > SLE_TEAM_PAIRING_KEEP_CONNECTED; i++) {
+        uint8_t index = (uint8_t)((g_team_rt.pairing_rotate_index + i) % conn_count);
+        uint8_t member_id = 0U;
+
+        if (sle_uart_client_get_conn_member(conn_ids[index], &member_id) != 0U &&
+            team_member_is_pending_or_online(member_id) != 0U) {
+            continue;
+        }
+        if (sle_uart_client_disconnect_conn(conn_ids[index]) != 0U) {
+            osal_printk("[team] pairing rotate disconnect conn=%u\r\n", conn_ids[index]);
+            g_team_rt.pairing_rotate_index = (uint8_t)((index + 1U) % conn_count);
+            return;
+        }
+    }
+}
+
+static void team_leader_auto_approve_pending(void)
+{
+    uint8_t i;
+    uint8_t relay_quota = SLE_TEAM_AUTO_RELAY_MAX;
+
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &g_team_node.members[i];
+
+        if (member->online == 0U) {
+            continue;
+        }
+        if (member->relay_allowed != 0U && relay_quota > 0U) {
+            relay_quota--;
+        }
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_pending_member_t *pending = &g_team_node.pending_members[i];
+        uint8_t relay_allowed;
+        int ret;
+
+        if (pending->active == 0U || pending->member_id == 0U || pending->member_id == SLE_TEAM_BROADCAST_ID) {
+            continue;
+        }
+        relay_allowed = relay_quota > 0U ? 1U : 0U;
+        ret = sle_team_node_pairing_approve_with_relay(&g_team_node, pending->member_id, relay_allowed);
+        osal_printk("[team] auto approve pending member=%u relay=%u ret=%d\r\n",
+            pending->member_id, relay_allowed, ret);
+        if (ret == SLE_TEAM_OK && relay_allowed != 0U && relay_quota > 0U) {
+            relay_quota--;
+        }
+    }
+}
+
 static void team_log(void *user_ctx, const char *text)
 {
     unused(user_ctx);
@@ -2276,10 +2383,14 @@ static void team_http_handle_client(int fd)
         }
         if (strstr(path, "action=start") != NULL) {
             ret = sle_team_node_pairing_start(&g_team_node);
+            g_team_rt.pairing_rotate_last_s = 0U;
+            g_team_rt.pairing_rotate_index = 0U;
             osal_printk("[team-wifi] pairing start ret=%d\r\n", ret);
             team_http_send_redirect(fd, "/pairing");
         } else if (strstr(path, "action=stop") != NULL) {
+            team_leader_auto_approve_pending();
             ret = sle_team_node_pairing_stop(&g_team_node);
+            g_team_rt.pairing_rotate_last_s = 0U;
             osal_printk("[team-wifi] pairing stop ret=%d\r\n", ret);
             team_http_send_redirect(fd, "/pairing");
         } else if (strstr(path, "action=approve") != NULL &&
@@ -3180,6 +3291,9 @@ static void *team_network_task(const char *arg)
                 (g_team_node.cfg.pairing_enabled != 0U || sle_uart_client_connected_count() == 0U)) {
                 team_leader_rescan_if_needed(g_team_node.cfg.pairing_enabled != 0U ?
                     "pairing_window" : "no_member");
+            }
+            if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER && g_team_node.cfg.pairing_enabled != 0U) {
+                team_leader_pairing_rotate_connections();
             }
             team_relay_start_client_if_ready();
             team_request_sle_rssi();
