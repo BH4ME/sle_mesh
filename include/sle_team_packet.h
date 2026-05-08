@@ -139,6 +139,8 @@ typedef struct {
     uint8_t reserved;
 } sle_team_config_body_t;
 
+#define SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY 0x01U
+
 typedef struct {
     uint16_t ack_seq;
     uint8_t acked_msg_type;

@@ -103,6 +103,7 @@ typedef struct {
     uint8_t relay_tier;
     uint8_t max_downstream;
     uint8_t relay_enabled;
+    uint8_t relay_discovery_only;
     uint8_t default_ttl;
     uint8_t allowed_member_count;
     uint8_t allowed_member_ids[SLE_TEAM_MAX_MEMBERS];

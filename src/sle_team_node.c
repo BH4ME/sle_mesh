@@ -213,6 +213,10 @@ static uint8_t sle_team_should_relay_packet(const sle_team_node_t *node, const s
     if (node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U || node->cfg.relay_enabled == 0U) {
         return 0U;
     }
+    if (node->cfg.relay_discovery_only != 0U && app->app_msg_type != SLE_TEAM_APP_HELLO &&
+        app->app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE) {
+        return 0U;
+    }
     if (app->src_id == node->cfg.self_id || app->src_id == SLE_TEAM_BROADCAST_ID) {
         return 0U;
     }
@@ -286,6 +290,24 @@ static uint8_t sle_team_node_relay_tier_for_member(uint8_t member_id)
     return (uint8_t)(((uint8_t)(member_id - 1U) % 3U) + 1U);
 }
 
+static void sle_team_leader_refresh_relay_config(sle_team_node_t *node)
+{
+    uint8_t i;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &node->members[i];
+
+        if (member->online == 0U || member->relay_allowed == 0U ||
+            member->member_id == 0U || member->member_id == SLE_TEAM_BROADCAST_ID) {
+            continue;
+        }
+        (void)sle_team_node_send_config(node, member->member_id);
+    }
+}
+
 static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t clear_permission)
 {
     if (node != NULL && node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
@@ -294,6 +316,7 @@ static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t cl
             node->cfg.relay_allowed = 0U;
             node->cfg.relay_tier = 0U;
             node->cfg.max_downstream = 0U;
+            node->cfg.relay_discovery_only = 0U;
         }
     }
 }
@@ -418,6 +441,7 @@ int sle_team_node_pairing_start(sle_team_node_t *node)
     node->cfg.pairing_enabled = 1U;
     node->cfg.member_filter_enabled = 1U;
     (void)memset(node->pending_members, 0, sizeof(node->pending_members));
+    sle_team_leader_refresh_relay_config(node);
     sle_team_log(node, "pairing started");
     return SLE_TEAM_OK;
 }
@@ -449,6 +473,7 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
     }
 
     node->cfg.pairing_enabled = 0U;
+    sle_team_leader_refresh_relay_config(node);
     (void)memset(node->pending_members, 0, sizeof(node->pending_members));
     sle_team_log(node, "pairing stopped");
     return SLE_TEAM_OK;
@@ -634,6 +659,8 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
         node->cfg.relay_allowed = cfg_body->relay_allowed != 0U ? 1U : 0U;
         node->cfg.relay_tier = node->cfg.relay_allowed != 0U ? cfg_body->relay_tier : 0U;
         node->cfg.max_downstream = node->cfg.relay_allowed != 0U ? cfg_body->max_downstream : 0U;
+        node->cfg.relay_discovery_only = (cfg_body->reserved & SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY) != 0U ?
+            1U : 0U;
         node->cfg.relay_enabled = (node->joined != 0U && node->cfg.relay_allowed != 0U) ? 1U : 0U;
     } else {
         sle_team_node_disable_member_relay(node, 1U);
@@ -778,6 +805,7 @@ int sle_team_node_init(sle_team_node_t *node, const sle_team_node_cfg_t *cfg, co
         node->cfg.relay_enabled = 0U;
         node->cfg.relay_tier = 0U;
         node->cfg.max_downstream = 0U;
+        node->cfg.relay_discovery_only = 0U;
     }
     node->last_leader_seen_s = (cfg->role == SLE_TEAM_ROLE_LEADER) ? 0U : sle_team_now(node);
     return SLE_TEAM_OK;
@@ -973,11 +1001,17 @@ int sle_team_node_send_config(sle_team_node_t *node, uint8_t dst_id)
             cfg_body.relay_allowed = 1U;
             cfg_body.relay_tier = member->relay_tier;
             cfg_body.max_downstream = member->max_downstream;
+            if (node->cfg.pairing_enabled != 0U) {
+                cfg_body.reserved |= SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY;
+            }
         }
     } else {
         cfg_body.relay_allowed = node->cfg.relay_allowed;
         cfg_body.relay_tier = node->cfg.relay_tier;
         cfg_body.max_downstream = node->cfg.max_downstream;
+        if (node->cfg.relay_discovery_only != 0U) {
+            cfg_body.reserved |= SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY;
+        }
     }
     return sle_team_build_and_send(node, dst_id, SLE_TEAM_APP_CONFIG, (const uint8_t *)&cfg_body, sizeof(cfg_body));
 }

@@ -294,6 +294,38 @@ int main(void)
     assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
     relay_last_packet(&leader_rt, &member);
     assert(member.cfg.relay_allowed != 0U);
+    assert(sle_team_node_send_ack(&leader, 2U, 0U, SLE_TEAM_APP_HELLO, 0U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+
+    assert(sle_team_node_pairing_start(&leader) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.cfg.relay_discovery_only != 0U);
+    assert(sle_team_node_pairing_stop(&leader) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.cfg.relay_discovery_only == 0U);
+
+    (void)memset(&pos, 0, sizeof(pos));
+    pos.latitude_e6 = 39908456;
+    pos.longitude_e6 = 116397128;
+    pos.speed_cms = 100U;
+    pos.heading_deg = 90U;
+    pos.battery_percent = 88U;
+    pos.fix_status = 1U;
+    pos.sat_count = 9U;
+
+    member_rt.last_tx_len = 0U;
+    relay_rt.last_tx_len = 0U;
+    relay.cfg.relay_enabled = 1U;
+    relay.cfg.relay_discovery_only = 1U;
+    assert(sle_team_node_send_position(&member, 1U, &pos) == SLE_TEAM_OK);
+    relay_last_packet(&member_rt, &relay);
+    assert(relay_rt.last_tx_len == 0U);
+    relay_rt.last_tx_len = 0U;
+    assert(sle_team_node_send_route_update(&member, 1U, 3U, (uint8_t)SLE_TEAM_PARENT_CONNECTED, 3U) == SLE_TEAM_OK);
+    relay_last_packet(&member_rt, &relay);
+    assert(relay_rt.last_tx_len != 0U);
+    relay_rt.last_tx_len = 0U;
+    relay.cfg.relay_discovery_only = 0U;
 
     member.last_leader_seen_s = 1U;
     member.cfg.heartbeat_timeout_s = 2U;
@@ -307,14 +339,6 @@ int main(void)
     assert(member.upstream_parent_reselect_pending != 0U);
     assert(member.upstream_parent_id == 3U);
 
-    (void)memset(&pos, 0, sizeof(pos));
-    pos.latitude_e6 = 39908456;
-    pos.longitude_e6 = 116397128;
-    pos.speed_cms = 100U;
-    pos.heading_deg = 90U;
-    pos.battery_percent = 88U;
-    pos.fix_status = 1U;
-    pos.sat_count = 9U;
     (void)sle_team_node_send_position(&member, 1U, &pos);
     relay_last_packet(&member_rt, &relay);
     assert(relay_rt.last_tx_len != 0U);

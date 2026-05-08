@@ -201,3 +201,20 @@ V2组网目标：从“V1手动relay授权 + relay主动找leaf”升级为“�
 - `examples/team_network_demo.c` 新增 JSON 字段断言覆盖；
 - `SLE_TEAM_NETWORK_TEST` / `SLE_TEAM_PACKET_TEST` 通过；
 - 已新增 `versions/v2.0.0-alpha10` 版本记录。
+
+
+当前进度（V2 Phase-10，alpha11 隐藏 relay 闭环）
+1. 已落地 pairing window 的“临时隐藏 relay”模式：
+- 复用 `CONFIG.reserved` 标志位下发隐藏 relay 意图（`SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY`）；
+- member 侧新增 `relay_discovery_only` 状态并解析 CONFIG 标志；
+- 当 `relay_discovery_only=1` 时，relay 仅转发 `HELLO/ROUTE_UPDATE`，不转发业务包。
+2. 窗口切换自动收敛已补齐：
+- leader 在 `pairing start/stop` 时主动刷新在线 relay 的 CONFIG；
+- pairing 打开后进入“隐藏 relay”；pairing 关闭后自动恢复常规业务转发。
+3. 测试与版本归档：
+- `examples/team_network_demo.c` 新增隐藏 relay 行为断言（窗口开关标志、消息白名单转发）；
+- `SLE_TEAM_NETWORK_TEST` / `SLE_TEAM_PACKET_TEST` 通过；
+- 已新增 `versions/v2.0.0-alpha11` 版本记录。
+4. 验收口径状态（截至 alpha11）：
+- 问题1中的方案B（临时隐藏 relay）已具备实现闭环；
+- V2 四条总体验收标准在能力侧均已覆盖，后续重点转向复杂多跳实机压测与参数调优。
