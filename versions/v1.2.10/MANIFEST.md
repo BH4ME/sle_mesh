@@ -37,7 +37,7 @@
   - 增加 `sle_uart_server_adv_set_local_addr()`，供业务层在启动 announce 前设置唯一地址。
 - `xc/ws63_team_network/README.md`
   - 更新 LED 诊断说明。
-- `docs/field-notes-2026-05-04.md`
+- `docs/v0/baseline.md`（历史现场结论已并入阶段文档）
   - 汇总最近更新、现场踩坑、验证日志、WebUI 字段含义和后续事项。
 
 验证：

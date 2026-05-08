@@ -1,42 +1,15 @@
 # sle_mesh
 
-`sle_mesh` 是面向 WS63 星闪设备的轻量组网和队伍协同协议工程。当前主线目标是把统一固件、SLE 多成员连接、板端 WiFi 控制台和协议状态机跑稳。
+`sle_mesh` 是 WS63 星闪组网工程。根目录只放“怎么编译、怎么烧录、怎么验证、怎么审查”。
 
-当前版本：`v1.2.10`
+## 文档入口
 
-## 当前状态
-
-- 统一固件：所有 WS63 烧同一个 `.fwpkg`，开机后通过板端 WebUI 或串口选择 `leader/member`。
-- 板端 WebUI：手机连接 `SLE-TEAM-WS63-XXXX`，打开 `http://192.168.43.1/`。
-- 当前拓扑：分层 relay 路由（leader + 多级 member），leader 仍是唯一审批方。
-- 已实现：`1vs8` 物理直连约束下的 `1vs20` 逻辑成员管理。
-- 已实现：leader-controlled approve-to-relay 模型。member 先 `approve/join`，再按 leader 授权启用 relay。
-- 已实现：`member_id -> next_hop` 路由学习，ACK/CONFIG/业务包优先走 next-hop 定向转发。
-- 已实现：member 上行 parent 状态维护与断连后 reselection/rejoin（heartbeat timeout 与 upstream disconnect 触发）。
-- 已实现：next-hop 严格选路。若路由记录存在 `next_hop_id`，发包必须先验证 next-hop 连接可达；不可达时直接报 `NO_ROUTE`，不再回退到陈旧 `conn_id`。
-
-## V1 组网流程（当前分支基线）
-
-- 模式：手动 relay 授权 + relay 主动寻找 leaf。
-- 操作入口：只在 leader 的 `/pairing` 页面审批成员。
-- 审批动作：
-  - `approve no-relay`：成员作为 leaf 入网，仅业务通信，不承担中继。
-  - `approve relay`：成员被授权为 relay，可主动扫描并连接下一层 leaf。
-- 连接方向：
-  - leader 是唯一审批方。
-  - relay 侧主动扫描并吸纳 leaf；leaf 侧不手动挑选 relay。
-- 路由行为：
-  - 使用 `member_id -> next_hop` 路由学习与定向转发。
-  - next-hop 不可达时直接 `NO_ROUTE`，避免陈旧连接回退。
-
-## 快速入口
-
-- [现场更新和踩坑记录](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/field-notes-2026-05-04.md)
-- [文档索引](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/README.md)
-- [版本记录](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)
-- [协议总览](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/README.md)
-- [WS63 板端样例说明](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network/README.md)
-- [域名 WebUI 说明](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui/README.md)
+- [docs/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/README.md)：总索引
+- [docs/v0/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/README.md)：V0（1vs2 / 1vs8）
+- [docs/v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay）
+- [docs/v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
+- [versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
+- [DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/DOC_WORKFLOW.md)：文档编写与维护流程
 
 ## 目录
 
@@ -45,7 +18,7 @@
 - [examples/](/Users/bh4me_macair/Documents/Codex/sle_intercom/examples)：本地协议测试和接入示例。
 - [xc/ws63_team_network/](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network)：WS63 上板样例。
 - [webui/](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui)：域名上位机 WebUI。
-- [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：协议、架构、现场记录。
+- [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：按 v0/v1/v2 分组的协议与组网文档。
 - [versions/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions)：版本记录。
 - [scripts/](/Users/bh4me_macair/Documents/Codex/sle_intercom/scripts)：编译和烧录脚本。
 
@@ -116,14 +89,19 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
   -o /tmp/sle_team_packet_test && /tmp/sle_team_packet_test
 ```
 
-## 当前限制
+## 一键审查（DeepSeek）
 
-- 当前不是通用自组织 Mesh，仍是面向队伍模型的 leader-controlled 分层路由。
-- 逻辑成员上限是 20，但单跳物理连接仍受 SDK 直连能力限制（当前按 8 设计）。
-- member 选择 leader 仍需要填写 leader MAC 后四位，还不是自动扫描附近 leader 后选择。
-- `cipher_mac` 目前是协议预留字段，尚未做真实加密认证。
-- `/api/status` 已包含 relay/parent 细节字段；`/status` HTML 页面仍以基础状态为主。
-- 板端 WebUI 为保护 RAM 使用 C 端 SSR，不直接烧录 Vite 产物。
+```sh
+scripts/run_review_with_deepseek.sh --scope "Bugfix / PR 审查" --goal-doc docs/v2/networking-goal.md
+```
+
+说明：
+- 脚本会强制 DeepSeek 先读取 `docs/v2/review_framework.md`，并按 Stage 执行。
+- 审查结果会覆盖写入根目录 `review_feedback.md`。
+- 可选 `--model deepseek-chat` 或其他 DeepSeek 模型。
+- 先预览 prompt 可用 `--dry-run`。
+- `scripts/run_review_with_gpt.sh` 仍可用，但已作为兼容入口转发到 DeepSeek 脚本。
+- 审查与文档维护完整流程见 [DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/DOC_WORKFLOW.md) 第 7、8 节。
 
 ## License
 

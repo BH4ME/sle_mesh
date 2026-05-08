@@ -59,6 +59,10 @@ uint16_t sle_uart_client_is_connected(void);
 int8_t sle_uart_server_get_last_rssi(void);
 errcode_t sle_uart_server_read_remote_rssi(void);
 errcode_t sle_uart_server_disconnect_current(void);
+uint8_t sle_uart_server_get_active_conns(uint16_t *conn_ids, uint8_t max_conns);
+uint8_t sle_uart_server_get_conn_member(uint16_t conn_id, uint8_t *member_id);
+uint8_t sle_uart_server_get_conn_rssi(uint16_t conn_id, int8_t *rssi);
+errcode_t sle_uart_server_disconnect_conn(uint16_t conn_id);
 
 typedef void (*sle_uart_server_msg_queue)(uint8_t *buffer_addr, uint16_t buffer_size);
 

@@ -561,6 +561,54 @@ uint16_t sle_uart_client_is_connected(void)
     return sle_uart_server_connected_count();
 }
 
+uint8_t sle_uart_server_get_active_conns(uint16_t *conn_ids, uint8_t max_conns)
+{
+    uint8_t count = 0U;
+
+    if (conn_ids == NULL || max_conns == 0U) {
+        return 0U;
+    }
+    for (uint8_t i = 0U; i < SLE_UART_SERVER_MAX_CONNECTIONS && count < max_conns; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        conn_ids[count++] = g_sle_conns[i].conn_id;
+    }
+    return count;
+}
+
+uint8_t sle_uart_server_get_conn_member(uint16_t conn_id, uint8_t *member_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL || member_id == NULL) {
+        return 0U;
+    }
+    *member_id = conn->member_id;
+    return 1U;
+}
+
+uint8_t sle_uart_server_get_conn_rssi(uint16_t conn_id, int8_t *rssi)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL || rssi == NULL) {
+        return 0U;
+    }
+    *rssi = conn->rssi;
+    return 1U;
+}
+
+errcode_t sle_uart_server_disconnect_conn(uint16_t conn_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL) {
+        return ERRCODE_SLE_FAIL;
+    }
+    return sle_disconnect_remote_device(&conn->addr);
+}
+
 errcode_t sle_uart_server_disconnect_current(void)
 {
     if (g_sle_conn_count == 0U) {

@@ -5,8 +5,8 @@
 - `xc/ws63_team_network/sle_uart_client/sle_uart_client.h`
 - `xc/ws63_team_network/sle_uart_client/sle_uart_client.c`
 - `xc/ws63_team_network/src/ws63_team_network_app.c`
-- `docs/v2-networking-goal.md`
-- `docs/protocol/packet-structure.md`
+- `docs/v2/networking-goal.md`
+- `docs/v2/protocol.md`
 - `versions/v2.0.0-alpha1/VERSION.md`
 - `versions/v2.0.0-alpha1/MANIFEST.md`
 
@@ -25,8 +25,8 @@
 - relay 授权按配额自动分配（当前默认上限3）。
 
 4. 文档更新：
-- `/goal v2` 固化至 `docs/v2-networking-goal.md`。
-- 协议包结构文档修正为与当前实现一致（v1.2.10语义、多跳TTL说明、加密口径说明）。
+- `/goal v2` 固化至 `docs/v2/networking-goal.md`。
+- 协议文档整理至 `docs/v2/protocol.md`（并在 v0/v1/v2 分线维护）。
 
 ## 验证
 
