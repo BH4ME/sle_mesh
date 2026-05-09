@@ -627,6 +627,10 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
 
     ack = (const sle_team_ack_body_t *)app->body;
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && ack->acked_msg_type == SLE_TEAM_APP_HELLO) {
+        if (ack->status_code != 0U) {
+            sle_team_log(node, "hello ack rejected");
+            return SLE_TEAM_ERR_UNSUPPORTED;
+        }
         if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {
             node->upstream_parent_id = app->src_id;
         }
@@ -648,6 +652,10 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
 
     if (node == NULL || app == NULL || app->body_len < SLE_TEAM_CONFIG_BODY_BASE_SIZE) {
         return SLE_TEAM_ERR_FORMAT;
+    }
+    if (node->cfg.role != SLE_TEAM_ROLE_MEMBER || app->src_id != node->cfg.leader_id) {
+        sle_team_log(node, "config rejected by role/source");
+        return SLE_TEAM_ERR_UNSUPPORTED;
     }
 
     cfg_body = (const sle_team_config_body_t *)app->body;
@@ -841,7 +849,8 @@ void sle_team_node_tick(sle_team_node_t *node)
         return;
     }
 
-    if ((now_s - node->last_heartbeat_s) >= node->cfg.heartbeat_interval_s) {
+    if (node->cfg.heartbeat_interval_s != 0U &&
+        (now_s - node->last_heartbeat_s) >= node->cfg.heartbeat_interval_s) {
         hb.battery_percent = 100U;
         hb.rssi_dbm = sle_team_rssi_dbm(node);
         hb.fix_status = 1U;

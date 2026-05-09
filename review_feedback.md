@@ -1,187 +1,128 @@
 # Code Review Feedback
 
 **Reviewer:** DeepSeek Flash (deepseek-v4-flash)
-**Date:** 2026-05-07
-**Version:** v2.0.0-alpha10
+**Date:** 2026-05-10
+**Version:** v2.0.0-alpha11
 **Branch:** codex/v2-networking-auto-parent
-**Scope:** 增量/小修改 — V2 alpha10 (ROUTE_UPDATE 接收与重挂载观测指标)
+**Scope:** 增量/小修改 — alpha11 之上的 3 项加固修复（HELLO ACK 拒绝、CONFIG 角色/来源守卫、心跳零间隔守卫）
 
 ---
 
-## 1. README 声明验证
-
-| # | README 声明 | 源码验证 | 状态 |
-|---|------------|----------|------|
-| 1 | 审查脚本/框架路径 | 文件存在 | ✅ 一致 |
-| 2 | 输出路径 `review_feedback.md` | 本文件即输出 | ✅ 一致 |
-| 3 | 本地验证命令 | MANIFEST 确认编译通过 | ✅ 一致 |
-| 4 | `GET /api/status` 返回 routeMetrics | 含 routeUpdateRxTotal/routeReparentTotal/routeReparentLastS | ✅ 一致 |
-
-**结果:** 4/4 通过
-
----
-
-## 2. 历史反馈追踪
-
-| # | 之前的问题 | 状态 | 当前证据 |
-|---|-----------|------|----------|
-| 1-6 | a5-a9 修复 | ✅ Resolved | 各版本已验证 |
-| 7 | a9 N1: 累计计数器单调递增 | ⚠️ Still Open | 设计如此，alpha10 同样模式 |
-
----
-
-## 3. 新代码逻辑审查
+## 1. 新代码逻辑审查
 
 ### 审查清单
 
-- [x] **状态机完备性** — 不涉及状态机变更
-- [x] **竞态条件** — 累计计数在主循环单线程写入，无并发
-- [x] **缓冲区安全** — JSON 序列化经 `json_append` 有界追加
-- [x] **空指针与边界** — `team_route_update_observe` 检查 `app_packet==NULL`；`body_len < sizeof(body)` 防止越界读
+- [x] **状态机完备性** — HELLO ACK 拒绝后 member 保持 `DISCOVERING`/`JOINING` 状态不变；CONFIG 守卫不涉及状态机变更；心跳零间隔守卫仅跳过发送，不改变 state
+- [x] **竞态条件** — 所有变更在主循环单线程路径执行，无可重入/并发路径
+- [x] **缓冲区安全** — 无新增缓冲区操作
+- [x] **空指针与边界** — HELLO ACK 处理在 `node==NULL || app==NULL || body_len < sizeof(*ack)` 格式检查之后；CONFIG 守卫在相同格式检查之后；心跳守卫仅读取 `cfg` 字段，无指针操作
 - [x] **资源泄漏** — 无动态分配
-- [x] **整数与类型** — `uint32_t` 累计计数，长期运行安全
-- [x] **魔法数字** — 无新增硬编码常量
-- [x] **协议兼容性** — 仅扩展 JSON API 字段，不改协议包；`route_metrics==NULL` 向下兼容
+- [x] **整数与类型** — `status_code` 为 `uint8_t` 与 `0U` 比较正确；`heartbeat_interval_s` 为 `uint16_t` 与 `0U` 比较正确；无符号溢出风险：在 `heartbeat_interval_s != 0U` 前置条件下，`(now_s - last_heartbeat_s) >= interval` 依赖 `now_s >= last_heartbeat_s`（单调递增时间源），行为安全
+- [x] **魔法数字** — `SLE_TEAM_APP_HELLO`、`SLE_TEAM_ROLE_MEMBER`、`SLE_TEAM_ERR_UNSUPPORTED` 均为已有枚举/宏
+- [x] **协议兼容性** — 所有变更均为接收端守卫逻辑，不改变包结构或发送行为；新旧互通不受影响
 
 ---
 
-### 3.1 运行时累计计数 (app.c:272-274)
+### 1.1 HELLO ACK 拒绝处理 (sle_team_node.c:630-632)
 
 ```c
-uint32_t route_update_rx_total;    // ROUTE_UPDATE 接收累计
-uint32_t route_reparent_total;     // next-hop 变化重挂载累计
-uint32_t route_reparent_last_s;    // 最近重挂载时间戳
-```
-
-- 全部 `uint32_t`，零初始化 ✅
-
-### 3.2 `team_route_update_observe()` 核心观测逻辑 (app.c:1222-1250)
-
-```c
-static void team_route_update_observe(const sle_team_app_packet_t *app_packet)
-```
-
-**守卫：**
-- `app_packet == NULL` → return ✅
-- `role != LEADER` → return（仅 leader 观测） ✅
-- `app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE` → return ✅
-- `body_len < sizeof(route_update_body_t)` → return（防越界） ✅
-
-**重挂载判定逻辑：**
-
-```c
-previous_next_hop = 0U;
-existing = team_route_entry_find(src_id);
-if (existing != NULL) {
-    previous_next_hop = existing->next_hop_id;      // 路由表记录的旧 next-hop
-}
-
-observed_next_hop = route_update->next_hop_id ?: route_update->parent_id;  // 上报的新 next-hop
-
-route_update_rx_total++;  // 每收到有效 ROUTE_UPDATE 都计数
-
-if (observed_next_hop != 0 && observed_next_hop != BROADCAST &&
-    previous_next_hop != 0 && previous_next_hop != observed_next_hop) {
-    route_reparent_total++;     // next-hop 变化 → 重挂载
-    route_reparent_last_s = now_s;
+if (ack->status_code != 0U) {
+    sle_team_log(node, "hello ack rejected");
+    return SLE_TEAM_ERR_UNSUPPORTED;
 }
 ```
 
-**场景覆盖：**
+**变更前：** member 收到任何 HELLO ACK（包括非零 status_code）都会触发 `joined=1U`、`state=ONLINE` 等入网动作。
 
-| 场景 | `routeUpdateRxTotal` | `routeReparentTotal` | 说明 |
-|------|---------------------|---------------------|------|
-| 首次收到某成员的 ROUTE_UPDATE | +1 | 不变 | `previous_next_hop==0`，不是重挂载 |
-| 同成员同 next-hop 再次上报 | +1 | 不变 | `previous==observed`，无变化 |
-| 同成员 next-hop 变化 | +1 | +1 | `previous!=0 && previous!=observed` |
-| 无效/空 next-hop | +1 | 不变 | `observed==0` 或 `BROADCAST` |
+**变更后：** 当 leader 返回非零 status_code 时，member 拒绝入网，保持原状态不变。
 
-- **首次不计数为重挂载**是正确的：成员首次上报路由是初始化，不是"重"挂载 ✅
-- **同 next-hop 重复上报不计为重挂载**：避免心跳性质的 ROUTE_UPDATE 产生无意义重挂载计数 ✅
-- **next-hop 从 A→B 才计数**：捕获真实的父节点切换事件 ✅
+- 守卫位置正确：在格式检查之后、`upstream_parent_id`/`joined`/`state` 等状态变更之前 ✅
+- `status_code` 为零表示批准、非零表示拒绝，语义符合通用约定 ✅
+- 使用 `SLE_TEAM_ERR_UNSUPPORTED` 作为返回值，调用方可感知处理失败 ✅
+- 返回前不修改任何 node 状态，无副作用 ✅
+
+**测试 (team_network_demo.c:226-234)：**
+```
+ACK(status_code=1) → assert(joined==0, state==DISCOVERING)  // 拒绝后保持未入网
+ACK(status_code=0) → assert(joined!=0)                       // 正常批准后入网
+```
+覆盖拒绝路径和正常路径，边界明确 ✅
 
 ---
 
-### 3.3 集成点：`team_bind_packet_source()` (app.c:3697)
+### 1.2 CONFIG 角色/来源守卫 (sle_team_node.c:656-660)
 
 ```c
-team_route_update_observe(&app_packet);
+if (node->cfg.role != SLE_TEAM_ROLE_MEMBER || app->src_id != node->cfg.leader_id) {
+    sle_team_log(node, "config rejected by role/source");
+    return SLE_TEAM_ERR_UNSUPPORTED;
+}
 ```
 
-- 在 `team_bind_packet_source` 解包完成后调用 ✅
-- 执行顺序：解码 app_packet → `team_route_update_observe` → `team_upstream_parent_note` → `team_conn_track_note_packet` → `team_route_note`
-- 观测在路由表更新（`team_route_note`）**之前**执行，因此 `team_route_entry_find()` 读到的是旧 next-hop，与"变化前 vs 变化后"比较语义一致 ✅
+**变更前：** 任何节点收到 CONFIG 包都会处理并覆盖自身配置，包括 leader 收到 member 发来的 CONFIG。
 
-### 3.4 Web API 扩展
+**变更后：** 仅 `role==MEMBER` 且 `src_id==leader_id` 时处理 CONFIG，其余情况拒绝。
 
-**结构体 (sle_team_web_api.h)：**
-```c
-uint32_t route_update_rx_total;
-uint32_t route_reparent_total;
-uint32_t route_reparent_last_s;
+- 守卫位置正确：在格式检查之后、`report_interval_s` 等配置写入之前 ✅
+- `role != MEMBER` 防止 leader 被 member 的 CONFIG 污染 ✅
+- `src_id != leader_id` 防止 member 被非 leader 来源的 CONFIG 误导 ✅
+- 多跳场景中 app 层 `src_id` 保持原始发送者不变（mesh 转发不改 app 包内容），因此通过 relay 转发的 leader CONFIG 仍会通过此守卫 ✅
+
+**测试 (team_network_demo.c:362-377)：**
 ```
-- 在 struct 末尾追加，不影响原字段偏移 ✅
-
-**JSON 序列化 (sle_team_web_api.c)：**
-```c
-"\"routeUpdateRxTotal\":%lu,\"routeReparentTotal\":%lu,\"routeReparentLastS\":%lu}"
+fake_member(role=MEMBER, self_id=99) → send_config(leader) →  leader 收到 CONFIG
+→ assert(leader.cfg.report_interval_s 不变)
 ```
-- 键名 camelCase，与已有风格一致 ✅
-
-### 3.5 状态页 UI (app.c:2884-2897)
-
-```c
-Route Update RX Total   → %lu
-Route Reparent Total    → %lu
-Route Reparent Last     → %lus / N/A  (值为 0 时)
-```
-- 仅 `role == LEADER` 时显示 ✅
-- `reparent_last_s == 0` 时显示 `N/A`，与已有风格一致 ✅
-
-### 3.6 测试断言 (team_network_demo.c)
-
-```c
-web_metrics.route_update_rx_total = 19U;
-web_metrics.route_reparent_total = 3U;
-web_metrics.route_reparent_last_s = 125U;
-
-assert(strstr(status_json, "\"routeUpdateRxTotal\":19") != NULL);
-assert(strstr(status_json, "\"routeReparentTotal\":3") != NULL);
-assert(strstr(status_json, "\"routeReparentLastS\":125") != NULL);
-```
-- 3 个新增字段均有断言覆盖 ✅
+覆盖 `role != MEMBER` 路径（leader 收到 CONFIG 时拒绝）。`src_id != leader_id` 路径未独立测试但逻辑等价（同一 if-OR 守卫），低风险。
 
 ---
 
-### 发现的问题
+### 1.3 心跳零间隔守卫 (sle_team_node.c:852-853)
+
+```c
+if (node->cfg.heartbeat_interval_s != 0U &&
+    (now_s - node->last_heartbeat_s) >= node->cfg.heartbeat_interval_s) {
+```
+
+**变更前：** `(now_s - last_heartbeat_s) >= 0` 始终为真（无符号算术），导致 `heartbeat_interval_s=0` 时每个 tick 都发送心跳，产生无意义流量。
+
+**变更后：** `interval != 0` 前置条件确保 `heartbeat_interval_s=0` 时完全跳过心跳发送，语义等价于"禁用心跳"。
+
+- 前置 `&&` 短路，`interval==0` 时不计算时间差，无整数溢出风险 ✅
+- 不影响 `interval>0` 的正常心跳逻辑 ✅
+- 逻辑一致性：interval=0 表示"不发送心跳"是直观的零值语义 ✅
+
+**测试 (team_network_demo.c:378-392)：**
+```
+hb_member(heartbeat_interval_s=0, joined=1, state=ONLINE) → tick()
+→ assert(last_tx_len == 0)  // 无心跳包发出
+```
+覆盖零间隔场景 ✅
+
+---
+
+## 2. 发现的问题
 
 **Blocker:** 无
 
 **Warning:** 无
 
-**Note:**
-
-- **N1: 进入 `team_route_update_observe` 时可能非 leader**
-  函数入口守卫 `role != LEADER` 直接 return。调用点 `team_bind_packet_source` 对所有角色都执行，但只有 leader 才需要观测重挂载。非 leader 路径恒定走 early return，零开销。✅
-  **影响:** 无害。
+**Note:** 无
 
 ---
 
-## 5. 汇总
+## 3. 汇总
 
 | 类别 | 数量 | 说明 |
 |------|------|------|
 | **Blocker** | 0 | 无阻塞性问题 |
 | **Warning** | 0 | — |
-| **Note** | 1 | N1: 非 leader 路径 early return（设计如此）|
-| **README 验证** | 4/4 通过 | |
+| **Note** | 0 | — |
 
 **结论:** ✅ **通过**
 
-alpha10 围绕"复杂多跳自愈闭环"的实机验证补齐了观测指标：
+alpha11 增量加固三个防守点：
 
-1. **`team_route_update_observe()`**：在 `team_bind_packet_source` 解包后、路由表更新前接入。重挂载判定语义正确——首次上报不计、同 next-hop 重复不计、仅 next-hop 从 A→B 变化时计数。
-
-2. **计数路径**：`routeUpdateRxTotal` 每次增量，`routeReparentTotal` 仅在 next-hop 实际变化时增量，`routeReparentLastS` 同步时间戳，三者覆盖完整观测需求。
-
-3. **JSON API + UI + 测试**：扩展字段已全部接入，3 个 `strstr` 断言覆盖 JSON 输出，`reparent_last_s==0` 显示 `N/A` 与已有风格一致。
+1. **HELLO ACK 拒绝**：当 leader 通过 `status_code != 0` 拒绝 HELLO 时，member 不再错误入网。逻辑完整（守卫位置、无副作用、状态不变），测试覆盖拒绝+正常双路径。
+2. **CONFIG 角色/来源守卫**：仅 member 且来自 leader 的 CONFIG 被接受，防止 leader 被 member 的 CONFIG 污染。守卫在格式检查后、状态变更前，多跳场景兼容。
+3. **心跳零间隔守卫**：修复 `interval=0` 时每个 tick 都发心跳的 bug，语义修正为"禁用心跳"。改动单行、影响范围明确、测试覆盖。

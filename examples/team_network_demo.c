@@ -223,6 +223,15 @@ int main(void)
     relay_last_packet(&leader_rt, &member);
     relay_last_packet(&leader_rt, &member);
     assert(member.joined != 0U);
+    member.joined = 0U;
+    member.state = SLE_TEAM_NET_DISCOVERING;
+    assert(sle_team_node_send_ack(&leader, 2U, 0U, SLE_TEAM_APP_HELLO, 1U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.joined == 0U);
+    assert(member.state == SLE_TEAM_NET_DISCOVERING);
+    assert(sle_team_node_send_ack(&leader, 2U, 0U, SLE_TEAM_APP_HELLO, 0U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.joined != 0U);
     assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
     relay_last_packet(&leader_rt, &member);
     assert(member.cfg.relay_allowed == 0U);
@@ -350,6 +359,37 @@ int main(void)
     relay_last_packet(&leader_rt, &relay);
     relay_last_packet(&relay_rt, &member);
     assert(member.cfg.report_interval_s == leader.cfg.report_interval_s);
+    {
+        uint16_t prev_report_interval = leader.cfg.report_interval_s;
+        sle_team_node_cfg_t fake_cfg = leader_cfg;
+        sle_team_node_t fake_member;
+        demo_runtime_t fake_rt = {.name = "fake-member"};
+        sle_team_node_ops_t fake_ops = leader_ops;
+
+        fake_cfg.role = SLE_TEAM_ROLE_MEMBER;
+        fake_cfg.self_id = 99U;
+        fake_ops.user_ctx = &fake_rt;
+        fake_ops.log = NULL;
+        (void)sle_team_node_init(&fake_member, &fake_cfg, &fake_ops);
+        assert(sle_team_node_send_config(&fake_member, 1U) == SLE_TEAM_OK);
+        relay_last_packet(&fake_rt, &leader);
+        assert(leader.cfg.report_interval_s == prev_report_interval);
+    }
+    {
+        sle_team_node_t hb_member;
+        sle_team_node_cfg_t hb_cfg = member_cfg;
+        demo_runtime_t hb_rt = {.name = "hb-member", .now_s = 100U};
+        sle_team_node_ops_t hb_ops = member_ops;
+
+        hb_cfg.heartbeat_interval_s = 0U;
+        hb_ops.user_ctx = &hb_rt;
+        (void)sle_team_node_init(&hb_member, &hb_cfg, &hb_ops);
+        hb_member.joined = 1U;
+        hb_member.state = SLE_TEAM_NET_ONLINE;
+        hb_rt.last_tx_len = 0U;
+        sle_team_node_tick(&hb_member);
+        assert(hb_rt.last_tx_len == 0U);
+    }
 
     {
         char status_json[1024];
