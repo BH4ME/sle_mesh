@@ -65,6 +65,20 @@ static void relay_last_packet(demo_runtime_t *from, sle_team_node_t *to)
     }
 }
 
+static int demo_send_fail_once(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_id, const uint8_t *buf, uint16_t len)
+{
+    demo_runtime_t *rt = (demo_runtime_t *)user_ctx;
+
+    if (rt == NULL) {
+        return -1;
+    }
+    if (rt->last_tx_len == 0xFFFFU) {
+        rt->last_tx_len = 0U;
+        return -1;
+    }
+    return demo_send(user_ctx, kind, dst_id, buf, len);
+}
+
 static uint8_t demo_decode_last_app_packet(const demo_runtime_t *rt, sle_team_app_packet_t *app)
 {
     sle_team_mesh_packet_t mesh;
@@ -215,8 +229,19 @@ int main(void)
     assert(leader.pending_members[0].active != 0U);
     assert(leader.pending_members[0].member_id == 2U);
     assert(member.joined == 0U);
+    {
+        sle_team_node_ops_t fail_once_ops = leader.ops;
+        fail_once_ops.send = demo_send_fail_once;
+        fail_once_ops.user_ctx = &leader_rt;
+        leader.ops = fail_once_ops;
+        leader_rt.last_tx_len = 0xFFFFU;
+        assert(sle_team_node_pairing_approve(&leader, 2U) != SLE_TEAM_OK);
+        assert(leader.pending_members[0].active != 0U);
+        assert(leader.pending_members[0].member_id == 2U);
+        leader.ops = leader_ops;
+    }
     relay_last_packet(&member_rt, &leader);
-    assert(sle_team_node_find_member(&leader, 2U) == NULL);
+    assert(sle_team_node_find_member(&leader, 2U) != NULL);
     assert(leader.pending_members[0].active != 0U);
 
     assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);

@@ -488,6 +488,8 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
 {
     sle_team_pending_member_t *pending;
     sle_team_member_record_t *member;
+    int cfg_ret;
+    int ack_ret;
     int ret;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
@@ -515,12 +517,21 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
         member->relay_tier = member->relay_allowed != 0U ? sle_team_node_relay_tier_for_member(member_id) : 0U;
         member->max_downstream = member->relay_allowed != 0U ? SLE_TEAM_MAX_DIRECT_CONNECTIONS : 0U;
     }
-    sle_team_clear_pending_member(node, member_id);
-    (void)sle_team_node_send_config(node, member_id);
-    ret = sle_team_node_send_ack(node, member_id, 0U, SLE_TEAM_APP_HELLO, 0U);
-    if (ret == SLE_TEAM_OK) {
+    cfg_ret = sle_team_node_send_config(node, member_id);
+    ack_ret = sle_team_node_send_ack(node, member_id, 0U, SLE_TEAM_APP_HELLO, 0U);
+    if (cfg_ret == SLE_TEAM_OK && ack_ret == SLE_TEAM_OK) {
+        sle_team_clear_pending_member(node, member_id);
         sle_team_log(node, "member approved");
+        return SLE_TEAM_OK;
     }
+    if (cfg_ret != SLE_TEAM_OK) {
+        sle_team_log(node, "member approve config send failed");
+    }
+    if (ack_ret != SLE_TEAM_OK) {
+        sle_team_log(node, "member approve ack send failed");
+        return ack_ret;
+    }
+    ret = cfg_ret;
     return ret;
 }
 
@@ -569,6 +580,8 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     const sle_team_hello_body_t *hello;
     sle_team_member_record_t *member;
     sle_team_pending_member_t *pending;
+    int ack_ret;
+    int cfg_ret;
 
     if (node == NULL || app == NULL || app->body_len < sizeof(*hello)) {
         return SLE_TEAM_ERR_FORMAT;
@@ -608,10 +621,23 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     member->last_seq = app->seq;
 
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER) {
-        sle_team_clear_pending_member(node, app->src_id);
-        (void)sle_team_node_send_ack(node, app->src_id, app->seq, SLE_TEAM_APP_HELLO, 0U);
-        (void)sle_team_node_send_config(node, app->src_id);
-        sle_team_mark_joined(node, app->src_id);
+        cfg_ret = sle_team_node_send_config(node, app->src_id);
+        ack_ret = sle_team_node_send_ack(node, app->src_id, app->seq, SLE_TEAM_APP_HELLO, 0U);
+        if (ack_ret == SLE_TEAM_OK) {
+            sle_team_clear_pending_member(node, app->src_id);
+            sle_team_mark_joined(node, app->src_id);
+        } else {
+            sle_team_log(node, "hello ack send failed");
+        }
+        if (cfg_ret != SLE_TEAM_OK) {
+            sle_team_log(node, "config send failed on hello");
+        }
+        if (ack_ret != SLE_TEAM_OK) {
+            return ack_ret;
+        }
+        if (cfg_ret != SLE_TEAM_OK) {
+            return cfg_ret;
+        }
     }
 
     return SLE_TEAM_OK;
