@@ -450,7 +450,9 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
 {
     uint8_t pending_ids[SLE_TEAM_MAX_MEMBERS];
     uint8_t pending_count = 0U;
+    uint8_t approve_failed = 0U;
     uint8_t i;
+    int last_err = SLE_TEAM_OK;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
         return SLE_TEAM_ERR_ARG;
@@ -469,14 +471,20 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
         pending_ids[pending_count++] = node->pending_members[i].member_id;
     }
     for (i = 0U; i < pending_count; i++) {
-        (void)sle_team_node_pairing_approve_with_relay(node, pending_ids[i], 0U);
+        int ret = sle_team_node_pairing_approve_with_relay(node, pending_ids[i], 0U);
+        if (ret != SLE_TEAM_OK) {
+            approve_failed = 1U;
+            last_err = ret;
+        }
     }
 
     node->cfg.pairing_enabled = 0U;
     sle_team_leader_refresh_relay_config(node);
-    (void)memset(node->pending_members, 0, sizeof(node->pending_members));
+    if (approve_failed != 0U) {
+        sle_team_log(node, "pairing stopped with pending retry");
+    }
     sle_team_log(node, "pairing stopped");
-    return SLE_TEAM_OK;
+    return approve_failed != 0U ? last_err : SLE_TEAM_OK;
 }
 
 int sle_team_node_pairing_approve(sle_team_node_t *node, uint8_t member_id)

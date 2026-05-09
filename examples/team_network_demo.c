@@ -240,9 +240,21 @@ int main(void)
         assert(leader.pending_members[0].member_id == 2U);
         leader.ops = leader_ops;
     }
+    {
+        sle_team_node_ops_t fail_once_ops = leader.ops;
+        fail_once_ops.send = demo_send_fail_once;
+        fail_once_ops.user_ctx = &leader_rt;
+        leader.ops = fail_once_ops;
+        leader_rt.last_tx_len = 0xFFFFU;
+        assert(sle_team_node_pairing_stop(&leader) != SLE_TEAM_OK);
+        assert(leader.pending_members[0].active != 0U);
+        assert(leader.pending_members[0].member_id == 2U);
+        leader.ops = leader_ops;
+        assert(sle_team_node_pairing_start(&leader) == SLE_TEAM_OK);
+    }
     relay_last_packet(&member_rt, &leader);
     assert(sle_team_node_find_member(&leader, 2U) != NULL);
-    assert(leader.pending_members[0].active != 0U);
+    assert(leader.pending_members[0].active == 0U);
 
     assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);
     relay_last_packet(&leader_rt, &member);
