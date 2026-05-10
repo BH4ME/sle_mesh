@@ -134,11 +134,18 @@ def _on_relay_down(
         if m.member_id in down_relay_ids:
             continue
         if m.parent_id in down_relay_ids:
+            old_parent = m.parent_id
             best = _best_available_relay(members)
             if best is None:
                 m.parent_id = 1
+                timeline.append(
+                    f"leaf_reparent member={m.member_id} old_parent={old_parent} new_parent=1 mode=fallback-leader"
+                )
             else:
                 m.parent_id = best
+                timeline.append(
+                    f"leaf_reparent member={m.member_id} old_parent={old_parent} new_parent={best} mode=switch-relay"
+                )
             route_reparent_total += 1
 
     relay_reselection_total += _rebalance_relays(members, cfg.relay_target, timeline)
