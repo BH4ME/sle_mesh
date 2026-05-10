@@ -68,6 +68,43 @@ class OneVsTwentySimulationTest(unittest.TestCase):
         self.assertGreaterEqual(result.batch_fail_events, 1)
         self.assertGreaterEqual(result.relay_reselection_total, 1)
 
+    def test_high_jitter_delays_reports_without_zeroing_all_success(self) -> None:
+        cfg = SimulationConfig(
+            member_count=20,
+            direct_connection_cap=8,
+            fail_relay_at_tick=6,
+            recover_relay_at_tick=10,
+            ticks_total=18,
+            packet_loss_rate=0.2,
+            jitter_min_ms=10,
+            jitter_max_ms=120,
+            batch_fail_relay_count=1,
+            batch_fail_relay_ticks=[6],
+        )
+        result = simulate_one_run(cfg)
+        self.assertEqual(result.discovered_members, 20)
+        self.assertEqual(result.approved_members, 20)
+        self.assertGreater(result.report_delayed, 0)
+        self.assertGreater(result.total_report_success, 0)
+
+    def test_delayed_reports_are_counted_by_send_tick(self) -> None:
+        cfg = SimulationConfig(
+            member_count=20,
+            direct_connection_cap=8,
+            fail_relay_at_tick=2,
+            recover_relay_at_tick=3,
+            ticks_total=3,
+            packet_loss_rate=0.0,
+            jitter_min_ms=10,
+            jitter_max_ms=10,
+        )
+        result = simulate_one_run(cfg)
+        self.assertEqual(result.discovered_members, 20)
+        self.assertEqual(result.approved_members, 20)
+        self.assertGreater(result.report_success_before_failover, 0)
+        self.assertGreater(result.report_success_during_failover, 0)
+        self.assertGreater(result.report_success_after_recover, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

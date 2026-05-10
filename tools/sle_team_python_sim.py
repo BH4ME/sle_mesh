@@ -210,8 +210,40 @@ def simulate_one_run(cfg: SimulationConfig) -> SimulationResult:
     batch_fail_events = 0
 
     failed_relay_id: Optional[int] = None
+    pending_deliveries: Dict[int, List[Tuple[int, int]]] = {}
+
+    def _record_success_for_phase(send_tick_value: int, count: int) -> Tuple[int, int, int]:
+        before = 0
+        during = 0
+        after = 0
+        if count <= 0:
+            return before, during, after
+        if send_tick_value < cfg.fail_relay_at_tick:
+            before = count
+        elif send_tick_value < cfg.recover_relay_at_tick:
+            during = count
+        else:
+            after = count
+        return before, during, after
 
     for tick in range(1, cfg.ticks_total + 1):
+        delivered_members = pending_deliveries.pop(tick, [])
+        delivered = len(delivered_members)
+        if delivered > 0:
+            for send_tick_value, member_id in delivered_members:
+                member = members.get(member_id)
+                if member is not None:
+                    member.reports_success += 1
+            phase_totals = [0, 0, 0]
+            for send_tick_value, _member_id in delivered_members:
+                b, d, a = _record_success_for_phase(send_tick_value, 1)
+                phase_totals[0] += b
+                phase_totals[1] += d
+                phase_totals[2] += a
+            report_before += phase_totals[0]
+            report_during += phase_totals[1]
+            report_after += phase_totals[2]
+
         if cfg.batch_fail_relay_count > 0 and tick in cfg.batch_fail_relay_ticks:
             live_relays = _available_relays(members)
             if live_relays:
@@ -257,18 +289,19 @@ def simulate_one_run(cfg: SimulationConfig) -> SimulationResult:
                 jitter = rng.randint(cfg.jitter_min_ms, cfg.jitter_max_ms)
                 if jitter > 0:
                     report_delayed += 1
-                    # Keep model simple: jitter > 0 means delayed out of this tick budget.
+                    # Model jitter as deferred delivery to a future tick instead of loss.
+                    delay_ticks = max(1, jitter // 20)
+                    deliver_tick = min(cfg.ticks_total, tick + delay_ticks)
+                    pending_deliveries.setdefault(deliver_tick, []).append((tick, m.member_id))
                     continue
 
             m.reports_success += 1
             success_this_tick += 1
 
-        if tick < cfg.fail_relay_at_tick:
-            report_before += success_this_tick
-        elif tick < cfg.recover_relay_at_tick:
-            report_during += success_this_tick
-        else:
-            report_after += success_this_tick
+        b, d, a = _record_success_for_phase(tick, success_this_tick)
+        report_before += b
+        report_during += d
+        report_after += a
 
         # Minor random parent optimization to mimic periodic route update.
         if tick % 4 == 0:
@@ -281,6 +314,25 @@ def simulate_one_run(cfg: SimulationConfig) -> SimulationResult:
                         m.parent_id = best_relay
                         route_reparent_total += 1
                         timeline.append(f"route_update member={m.member_id} parent={best_relay} tick={tick}")
+
+    for future_tick in sorted(pending_deliveries.keys()):
+        delivered_members = pending_deliveries[future_tick]
+        delivered = len(delivered_members)
+        if delivered <= 0:
+            continue
+        for send_tick_value, member_id in delivered_members:
+            member = members.get(member_id)
+            if member is not None:
+                member.reports_success += 1
+        phase_totals = [0, 0, 0]
+        for send_tick_value, _member_id in delivered_members:
+            b, d, a = _record_success_for_phase(send_tick_value, 1)
+            phase_totals[0] += b
+            phase_totals[1] += d
+            phase_totals[2] += a
+        report_before += phase_totals[0]
+        report_during += phase_totals[1]
+        report_after += phase_totals[2]
 
     total_success = sum(m.reports_success for m in members.values())
 
