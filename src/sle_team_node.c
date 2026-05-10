@@ -585,17 +585,17 @@ int sle_team_node_member_leave(sle_team_node_t *node)
 
 static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
-    const sle_team_hello_body_t *hello;
+    sle_team_hello_body_t hello;
     sle_team_member_record_t *member;
     sle_team_pending_member_t *pending;
     int ack_ret;
     int cfg_ret;
 
-    if (node == NULL || app == NULL || app->body_len < sizeof(*hello)) {
+    if (node == NULL || app == NULL || app->body_len < sizeof(hello)) {
         return SLE_TEAM_ERR_FORMAT;
     }
 
-    hello = (const sle_team_hello_body_t *)app->body;
+    (void)memcpy(&hello, app->body, sizeof(hello));
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
         if (sle_team_node_has_member_record(node, app->src_id) != 0U) {
             sle_team_log(node, "known member hello before allowlist sync");
@@ -604,10 +604,10 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
         if (node->cfg.pairing_enabled != 0U) {
             pending = sle_team_get_pending_slot(node, app->src_id, 1U);
             if (pending != NULL) {
-                pending->role = hello->role;
-                pending->battery_percent = hello->battery_percent;
-                pending->mac_ready = hello->mac_ready;
-                (void)memcpy(pending->mac, hello->mac, sizeof(pending->mac));
+                pending->role = hello.role;
+                pending->battery_percent = hello.battery_percent;
+                pending->mac_ready = hello.mac_ready;
+                (void)memcpy(pending->mac, hello.mac, sizeof(pending->mac));
                 pending->last_seen_s = sle_team_now(node);
                 sle_team_log(node, "member pending approval");
                 return SLE_TEAM_OK;
@@ -621,10 +621,10 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
         return SLE_TEAM_ERR_BUF;
     }
 
-    member->role = hello->role;
-    member->battery_percent = hello->battery_percent;
-    member->mac_ready = hello->mac_ready;
-    (void)memcpy(member->mac, hello->mac, sizeof(member->mac));
+    member->role = hello.role;
+    member->battery_percent = hello.battery_percent;
+    member->mac_ready = hello.mac_ready;
+    (void)memcpy(member->mac, hello.mac, sizeof(member->mac));
     member->last_seen_s = sle_team_now(node);
     member->last_seq = app->seq;
 
@@ -653,15 +653,15 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
 
 static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
-    const sle_team_ack_body_t *ack;
+    sle_team_ack_body_t ack;
 
-    if (node == NULL || app == NULL || app->body_len < sizeof(*ack)) {
+    if (node == NULL || app == NULL || app->body_len < sizeof(ack)) {
         return SLE_TEAM_ERR_FORMAT;
     }
 
-    ack = (const sle_team_ack_body_t *)app->body;
-    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && ack->acked_msg_type == SLE_TEAM_APP_HELLO) {
-        if (ack->status_code != 0U) {
+    (void)memcpy(&ack, app->body, sizeof(ack));
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && ack.acked_msg_type == SLE_TEAM_APP_HELLO) {
+        if (ack.status_code != 0U) {
             sle_team_log(node, "hello ack rejected");
             return SLE_TEAM_ERR_UNSUPPORTED;
         }
@@ -682,7 +682,7 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
 
 static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
-    const sle_team_config_body_t *cfg_body;
+    sle_team_config_body_t cfg_body;
 
     if (node == NULL || app == NULL || app->body_len < SLE_TEAM_CONFIG_BODY_BASE_SIZE) {
         return SLE_TEAM_ERR_FORMAT;
@@ -692,16 +692,17 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
 
-    cfg_body = (const sle_team_config_body_t *)app->body;
-    node->cfg.report_interval_s = cfg_body->report_interval_s;
-    node->cfg.warn_distance_m = cfg_body->warn_distance_m;
-    node->cfg.lost_distance_m = cfg_body->lost_distance_m;
-    node->cfg.heartbeat_timeout_s = cfg_body->heartbeat_timeout_s;
-    if (app->body_len >= sizeof(*cfg_body)) {
-        node->cfg.relay_allowed = cfg_body->relay_allowed != 0U ? 1U : 0U;
-        node->cfg.relay_tier = node->cfg.relay_allowed != 0U ? cfg_body->relay_tier : 0U;
-        node->cfg.max_downstream = node->cfg.relay_allowed != 0U ? cfg_body->max_downstream : 0U;
-        node->cfg.relay_discovery_only = (cfg_body->reserved & SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY) != 0U ?
+    (void)memset(&cfg_body, 0, sizeof(cfg_body));
+    (void)memcpy(&cfg_body, app->body, app->body_len < sizeof(cfg_body) ? app->body_len : sizeof(cfg_body));
+    node->cfg.report_interval_s = cfg_body.report_interval_s;
+    node->cfg.warn_distance_m = cfg_body.warn_distance_m;
+    node->cfg.lost_distance_m = cfg_body.lost_distance_m;
+    node->cfg.heartbeat_timeout_s = cfg_body.heartbeat_timeout_s;
+    if (app->body_len >= sizeof(cfg_body)) {
+        node->cfg.relay_allowed = cfg_body.relay_allowed != 0U ? 1U : 0U;
+        node->cfg.relay_tier = node->cfg.relay_allowed != 0U ? cfg_body.relay_tier : 0U;
+        node->cfg.max_downstream = node->cfg.relay_allowed != 0U ? cfg_body.max_downstream : 0U;
+        node->cfg.relay_discovery_only = (cfg_body.reserved & SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY) != 0U ?
             1U : 0U;
         node->cfg.relay_enabled = (node->joined != 0U && node->cfg.relay_allowed != 0U) ? 1U : 0U;
     } else {
@@ -722,14 +723,14 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
 
 static int sle_team_handle_heartbeat(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
-    const sle_team_heartbeat_body_t *hb;
+    sle_team_heartbeat_body_t hb;
     sle_team_member_record_t *member;
 
-    if (node == NULL || app == NULL || app->body_len < sizeof(*hb)) {
+    if (node == NULL || app == NULL || app->body_len < sizeof(hb)) {
         return SLE_TEAM_ERR_FORMAT;
     }
 
-    hb = (const sle_team_heartbeat_body_t *)app->body;
+    (void)memcpy(&hb, app->body, sizeof(hb));
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
         sle_team_log(node, "heartbeat rejected by allowlist");
         return SLE_TEAM_ERR_UNSUPPORTED;
@@ -739,9 +740,9 @@ static int sle_team_handle_heartbeat(sle_team_node_t *node, const sle_team_app_p
         return SLE_TEAM_ERR_BUF;
     }
 
-    member->battery_percent = hb->battery_percent;
-    member->fix_status = hb->fix_status;
-    member->last_rssi_dbm = hb->rssi_dbm;
+    member->battery_percent = hb.battery_percent;
+    member->fix_status = hb.fix_status;
+    member->last_rssi_dbm = hb.rssi_dbm;
     member->last_seen_s = sle_team_now(node);
     member->last_seq = app->seq;
     sle_team_note_leader_seen(node);
@@ -750,14 +751,14 @@ static int sle_team_handle_heartbeat(sle_team_node_t *node, const sle_team_app_p
 
 static int sle_team_handle_position(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
-    const sle_team_pos_body_t *pos;
+    sle_team_pos_body_t pos;
     sle_team_member_record_t *member;
 
-    if (node == NULL || app == NULL || app->body_len < sizeof(*pos)) {
+    if (node == NULL || app == NULL || app->body_len < sizeof(pos)) {
         return SLE_TEAM_ERR_FORMAT;
     }
 
-    pos = (const sle_team_pos_body_t *)app->body;
+    (void)memcpy(&pos, app->body, sizeof(pos));
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
         sle_team_log(node, "position rejected by allowlist");
         return SLE_TEAM_ERR_UNSUPPORTED;
@@ -767,14 +768,14 @@ static int sle_team_handle_position(sle_team_node_t *node, const sle_team_app_pa
         return SLE_TEAM_ERR_BUF;
     }
 
-    member->battery_percent = pos->battery_percent;
-    member->fix_status = pos->fix_status;
+    member->battery_percent = pos.battery_percent;
+    member->fix_status = pos.fix_status;
     member->last_seen_s = sle_team_now(node);
     member->last_seq = app->seq;
     sle_team_note_leader_seen(node);
 
     if (node->ops.on_position != NULL) {
-        node->ops.on_position(node->ops.user_ctx, app->src_id, pos);
+        node->ops.on_position(node->ops.user_ctx, app->src_id, &pos);
     }
     return SLE_TEAM_OK;
 }

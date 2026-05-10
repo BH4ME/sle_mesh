@@ -176,12 +176,16 @@ int main(void)
     assert(relay.cfg.relay_allowed != 0U);
     assert(relay.cfg.relay_enabled == 0U);
     assert(relay.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
-    relay.joined = 1U;
-    relay.state = SLE_TEAM_NET_ONLINE;
-    relay.last_leader_seen_s = relay_rt.now_s;
-    relay.upstream_parent_id = 3U;
-    relay.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
-    relay.upstream_parent_reselect_pending = 0U;
+    relay_rt.now_s = 9U;
+    leader_rt.now_s = 9U;
+    sle_team_node_tick(&relay);
+    relay_last_packet(&relay_rt, &leader);
+    relay_last_packet(&leader_rt, &relay);
+    assert(relay.joined != 0U);
+    assert(relay.state == SLE_TEAM_NET_ONLINE);
+    assert(relay.cfg.relay_allowed != 0U);
+    assert(relay.cfg.relay_enabled != 0U);
+    assert(relay.upstream_parent_state == SLE_TEAM_PARENT_CONNECTED);
 
     assert(SLE_TEAM_MAX_MEMBERS >= 20U);
     for (uint8_t member_id = 2U; member_id <= 21U; member_id++) {

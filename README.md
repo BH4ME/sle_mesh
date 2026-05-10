@@ -89,6 +89,17 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
   -o /tmp/sle_team_packet_test && /tmp/sle_team_packet_test
 ```
 
+一键仿真（自动构建并运行两套测试，输出日志）：
+
+```sh
+./scripts/simulate_v2.sh
+```
+
+日志输出：
+- `logs/sim/network_test.log`
+- `logs/sim/packet_test.log`
+- `logs/sim/relay_rebalance_test.log`（relay 断链补选与重连身份场景）
+
 ## 一键审查（DeepSeek）
 
 ```sh
