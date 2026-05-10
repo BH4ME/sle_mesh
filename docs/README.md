@@ -11,7 +11,7 @@
 ## 审查与版本
 
 - [v2/review_framework.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/review_framework.md)：审查 Stage 框架
-- [../review_feedback.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/review_feedback.md)：最近一次审查输出（根目录）
+- [../meta/review_feedback.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/review_feedback.md)：最近一次审查输出（根目录）
 - [../versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
 
 ## 根目录操作文档

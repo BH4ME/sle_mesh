@@ -3,7 +3,7 @@
 > ⚠️ 本文档是给 AI 审查者（DeepSeek Flash）执行用的操作手册，不是给开发者看的。
 >
 > **AI 每次执行代码审查前**，先读本文档，严格按各 Stage 执行。
-> **审查完成后**，将结果写入根目录 `review_feedback.md`，开发者只看那个文件。
+> **审查完成后**，将结果写入`meta/review_feedback.md`，开发者只看那个文件。
 
 ---
 
@@ -57,7 +57,7 @@
 
 步骤：
 
-1. 读取根目录 `review_feedback.md` 的 **汇总** 或 **历史反馈追踪** 章节。
+1. 读取`meta/review_feedback.md` 的 **汇总** 或 **历史反馈追踪** 章节。
 2. 逐条验证：
    - 标记为 "Resolved" 的：确认代码是否仍保持修复状态。
    - 标记为 "Open / Warning" 的：重新验证是否已修复。
@@ -147,7 +147,7 @@
 
 ## 3. 反馈文件格式
 
-每次审查结果统一写入根目录 `review_feedback.md`，格式：
+每次审查结果统一写入`meta/review_feedback.md`，格式：
 
 ```markdown
 # Code Review Feedback
@@ -183,7 +183,7 @@
 
 写入规则：
 
-- 每次审查**覆盖写入**根目录 `review_feedback.md`，只保留本次结果。
+- 每次审查**覆盖写入**`meta/review_feedback.md`，只保留本次结果。
 - 旧审查结果通过 git history 追溯，不保留在文件中。
 
 ---

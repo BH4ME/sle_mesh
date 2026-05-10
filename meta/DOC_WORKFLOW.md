@@ -6,8 +6,8 @@
 
 1. 根目录文档（操作类）
 - `README.md`：编译、烧录、验证、审查脚本入口。
-- `DOC_WORKFLOW.md`：本文档（流程规范）。
-- `review_feedback.md`：每次最新审查结果（覆盖写入）。
+- `meta/DOC_WORKFLOW.md`：本文档（流程规范）。
+- `meta/review_feedback.md`：每次最新审查结果（覆盖写入）。
 
 2. 阶段文档（方案类）
 - `docs/v0/`：1vs2 / 1vs8 基线阶段。
@@ -29,7 +29,7 @@
 
 1. 审查规则文档固定：`docs/v2/review_framework.md`。
 2. 执行脚本：`scripts/run_review_with_deepseek.sh`。
-3. 输出文件固定：根目录 `review_feedback.md`（覆盖写入）。
+3. 输出文件固定：`meta/review_feedback.md`（覆盖写入）。
 
 ## 4. 版本更新时机
 
@@ -70,7 +70,7 @@
 1. 先读 `docs/v2/review_framework.md`。
 2. 根据当前 Scope 选择 Stage（不要跳步）。
 3. 审查时先核对 README 声明，再看历史反馈，再看本次新增逻辑。
-4. 输出必须覆盖写入根目录 `review_feedback.md`。
+4. 输出必须覆盖写入`meta/review_feedback.md`。
 5. 报告必须带完整头信息：Reviewer / Date / Version / Branch / Scope。
 6. 结论必须给出 Blocker/Warning/Note 数量和最终结论（通过/有条件通过/拒绝）。
 
@@ -78,7 +78,7 @@
 
 1. 不要把审查结果写到 `docs/` 子目录。
 2. 不要保留多份“本次审查”副本文件。
-3. 不要只给口头结论而不更新 `review_feedback.md`。
+3. 不要只给口头结论而不更新 `meta/review_feedback.md`。
 
 ## 8. 给我自己（Codex）的执行指令
 
@@ -87,6 +87,6 @@
 1. 先判断变更属于 `v0 / v1 / v2` 哪条线，只改对应目录。
 2. 同主题优先改现有文档，不新建重复 md。
 3. 改完后跑链接与结构检查（第 6 节清单）。
-4. 需要审查时，使用 `scripts/run_review_with_deepseek.sh`，并确认输出落在根目录 `review_feedback.md`。
+4. 需要审查时，使用 `scripts/run_review_with_deepseek.sh`，并确认输出落在`meta/review_feedback.md`。
 5. 如果是里程碑改动，同步更新 `versions/`（`VERSION.md` + `MANIFEST.md` + `versions/README.md`）。
 6. 保持根目录“操作文档少而清晰”，避免再次堆叠临时文档。

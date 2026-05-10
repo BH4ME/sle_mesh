@@ -9,7 +9,7 @@
 - [docs/v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay）
 - [docs/v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
 - [versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
-- [DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/DOC_WORKFLOW.md)：文档编写与维护流程
+- [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md)：文档编写与维护流程
 
 ## 目录
 
@@ -108,11 +108,11 @@ scripts/run_review_with_deepseek.sh --scope "Bugfix / PR 审查" --goal-doc docs
 
 说明：
 - 脚本会强制 DeepSeek 先读取 `docs/v2/review_framework.md`，并按 Stage 执行。
-- 审查结果会覆盖写入根目录 `review_feedback.md`。
+- 审查结果会覆盖写入`meta/review_feedback.md`。
 - 可选 `--model deepseek-chat` 或其他 DeepSeek 模型。
 - 先预览 prompt 可用 `--dry-run`。
 - `scripts/run_review_with_gpt.sh` 仍可用，但已作为兼容入口转发到 DeepSeek 脚本。
-- 审查与文档维护完整流程见 [DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/DOC_WORKFLOW.md) 第 7、8 节。
+- 审查与文档维护完整流程见 [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md) 第 7、8 节。
 
 ## License
 

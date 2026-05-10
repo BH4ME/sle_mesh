@@ -21,7 +21,7 @@ Environment:
 Behavior:
   1) 把 docs/v2/review_framework.md、目标文档、git 变更注入 prompt
   2) 按 Stage 执行审查
-  3) 输出覆盖写入 review_feedback.md
+  3) 输出覆盖写入 meta/review_feedback.md
 EOF
 }
 
@@ -237,11 +237,11 @@ if [[ -z "$CONTENT" ]]; then
   exit 1
 fi
 
-printf '%s\n' "$CONTENT" > review_feedback.md
+printf '%s\n' "$CONTENT" > meta/review_feedback.md
 
-if ! rg -q "^# Code Review Feedback" review_feedback.md; then
-  echo "review_feedback.md updated, but header is unexpected. Please verify manually." >&2
+if ! rg -q "^# Code Review Feedback" meta/review_feedback.md; then
+  echo "meta/review_feedback.md updated, but header is unexpected. Please verify manually." >&2
   exit 1
 fi
 
-echo "review_feedback.md updated by DeepSeek"
+echo "meta/review_feedback.md updated by DeepSeek"

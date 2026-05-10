@@ -10,5 +10,5 @@
 
 ## 说明
 
-- V2 审查结果统一写根目录 `review_feedback.md`。
+- V2 审查结果统一写`meta/review_feedback.md`。
 - V0/V1 文档分别位于 `docs/v0` 与 `docs/v1`，用于对比基线与演进路径。
