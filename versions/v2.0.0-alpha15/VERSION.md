@@ -17,3 +17,8 @@
 3. 回归验证增强：
 - `simulate_v2.sh --suite=failover` 与 `simulate_v2.sh --suite=core` 均可独立通过；
 - `simulate_20_members.sh` 保持 20-member 逻辑回归通过。
+
+4. alpha15 增补（单层 relay 口径修复）：
+- leader relay rebalance 新增 `target` 下调时的自动回收（auto-demote），不再仅“只增不减”；
+- failover suite 新增并通过四类补测：`target downscale`、`hidden relay + failover` 并发、`CONFIG` 下发失败重试闭环、`leader restart/reconcile`；
+- 明确按“一层 relay”建模验证，不引入二级 relay 假设。

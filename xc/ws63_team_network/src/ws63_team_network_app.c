@@ -2059,14 +2059,49 @@ static sle_team_member_record_t *team_leader_pick_best_relay_candidate(uint32_t 
         if (team_leader_relay_is_candidate(member, now_s, timeout_s) == 0U) {
             continue;
         }
-        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(SLE_TEAM_RSSI_UNKNOWN - 1) :
-            member->last_rssi_dbm;
+        /* Unknown RSSI should be treated as weakest in auto-demote selection. */
+        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(-128) : member->last_rssi_dbm;
         if (best == NULL || member_rssi > best_rssi) {
             best = member;
             best_rssi = member_rssi;
         }
     }
     return best;
+}
+
+static sle_team_member_record_t *team_leader_pick_worst_active_relay(uint32_t now_s, uint16_t timeout_s)
+{
+    uint8_t i;
+    sle_team_member_record_t *worst = NULL;
+    int8_t worst_rssi = (int8_t)(SLE_TEAM_RSSI_UNKNOWN + 1);
+    uint32_t worst_age_s = 0U;
+
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        sle_team_member_record_t *member = &g_team_node.members[i];
+        int8_t member_rssi;
+        uint32_t member_age_s;
+
+        if (member->online == 0U || member->relay_allowed == 0U ||
+            member->member_id == 0U || member->member_id == SLE_TEAM_BROADCAST_ID ||
+            member->member_id == g_team_node.cfg.self_id || member->member_id == g_team_node.cfg.leader_id) {
+            continue;
+        }
+        if (team_elapsed_exceeds(now_s, member->last_seen_s,
+                (uint32_t)timeout_s * SLE_TEAM_RELAY_REVOKE_STALE_FACTOR) != 0U) {
+            continue;
+        }
+        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(SLE_TEAM_RSSI_UNKNOWN - 1) :
+            member->last_rssi_dbm;
+        member_age_s = team_elapsed_s(now_s, member->last_seen_s);
+        if (worst == NULL || member_rssi < worst_rssi ||
+            (member_rssi == worst_rssi && member_age_s > worst_age_s) ||
+            (member_rssi == worst_rssi && member_age_s == worst_age_s && member->member_id > worst->member_id)) {
+            worst = member;
+            worst_rssi = member_rssi;
+            worst_age_s = member_age_s;
+        }
+    }
+    return worst;
 }
 
 static int team_leader_set_member_relay_allowed(sle_team_member_record_t *member, uint8_t relay_allowed, const char *reason)
@@ -2175,6 +2210,19 @@ static void team_leader_rebalance_relays(void)
     relay_target = team_leader_relay_target_for_online(online_count);
     if (relay_target > SLE_TEAM_AUTO_RELAY_MAX) {
         relay_target = SLE_TEAM_AUTO_RELAY_MAX;
+    }
+
+    while (relay_count > relay_target) {
+        sle_team_member_record_t *victim = team_leader_pick_worst_active_relay(now_s, timeout_s);
+
+        if (victim == NULL) {
+            break;
+        }
+        if (team_leader_set_member_relay_allowed(victim, 0U, "auto-demote") != SLE_TEAM_OK) {
+            break;
+        }
+        relay_count--;
+        changed = 1U;
     }
 
     while (relay_count < relay_target) {
