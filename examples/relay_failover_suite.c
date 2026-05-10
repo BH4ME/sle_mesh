@@ -205,8 +205,8 @@ static suite_member_t *suite_pick_worst_active_relay(suite_cluster_t *cluster, u
                 (uint32_t)timeout_s * SUITE_RELAY_REVOKE_STALE_FACTOR) != 0U) {
             continue;
         }
-        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(SLE_TEAM_RSSI_UNKNOWN - 1) :
-            member->last_rssi_dbm;
+        /* Unknown RSSI must be treated as weakest so known links are demoted first. */
+        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(-128) : member->last_rssi_dbm;
         member_age_s = suite_elapsed_s(now_s, member->last_seen_s);
         if (worst == NULL || member_rssi < worst_rssi ||
             (member_rssi == worst_rssi && member_age_s > worst_age_s) ||
@@ -608,6 +608,73 @@ static void scenario_target_downscale_demote(void)
     printf("[failover] scenario H pass\n");
 }
 
+static void scenario_demoted_relay_leaf_reparent(void)
+{
+    suite_cluster_t cluster;
+    suite_member_t *relay2;
+    suite_member_t *relay3;
+    suite_member_t *relay4;
+
+    suite_seed_cluster(&cluster);
+    relay2 = suite_find_member(&cluster, 2U);
+    relay3 = suite_find_member(&cluster, 3U);
+    relay4 = suite_find_member(&cluster, 4U);
+    assert(relay2 != NULL && relay3 != NULL && relay4 != NULL);
+
+    suite_leaf_reselect_parent(&cluster, 10U, 4U);
+    suite_leaf_reselect_parent(&cluster, 11U, 4U);
+    assert(suite_leaf_can_report(&cluster, 10U) != 0U);
+    assert(suite_leaf_can_report(&cluster, 11U) != 0U);
+
+    suite_set_online_count(&cluster, 17U);
+    suite_refresh_online_seen(&cluster, 108U);
+    suite_rebalance_relays(&cluster, 108U);
+    assert(cluster.relay_online_count == 3U);
+
+    suite_set_online_count(&cluster, 16U);
+    suite_refresh_online_seen(&cluster, 116U);
+    suite_rebalance_relays(&cluster, 116U);
+    assert(relay4->relay_allowed == 0U);
+    assert(suite_leaf_can_report(&cluster, 10U) == 0U);
+    assert(suite_leaf_can_report(&cluster, 11U) == 0U);
+
+    suite_leaf_reselect_parent(&cluster, 10U, 2U);
+    suite_leaf_reselect_parent(&cluster, 11U, 3U);
+    assert(suite_leaf_can_report(&cluster, 10U) != 0U);
+    assert(suite_leaf_can_report(&cluster, 11U) != 0U);
+    printf("[failover] scenario J pass\n");
+}
+
+static void scenario_unknown_rssi_demote(void)
+{
+    suite_cluster_t cluster;
+    suite_member_t *relay2;
+    suite_member_t *relay3;
+    suite_member_t *relay4;
+
+    suite_seed_cluster(&cluster);
+    relay2 = suite_find_member(&cluster, 2U);
+    relay3 = suite_find_member(&cluster, 3U);
+    relay4 = suite_find_member(&cluster, 4U);
+    assert(relay2 != NULL && relay3 != NULL && relay4 != NULL);
+
+    relay3->last_rssi_dbm = SLE_TEAM_RSSI_UNKNOWN;
+    relay4->last_rssi_dbm = -75;
+    suite_set_online_count(&cluster, 17U);
+    suite_refresh_online_seen(&cluster, 108U);
+    suite_rebalance_relays(&cluster, 108U);
+    assert(cluster.relay_online_count == 3U);
+
+    suite_set_online_count(&cluster, 16U);
+    suite_refresh_online_seen(&cluster, 116U);
+    suite_rebalance_relays(&cluster, 116U);
+    assert(cluster.relay_target_count == 2U);
+    assert(relay3->relay_allowed == 0U);
+    assert(relay2->relay_allowed != 0U);
+    assert(relay4->relay_allowed != 0U);
+    printf("[failover] scenario K pass\n");
+}
+
 static void scenario_threshold_flap(void)
 {
     suite_cluster_t cluster;
@@ -644,6 +711,8 @@ static void scenario_leader_restart_reconcile(void)
     suite_rebalance_relays(&before, 108U);
     assert(before.relay_online_count == 2U);
     assert(before.relay_target_count == 2U);
+    before.pairing_enabled = 1U;
+    before.pairing_hidden_relay_only = 1U;
 
     suite_seed_cluster(&after);
     for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
@@ -653,6 +722,8 @@ static void scenario_leader_restart_reconcile(void)
         after.members[i].relay_allowed = 0U;
     }
     after.relay_rebalance_last_s = 0U;
+    assert(after.pairing_enabled == 0U);
+    assert(after.pairing_hidden_relay_only == 0U);
     suite_rebalance_relays(&after, 108U);
     assert(after.relay_target_count == before.relay_target_count);
     assert(after.relay_online_count == before.relay_online_count);
@@ -691,6 +762,8 @@ int main(void)
     scenario_hidden_relay_failover_race();
     scenario_pairing_boundary_race();
     scenario_target_downscale_demote();
+    scenario_demoted_relay_leaf_reparent();
+    scenario_unknown_rssi_demote();
     scenario_threshold_flap();
     scenario_leader_restart_reconcile();
     scenario_wraparound_time();

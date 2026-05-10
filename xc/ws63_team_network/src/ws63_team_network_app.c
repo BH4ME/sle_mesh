@@ -2090,8 +2090,8 @@ static sle_team_member_record_t *team_leader_pick_worst_active_relay(uint32_t no
                 (uint32_t)timeout_s * SLE_TEAM_RELAY_REVOKE_STALE_FACTOR) != 0U) {
             continue;
         }
-        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(SLE_TEAM_RSSI_UNKNOWN - 1) :
-            member->last_rssi_dbm;
+        /* Unknown RSSI must be treated as weakest so known links are demoted first. */
+        member_rssi = member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN ? (int8_t)(-128) : member->last_rssi_dbm;
         member_age_s = team_elapsed_s(now_s, member->last_seen_s);
         if (worst == NULL || member_rssi < worst_rssi ||
             (member_rssi == worst_rssi && member_age_s > worst_age_s) ||

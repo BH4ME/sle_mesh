@@ -73,8 +73,8 @@ static demo_member_t *demo_pick_best_candidate(demo_cluster_t *cluster, uint32_t
         if (demo_member_is_relay_candidate(member, now_s, timeout_s) == 0U) {
             continue;
         }
-        member_rssi = (member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN) ?
-            (int8_t)(SLE_TEAM_RSSI_UNKNOWN - 1) : member->last_rssi_dbm;
+        /* Unknown RSSI must be treated as weakest so known links are promoted first. */
+        member_rssi = (member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN) ? (int8_t)(-128) : member->last_rssi_dbm;
         if (best == NULL || member_rssi > best_rssi) {
             best = member;
             best_rssi = member_rssi;
