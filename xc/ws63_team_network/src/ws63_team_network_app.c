@@ -2533,6 +2533,7 @@ static void team_http_send_redirect(int fd, const char *location)
         "Location: %s\r\n"
         "Content-Length: 0\r\n"
         "Connection: close\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
         "Cache-Control: no-store, no-cache, must-revalidate\r\n"
         "Pragma: no-cache\r\n"
         "Expires: 0\r\n"

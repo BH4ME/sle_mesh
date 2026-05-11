@@ -458,6 +458,11 @@ int main(void)
         status_len = sle_team_web_write_status_json(&leader, 126U, "unit-test", &web_metrics,
             status_json, sizeof(status_json));
         assert(status_len > 0);
+        assert(strstr(status_json, "\"relayTarget\":2") != NULL);
+        assert(strstr(status_json, "\"relayOnline\":2") != NULL);
+        assert(strstr(status_json, "\"epoch\":9") != NULL);
+        assert(strstr(status_json, "\"lastChangeS\":120") != NULL);
+        assert(strstr(status_json, "\"lastConvergedS\":123") != NULL);
         assert(strstr(status_json, "\"routeHintSentTotal\":7") != NULL);
         assert(strstr(status_json, "\"routeHintFailedTotal\":1") != NULL);
         assert(strstr(status_json, "\"routeHintCooldownSkippedTotal\":4") != NULL);

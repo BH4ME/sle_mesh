@@ -1,9 +1,26 @@
-import type { AllowMembersCommand, SendCommand, TeamEvent, TeamNode, TeamStatus } from "../protocol/types";
+import type {
+  AllowMembersCommand,
+  MemberSelectCommand,
+  PairingCommand,
+  PendingMember,
+  RoleCommand,
+  SendCommand,
+  TeamEvent,
+  TeamNode,
+  TeamStatus,
+  UnconfiguredStatus,
+} from "../protocol/types";
 
 export interface TeamApi {
-  getStatus(): Promise<TeamStatus>;
+  getStatus(): Promise<TeamStatus | UnconfiguredStatus>;
   getNodes(): Promise<TeamNode[]>;
   getEvents(): Promise<TeamEvent[]>;
+  getPending(): Promise<PendingMember[]>;
+  configureRole(command: RoleCommand): Promise<void>;
+  configurePairing(command: PairingCommand): Promise<void>;
+  selectMemberLeader(command: MemberSelectCommand): Promise<void>;
+  leaveMember(): Promise<void>;
+  factoryReset(): Promise<void>;
   send(command: SendCommand): Promise<TeamEvent>;
   configureAllow(command: AllowMembersCommand): Promise<TeamEvent>;
 }
@@ -50,20 +67,36 @@ export function saveConnectionConfig(config: ConnectionConfig): void {
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: { "content-type": "application/json" },
-    ...init,
-  });
+  const requestInit = init?.body
+    ? { headers: { "content-type": "application/json" }, ...init }
+    : init;
+  const response = await fetch(path, requestInit);
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
   return response.json() as Promise<T>;
 }
 
+async function fetchAction(path: string): Promise<void> {
+  const response = await fetch(path, { redirect: "manual" });
+  if (response.ok || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    return;
+  }
+  throw new Error(`${response.status} ${response.statusText}`);
+}
+
+function qs(params: Record<string, string | number | boolean>): string {
+  const out = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    out.set(key, String(value));
+  }
+  return out.toString();
+}
+
 export class HttpTeamApi implements TeamApi {
   constructor(private readonly baseUrl = "") {}
 
-  getStatus(): Promise<TeamStatus> {
+  getStatus(): Promise<TeamStatus | UnconfiguredStatus> {
     return fetchJson(`${this.baseUrl}/api/status`);
   }
 
@@ -73,6 +106,55 @@ export class HttpTeamApi implements TeamApi {
 
   getEvents(): Promise<TeamEvent[]> {
     return fetchJson(`${this.baseUrl}/api/events`);
+  }
+
+  getPending(): Promise<PendingMember[]> {
+    return fetchJson(`${this.baseUrl}/api/pending`);
+  }
+
+  configureRole(command: RoleCommand): Promise<void> {
+    if (command.role === "leader") {
+      return fetchAction(`${this.baseUrl}/api/role?role=leader`);
+    }
+    return fetchAction(
+      `${this.baseUrl}/api/role?${qs({
+        role: "member",
+        leader: command.leaderSuffix,
+        team: command.teamId,
+        channel: command.channel,
+      })}`,
+    );
+  }
+
+  configurePairing(command: PairingCommand): Promise<void> {
+    if (command.action === "approve") {
+      return fetchAction(
+        `${this.baseUrl}/api/pairing?${qs({
+          action: "approve",
+          id: command.id,
+          relay: command.relay ? 1 : 0,
+        })}`,
+      );
+    }
+    return fetchAction(`${this.baseUrl}/api/pairing?action=${command.action}`);
+  }
+
+  selectMemberLeader(command: MemberSelectCommand): Promise<void> {
+    return fetchAction(
+      `${this.baseUrl}/api/member/select?${qs({
+        team: command.teamId,
+        leader: command.leaderSuffix,
+        channel: command.channel,
+      })}`,
+    );
+  }
+
+  leaveMember(): Promise<void> {
+    return fetchAction(`${this.baseUrl}/api/member/leave`);
+  }
+
+  factoryReset(): Promise<void> {
+    return fetchAction(`${this.baseUrl}/api/factory-reset`);
   }
 
   send(command: SendCommand): Promise<TeamEvent> {
@@ -120,6 +202,7 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
   const pairingMatch = line.match(/pairing=(\d+)/);
   const allowMatch = line.match(/allow=(all|only)\s+allow_count=(\d+)/);
   return {
+    configured: true,
     teamId: Number(match[1]),
     selfId: Number(match[2]),
     leaderId: Number(match[3]),
@@ -151,6 +234,28 @@ function cliMemberToNode(line: string): TeamNode | undefined {
     lastSeq: Number(match[7]),
     lastSeenS: Number(match[8]),
   };
+}
+
+function cliPendingToMember(line: string): PendingMember | undefined {
+  const match = line.match(/pending member=(\d+)\s+role=(\d+)\s+battery=(\d+)\s+mac=([0-9A-Fa-f]{4})\s+ready=(\d+)\s+last_seen=(\d+)/);
+  if (!match) return undefined;
+  return {
+    id: Number(match[1]),
+    role: Number(match[2]) === 1 ? "leader" : "member",
+    batteryPercent: Number(match[3]),
+    macReady: Number(match[5]) !== 0,
+    macSuffix: match[4].toUpperCase(),
+    lastSeenS: Number(match[6]),
+  };
+}
+
+function routeIdFromSuffix(suffix: string): number {
+  const value = Number.parseInt(suffix, 16) & 0xffff;
+  let routeId = value & 0xff;
+  if (routeId === 0 || routeId === 0xff) {
+    routeId = ((value >> 8) % 254) + 1;
+  }
+  return routeId;
 }
 
 function sendCommandToCli(command: SendCommand): string {
@@ -311,6 +416,39 @@ export class SerialTeamApi implements TeamApi {
       .slice(-20)
       .reverse()
       .map((line, index) => serialLineToEvent(line, index));
+  }
+
+  async getPending(): Promise<PendingMember[]> {
+    const lines = await this.runCli("pairing pending");
+    return lines.map(cliPendingToMember).filter((member): member is PendingMember => member !== undefined);
+  }
+
+  async configureRole(command: RoleCommand): Promise<void> {
+    if (command.role === "leader") {
+      await this.runCli("role leader", 1200);
+      return;
+    }
+    await this.runCli(`role member ${command.leaderSuffix}`, 1200);
+  }
+
+  async configurePairing(command: PairingCommand): Promise<void> {
+    if (command.action === "approve") {
+      await this.runCli(`pairing approve ${command.id} ${command.relay ? "relay" : "norelay"}`, 800);
+      return;
+    }
+    await this.runCli(`pairing ${command.action}`, 800);
+  }
+
+  async selectMemberLeader(command: MemberSelectCommand): Promise<void> {
+    await this.runCli(`join ${command.teamId} ${routeIdFromSuffix(command.leaderSuffix)} ${command.channel}`, 800);
+  }
+
+  async leaveMember(): Promise<void> {
+    await this.runCli("leave", 800);
+  }
+
+  async factoryReset(): Promise<void> {
+    return Promise.reject(new Error("串口模式暂无 factory reset CLI；请用 WiFi HTTP /api/factory-reset 或串口 leave 后重新配置"));
   }
 
   async send(command: SendCommand): Promise<TeamEvent> {

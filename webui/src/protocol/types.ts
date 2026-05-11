@@ -1,5 +1,6 @@
 export type NodeRole = "leader" | "member";
 export type NodeState = "idle" | "discovering" | "joining" | "online";
+export type ParentState = "idle" | "discovering" | "connected" | "reselecting";
 
 export type AppMessageType =
   | "HELLO"
@@ -8,6 +9,7 @@ export type AppMessageType =
   | "ALERT"
   | "CONFIG"
   | "ACK"
+  | "ROUTE_UPDATE"
   | "PACKET"
   | "CLI"
   | "STATE"
@@ -15,19 +17,65 @@ export type AppMessageType =
   | "UNKNOWN";
 
 export interface TeamStatus {
+  configured?: boolean;
+  selfLabel?: string;
+  routeId?: number;
+  macReady?: boolean;
+  mac?: string;
+  macSuffix?: string;
+  ssid?: string;
   teamId: number;
   selfId: number;
   leaderId: number;
   role: NodeRole;
   state: NodeState;
   joined: boolean;
+  relayAllowed?: boolean;
+  relayEnabled?: boolean;
+  relayTier?: number;
+  maxDownstream?: number;
+  upstreamParentId?: number;
+  upstreamParentState?: ParentState;
+  upstreamParentReselectPending?: boolean;
   nextSeq: number;
   uptimeS: number;
-  transport: "ws63-http" | "hosted-http" | "serial";
+  transport: "ws63-softap" | "ws63-http" | "hosted-http" | "serial";
   pairingEnabled?: boolean;
   memberFilterEnabled?: boolean;
   allowedMemberCount?: number;
   allowedMembers?: number[];
+  routeMetrics?: RouteMetrics;
+}
+
+export interface UnconfiguredStatus {
+  configured: false;
+  selfLabel: string;
+  routeId: number;
+  macReady: boolean;
+  macSuffix: string;
+  ssid: string;
+  transport: "ws63-softap" | "ws63-http" | "hosted-http" | "serial";
+}
+
+export interface RouteMetrics {
+  active: number;
+  direct: number;
+  relayed: number;
+  unreachable: number;
+  stale: number;
+  converged: boolean;
+  relayTarget: number;
+  relayOnline: number;
+  epoch: number;
+  lastChangeS: number;
+  lastConvergedS: number;
+  routeHintSentTotal: number;
+  routeHintFailedTotal: number;
+  routeHintCooldownSkippedTotal: number;
+  routeHintLastActivityS: number;
+  routeUpdateRxTotal: number;
+  routeReparentTotal: number;
+  routeReparentLastS: number;
 }
 
 export interface TeamNode {
@@ -37,6 +85,12 @@ export interface TeamNode {
   batteryPercent: number;
   fixStatus: number;
   lastRssiDbm: number | null;
+  macReady?: boolean;
+  mac?: string;
+  macSuffix?: string;
+  relayAllowed?: boolean;
+  relayTier?: number;
+  maxDownstream?: number;
   lastSeq: number;
   lastSeenS: number;
   latitudeE6?: number;
@@ -44,6 +98,16 @@ export interface TeamNode {
   speedCms?: number;
   headingDeg?: number;
   satCount?: number;
+}
+
+export interface PendingMember {
+  id: number;
+  role: NodeRole;
+  batteryPercent: number;
+  macReady: boolean;
+  mac?: string;
+  macSuffix: string;
+  lastSeenS: number;
 }
 
 export interface TeamEvent {
@@ -104,4 +168,19 @@ export interface SendCommand {
 export interface AllowMembersCommand {
   mode: "all" | "only" | "add" | "del";
   memberIds?: number[];
+}
+
+export type RoleCommand =
+  | { role: "leader" }
+  | { role: "member"; leaderSuffix: string; teamId: number; channel: number };
+
+export type PairingCommand =
+  | { action: "start" }
+  | { action: "stop" }
+  | { action: "approve"; id: number; relay: boolean };
+
+export interface MemberSelectCommand {
+  teamId: number;
+  leaderSuffix: string;
+  channel: number;
 }
