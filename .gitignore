@@ -4,6 +4,7 @@
 *.bin
 *.map
 *.log
+logs/
 .DS_Store
 *冲突副本*
 *Mac.lan*
