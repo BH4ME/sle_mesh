@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AUTO_BURN_TOOL="$ROOT_DIR/tools/ws63_auto_burn.py"
+AUTO_BURN_TOOL="$ROOT_DIR/automation/ws63/tools/ws63_auto_burn.py"
 BURN_TOOL="${BURN_TOOL:-$AUTO_BURN_TOOL}"
 FW_ROOT="${FW_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
 AUTO_RESET="${AUTO_RESET:-1}"
@@ -35,7 +35,7 @@ The script prints role, port, and firmware path, then asks for an exact
 confirmation before it runs the burn tool.
 Use --yes or WS63_FLASH_NO_CONFIRM=1 for non-interactive runs.
 
-By default this script uses tools/ws63_auto_burn.py, which first sends the
+By default this script uses automation/ws63/tools/ws63_auto_burn.py, which first sends the
 board's serial CLI reboot command and toggles DTR/RTS before the WS63 burn
 handshake. Set AUTO_RESET=0 to keep the old manual-reset flow.
 USAGE

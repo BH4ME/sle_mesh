@@ -114,7 +114,7 @@ scripts/ws63_flash_team.sh member /dev/tty.usbserial-110
 脚本会在烧录前打印角色、串口和固件路径，并要求输入 `flash leader` 或 `flash member` 才会继续。
 macOS 烧录优先使用 `/dev/tty.usbserial-*`，不要用 `/dev/cu.usbserial-*`。
 
-脚本默认使用 `tools/ws63_auto_burn.py` 自动复位：
+脚本默认使用 `automation/ws63/tools/ws63_auto_burn.py` 自动复位（兼容入口仍保留 `tools/ws63_auto_burn.py`）：
 
 - 新固件支持串口 CLI `reboot/reset`，烧录前会先发 `reboot`，再进入 WS63 bootrom 握手。
 - 脚本还会按 `RESET_CONTROL_SEQUENCE` 尝试 DTR/RTS 脉冲，适配有自动复位接线的烧录器。

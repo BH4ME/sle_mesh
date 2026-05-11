@@ -21,6 +21,7 @@
 - [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：按 v0/v1/v2 分组的协议与组网文档。
 - [versions/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions)：版本记录。
 - [scripts/](/Users/bh4me_macair/Documents/Codex/sle_intercom/scripts)：编译和烧录脚本。
+- [automation/ws63/](/Users/bh4me_macair/Documents/Codex/sle_intercom/automation/ws63)：自动化烧录、角色绑定与回归测试（独立目录）。
 
 ## WS63 使用
 
@@ -75,7 +76,7 @@ scripts/ws63_build_team_ubuntu.sh unified
 printf 'flash leader\n' | scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
 ```
 
-烧录脚本中的 `leader/member` 只用于选择串口和二次确认，实际烧录的是同一个统一固件。脚本默认会通过 `tools/ws63_auto_burn.py` 先发串口 `reboot` 并尝试 DTR/RTS 自动复位；第一次从老固件升级或烧录器没有复位控制线时，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 这类没有 BOOT 键的开发板按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。临时关闭自动复位：
+烧录脚本中的 `leader/member` 只用于选择串口和二次确认，实际烧录的是同一个统一固件。脚本默认会通过 `automation/ws63/tools/ws63_auto_burn.py`（保留兼容入口 `tools/ws63_auto_burn.py`）先发串口 `reboot` 并尝试 DTR/RTS 自动复位；第一次从老固件升级或烧录器没有复位控制线时，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 这类没有 BOOT 键的开发板按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。临时关闭自动复位：
 
 ```sh
 printf 'flash leader\n' | AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
