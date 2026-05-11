@@ -2356,6 +2356,33 @@ static void team_web_record_packet(sle_team_web_event_direction_t direction, con
         fallback != NULL ? fallback : "packet");
 }
 
+static void *team_reboot_task(const char *arg)
+{
+    const char *reason = (arg != NULL) ? arg : "manual";
+
+    osal_msleep(800);
+    osal_printk("[team] reboot now reason=%s\r\n", reason);
+    (void)uapi_watchdog_init(1);
+    (void)uapi_watchdog_set_time(1);
+    (void)uapi_watchdog_enable(WDT_MODE_RESET);
+    while (1) {
+    }
+    return NULL;
+}
+
+static void team_reboot_schedule(const char *reason)
+{
+    osal_task *task = NULL;
+
+    osal_kthread_lock();
+    task = osal_kthread_create((osal_kthread_handler)team_reboot_task, (void *)reason, "TeamReboot",
+        SLE_TEAM_FACTORY_RESET_TASK_STACK_SIZE);
+    if (task != NULL) {
+        osal_kthread_set_priority(task, SLE_TEAM_FACTORY_RESET_TASK_PRIO);
+    }
+    osal_kthread_unlock();
+}
+
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 static int team_wifi_ap_start(void)
 {
@@ -2518,31 +2545,9 @@ static void team_http_send_redirect(int fd, const char *location)
     }
 }
 
-static void *team_factory_reset_task(const char *arg)
-{
-    unused(arg);
-
-    osal_msleep(800);
-    osal_printk("[team] factory reset reboot now\r\n");
-    (void)uapi_watchdog_init(1);
-    (void)uapi_watchdog_set_time(1);
-    (void)uapi_watchdog_enable(WDT_MODE_RESET);
-    while (1) {
-    }
-    return NULL;
-}
-
 static void team_factory_reset_schedule(void)
 {
-    osal_task *task = NULL;
-
-    osal_kthread_lock();
-    task = osal_kthread_create((osal_kthread_handler)team_factory_reset_task, NULL, "TeamFactoryReset",
-        SLE_TEAM_FACTORY_RESET_TASK_STACK_SIZE);
-    if (task != NULL) {
-        osal_kthread_set_priority(task, SLE_TEAM_FACTORY_RESET_TASK_PRIO);
-    }
-    osal_kthread_unlock();
+    team_reboot_schedule("factory-reset");
 }
 
 static void team_http_send_factory_reset_page(int fd)
@@ -4071,6 +4076,11 @@ static void team_handle_cli_queue_once(void)
             return;
         }
 #endif
+        if (strcmp(msg.line, "reboot") == 0 || strcmp(msg.line, "reset") == 0) {
+            osal_printk("[cli] reboot requested\r\n");
+            team_reboot_schedule("cli");
+            return;
+        }
         if (strcmp(msg.line, "role leader") == 0) {
             int ret = team_configure_role(SLE_TEAM_ROLE_LEADER, g_team_rt.route_id);
             osal_printk("[cli] role leader ret=%d\r\n", ret);

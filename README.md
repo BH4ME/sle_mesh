@@ -75,13 +75,17 @@ scripts/ws63_build_team_ubuntu.sh unified
 printf 'flash leader\n' | scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
 ```
 
-烧录脚本中的 `leader/member` 只用于选择串口和二次确认，实际烧录的是同一个统一固件。
+烧录脚本中的 `leader/member` 只用于选择串口和二次确认，实际烧录的是同一个统一固件。脚本默认会通过 `tools/ws63_auto_burn.py` 先发串口 `reboot` 并尝试 DTR/RTS 自动复位；第一次从老固件升级或烧录器没有复位控制线时，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 这类没有 BOOT 键的开发板按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。临时关闭自动复位：
+
+```sh
+printf 'flash leader\n' | AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
+```
 
 ## 本地验证
 
 ```sh
 cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_NETWORK_TEST \
-  examples/team_network_demo.c src/sle_team_node.c src/sle_team_packet.c \
+  examples/team_network_demo.c src/sle_team_node.c src/sle_team_packet.c src/sle_team_web_api.c \
   -o /tmp/sle_team_network_test && /tmp/sle_team_network_test
 
 cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \

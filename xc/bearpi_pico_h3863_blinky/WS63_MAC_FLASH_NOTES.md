@@ -250,6 +250,23 @@ python3 -m pip install --user xf-burn-tools rich
 
 ## 烧录命令
 
+`sle_mesh` 工程当前推荐走项目脚本，它会先尝试自动复位：
+
+```sh
+printf 'flash leader\n' | \
+  /Users/bh4me_macair/Documents/Codex/sle_intercom/scripts/ws63_flash_team.sh \
+  leader /dev/tty.usbserial-10
+```
+
+自动复位机制：
+
+- 新版 `xc/ws63_team_network` 固件支持串口 CLI `reboot/reset`，烧录脚本会先发 `reboot`。
+- 脚本也会尝试 DTR/RTS 脉冲；是否有效取决于当前 USB 转串口/烧录器是否把控制线接到板子的复位控制脚。
+- 第一次从老固件升级时，老固件没有 `reboot` 命令，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 没有 BOOT 键时按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。
+- 关闭自动复位可用：`AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10`。
+
+底层 `xf-burn-tools` 命令仍是：
+
 最终成功命令：
 
 ```sh
@@ -461,7 +478,9 @@ rsync -a --exclude=/output source/ fresh/
 
 ### 工具一直等待 reset
 
-解决：按板子复位；如果有 BOOT 键，按住 BOOT 再点 RESET。
+优先解决：升级到支持串口 CLI `reboot/reset` 的 `xc/ws63_team_network` 固件，然后用 `scripts/ws63_flash_team.sh` 默认自动复位烧录。
+
+如果是第一次从老固件升级，或当前烧录器没有接复位控制线，按板子复位；如果有 BOOT 键，按住 BOOT 再点 RESET。
 
 ### 烧录成功但灯不闪
 

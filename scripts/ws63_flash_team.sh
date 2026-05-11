@@ -2,15 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BURN_TOOL="${BURN_TOOL:-/Users/bh4me_macair/Library/Python/3.9/bin/burn}"
+AUTO_BURN_TOOL="$ROOT_DIR/tools/ws63_auto_burn.py"
+BURN_TOOL="${BURN_TOOL:-$AUTO_BURN_TOOL}"
 FW_ROOT="${FW_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
+AUTO_RESET="${AUTO_RESET:-1}"
+RESET_COMMAND="${RESET_COMMAND:-reboot}"
+RESET_COMMAND_DELAY="${RESET_COMMAND_DELAY:-0.3}"
+RESET_CONTROL_SEQUENCE="${RESET_CONTROL_SEQUENCE:-rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05}"
+NO_CONFIRM="${WS63_FLASH_NO_CONFIRM:-0}"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/ws63_flash_team.sh leader [port]
-  scripts/ws63_flash_team.sh member [port]
-  scripts/ws63_flash_team.sh unified [port]
+  scripts/ws63_flash_team.sh [--yes] leader [port]
+  scripts/ws63_flash_team.sh [--yes] member [port]
+  scripts/ws63_flash_team.sh [--yes] unified [port]
 
 Defaults:
   leader port: /dev/tty.usbserial-10
@@ -19,13 +25,55 @@ Defaults:
 Environment:
   BURN_TOOL=/path/to/burn
   FW_ROOT=/path/to/output_from_vm
+  AUTO_RESET=1|0
+  WS63_FLASH_NO_CONFIRM=1|0
+  RESET_COMMAND=reboot
+  RESET_COMMAND_DELAY=0.3
+  RESET_CONTROL_SEQUENCE='rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05'
 
 The script prints role, port, and firmware path, then asks for an exact
 confirmation before it runs the burn tool.
+Use --yes or WS63_FLASH_NO_CONFIRM=1 for non-interactive runs.
+
+By default this script uses tools/ws63_auto_burn.py, which first sends the
+board's serial CLI reboot command and toggles DTR/RTS before the WS63 burn
+handshake. Set AUTO_RESET=0 to keep the old manual-reset flow.
 USAGE
 }
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -y|--yes)
+      NO_CONFIRM=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
 role="${1:-}"
+port_arg="${2:-}"
+if [[ $# -gt 2 ]]; then
+  echo "Too many arguments." >&2
+  usage >&2
+  exit 2
+fi
+
 case "$role" in
   leader)
     default_port="/dev/tty.usbserial-10"
@@ -38,7 +86,7 @@ case "$role" in
     fallback_firmware="$FW_ROOT/team_network_member_serial_led/ws63-liteos-app_member_all.fwpkg"
     ;;
   unified)
-    default_port="${2:-/dev/tty.usbserial-10}"
+    default_port="/dev/tty.usbserial-10"
     firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
     fallback_firmware="$firmware"
     ;;
@@ -53,13 +101,14 @@ case "$role" in
     ;;
 esac
 
-port="${2:-$default_port}"
+port="${port_arg:-$default_port}"
 
 echo "WS63 team flash confirmation"
 echo "repo:     $ROOT_DIR"
 echo "role:     $role"
 echo "port:     $port"
 echo "firmware: $firmware"
+echo "auto rst: $AUTO_RESET"
 echo
 
 if [[ ! -x "$BURN_TOOL" ]]; then
@@ -87,12 +136,36 @@ if [[ ! -f "$firmware" ]]; then
 fi
 
 expected="flash $role"
-printf "Type '%s' to continue: " "$expected"
-read -r answer
-if [[ "$answer" != "$expected" ]]; then
-  echo "Cancelled."
-  exit 1
+if [[ "$NO_CONFIRM" == "1" ]]; then
+  echo "Non-interactive mode: skip manual confirmation."
+else
+  printf "Type '%s' to continue: " "$expected"
+  read -r answer
+  if [[ "$answer" != "$expected" ]]; then
+    echo "Cancelled."
+    exit 1
+  fi
 fi
 
-echo "Starting burn. When the tool waits for reset, press BOOT + RESET as needed."
-exec "$BURN_TOOL" -p "$port" -b 115200 "$firmware"
+burn_args=(-p "$port" -b 115200)
+if [[ "$BURN_TOOL" == "$AUTO_BURN_TOOL" ]]; then
+  if [[ "$AUTO_RESET" == "0" ]]; then
+    burn_args+=(--no-auto-reset)
+    echo "Starting burn with auto reset disabled. Press RESET/RST if the tool waits for reset."
+  else
+    burn_args+=(
+      --reset-command "$RESET_COMMAND"
+      --reset-command-delay "$RESET_COMMAND_DELAY"
+      --control-sequence "$RESET_CONTROL_SEQUENCE"
+    )
+    echo "Starting burn with auto reset enabled."
+    echo "If this board still waits for reset, press RESET/RST manually; boards with a BOOT key may need BOOT + RESET."
+  fi
+else
+  if [[ "$AUTO_RESET" != "0" ]]; then
+    echo "AUTO_RESET requested, but custom BURN_TOOL does not support project auto reset: $BURN_TOOL" >&2
+    echo "Falling back to the custom burn tool; press RESET/RST if it waits for reset." >&2
+  fi
+  echo "Starting burn with custom burn tool."
+fi
+exec "$BURN_TOOL" "${burn_args[@]}" "$firmware"

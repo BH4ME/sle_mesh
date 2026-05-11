@@ -113,7 +113,22 @@ scripts/ws63_flash_team.sh member /dev/tty.usbserial-110
 
 脚本会在烧录前打印角色、串口和固件路径，并要求输入 `flash leader` 或 `flash member` 才会继续。
 macOS 烧录优先使用 `/dev/tty.usbserial-*`，不要用 `/dev/cu.usbserial-*`。
-看到 `Waiting for device reset...` 后，需要按板子的 `BOOT + RESET` 或按当前烧录器要求复位让它握手。
+
+脚本默认使用 `tools/ws63_auto_burn.py` 自动复位：
+
+- 新固件支持串口 CLI `reboot/reset`，烧录前会先发 `reboot`，再进入 WS63 bootrom 握手。
+- 脚本还会按 `RESET_CONTROL_SEQUENCE` 尝试 DTR/RTS 脉冲，适配有自动复位接线的烧录器。
+- 第一次从老固件升级，或当前 USB 转串口没有接复位控制线时，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 这类没有 BOOT 键的开发板按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。
+- 如需回到旧流程：`AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10`。
+
+可调参数：
+
+```sh
+AUTO_RESET=1
+RESET_COMMAND=reboot
+RESET_COMMAND_DELAY=0.3
+RESET_CONTROL_SEQUENCE='rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05'
+```
 
 ## LED 诊断
 
@@ -153,6 +168,8 @@ http
 role leader
 role member <leader_mac_suffix>
 led status
+reboot
+reset
 ```
 
 选好角色后：
@@ -170,6 +187,8 @@ leave
 hello [dst]
 hb [dst] [battery] [rssi] [fix]
 pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
+reboot
+reset
 ```
 
 `role member` 用 leader MAC 后四位；`join` 是已配置 member 后的低层调试命令，参数仍是内部 1 字节 leader ID。
