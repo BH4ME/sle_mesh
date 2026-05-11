@@ -1,3 +1,6 @@
+import pathlib
+import subprocess
+import sys
 import unittest
 
 from tools.sle_team_python_sim import SimulationConfig, simulate_one_run
@@ -104,6 +107,35 @@ class OneVsTwentySimulationTest(unittest.TestCase):
         self.assertGreater(result.report_success_before_failover, 0)
         self.assertGreater(result.report_success_during_failover, 0)
         self.assertGreater(result.report_success_after_recover, 0)
+
+    def test_cli_passes_when_no_failover_event_is_configured(self) -> None:
+        sim_path = pathlib.Path(__file__).resolve().parent / "sle_team_python_sim.py"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(sim_path),
+                "--members",
+                "20",
+                "--relay-fail-tick",
+                "20",
+                "--relay-recover-tick",
+                "20",
+                "--ticks",
+                "10",
+                "--batch-fail-relay-count",
+                "0",
+                "--stress",
+                "1",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            proc.returncode,
+            0,
+            msg=f"unexpected exit={proc.returncode}\nstdout={proc.stdout}\nstderr={proc.stderr}",
+        )
 
 
 if __name__ == "__main__":

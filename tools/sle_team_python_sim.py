@@ -421,11 +421,19 @@ def main() -> int:
             batch_fail_relay_ticks=batch_ticks,
         )
         result = simulate_one_run(cfg)
+        expects_reselection = False
+        if 1 <= args.relay_fail_tick <= args.ticks:
+            expects_reselection = True
+        if args.batch_fail_relay_count > 0 and batch_ticks:
+            for tick in batch_ticks:
+                if 1 <= tick <= args.ticks:
+                    expects_reselection = True
+                    break
         ok = (
             result.discovered_members == args.members
             and result.approved_members == args.members
             and result.total_report_success > 0
-            and result.relay_reselection_total >= 1
+            and (expects_reselection is False or result.relay_reselection_total >= 1)
         )
         if ok:
             pass_runs += 1
