@@ -290,22 +290,29 @@ static uint8_t sle_team_node_relay_tier_for_member(uint8_t member_id)
     return (uint8_t)(((uint8_t)(member_id - 1U) % 3U) + 1U);
 }
 
-static void sle_team_leader_refresh_relay_config(sle_team_node_t *node)
+static int sle_team_leader_refresh_relay_config(sle_team_node_t *node)
 {
     uint8_t i;
+    int last_err = SLE_TEAM_OK;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
-        return;
+        return SLE_TEAM_ERR_ARG;
     }
     for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
         const sle_team_member_record_t *member = &node->members[i];
+        int ret;
 
         if (member->online == 0U || member->relay_allowed == 0U ||
             member->member_id == 0U || member->member_id == SLE_TEAM_BROADCAST_ID) {
             continue;
         }
-        (void)sle_team_node_send_config(node, member->member_id);
+        ret = sle_team_node_send_config(node, member->member_id);
+        if (ret != SLE_TEAM_OK) {
+            last_err = ret;
+            sle_team_log(node, "relay config refresh failed");
+        }
     }
+    return last_err;
 }
 
 static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t clear_permission)
@@ -441,7 +448,7 @@ int sle_team_node_pairing_start(sle_team_node_t *node)
     node->cfg.pairing_enabled = 1U;
     node->cfg.member_filter_enabled = 1U;
     (void)memset(node->pending_members, 0, sizeof(node->pending_members));
-    sle_team_leader_refresh_relay_config(node);
+    (void)sle_team_leader_refresh_relay_config(node);
     sle_team_log(node, "pairing started");
     return SLE_TEAM_OK;
 }
@@ -452,6 +459,7 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
     uint8_t pending_count = 0U;
     uint8_t approve_failed = 0U;
     uint8_t i;
+    int refresh_ret;
     int last_err = SLE_TEAM_OK;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
@@ -479,7 +487,12 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
     }
 
     node->cfg.pairing_enabled = 0U;
-    sle_team_leader_refresh_relay_config(node);
+    refresh_ret = sle_team_leader_refresh_relay_config(node);
+    if (refresh_ret != SLE_TEAM_OK) {
+        approve_failed = 1U;
+        last_err = refresh_ret;
+        sle_team_log(node, "pairing stop config retry pending");
+    }
     if (approve_failed != 0U) {
         sle_team_log(node, "pairing stopped with pending retry");
     }
@@ -587,9 +600,11 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
 {
     sle_team_hello_body_t hello;
     sle_team_member_record_t *member;
+    sle_team_member_record_t member_before;
     sle_team_pending_member_t *pending;
     int ack_ret;
     int cfg_ret;
+    uint8_t had_member;
 
     if (node == NULL || app == NULL || app->body_len < sizeof(hello)) {
         return SLE_TEAM_ERR_FORMAT;
@@ -616,6 +631,11 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
         sle_team_log(node, "member rejected by allowlist");
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
+    member = sle_team_get_member_slot(node, app->src_id, 0U);
+    had_member = member != NULL ? 1U : 0U;
+    if (had_member != 0U) {
+        member_before = *member;
+    }
     member = sle_team_get_member_slot(node, app->src_id, 1U);
     if (member == NULL) {
         return SLE_TEAM_ERR_BUF;
@@ -630,21 +650,27 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
 
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER) {
         cfg_ret = sle_team_node_send_config(node, app->src_id);
+        if (cfg_ret != SLE_TEAM_OK) {
+            if (had_member != 0U) {
+                *member = member_before;
+            } else {
+                (void)memset(member, 0, sizeof(*member));
+            }
+            sle_team_log(node, "config send failed on hello");
+            return cfg_ret;
+        }
         ack_ret = sle_team_node_send_ack(node, app->src_id, app->seq, SLE_TEAM_APP_HELLO, 0U);
         if (ack_ret == SLE_TEAM_OK) {
             sle_team_clear_pending_member(node, app->src_id);
             sle_team_mark_joined(node, app->src_id);
         } else {
+            if (had_member != 0U) {
+                *member = member_before;
+            } else {
+                (void)memset(member, 0, sizeof(*member));
+            }
             sle_team_log(node, "hello ack send failed");
-        }
-        if (cfg_ret != SLE_TEAM_OK) {
-            sle_team_log(node, "config send failed on hello");
-        }
-        if (ack_ret != SLE_TEAM_OK) {
             return ack_ret;
-        }
-        if (cfg_ret != SLE_TEAM_OK) {
-            return cfg_ret;
         }
     }
 
@@ -734,6 +760,10 @@ static int sle_team_handle_heartbeat(sle_team_node_t *node, const sle_team_app_p
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
         sle_team_log(node, "heartbeat rejected by allowlist");
         return SLE_TEAM_ERR_UNSUPPORTED;
+    }
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
+        sle_team_note_leader_seen(node);
+        return SLE_TEAM_OK;
     }
     member = sle_team_get_member_slot(node, app->src_id, 1U);
     if (member == NULL) {
@@ -940,7 +970,10 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
                     return SLE_TEAM_OK;
                 }
             } else {
-                return ret;
+                sle_team_log(node, "relay forward failed");
+                if (app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
+                    return ret;
+                }
             }
         }
         if (app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
