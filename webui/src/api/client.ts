@@ -10,6 +10,7 @@ import type {
   TeamStatus,
   UnconfiguredStatus,
 } from "../protocol/types";
+import { fetchAction, fetchJson } from "./http";
 
 export interface TeamApi {
   getStatus(): Promise<TeamStatus | UnconfiguredStatus>;
@@ -64,25 +65,6 @@ export function loadConnectionConfig(): ConnectionConfig {
 
 export function saveConnectionConfig(config: ConnectionConfig): void {
   window.localStorage.setItem(configKey, JSON.stringify(config));
-}
-
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const requestInit = init?.body
-    ? { headers: { "content-type": "application/json" }, ...init }
-    : init;
-  const response = await fetch(path, requestInit);
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<T>;
-}
-
-async function fetchAction(path: string): Promise<void> {
-  const response = await fetch(path, { redirect: "manual" });
-  if (response.ok || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-    return;
-  }
-  throw new Error(`${response.status} ${response.statusText}`);
 }
 
 function qs(params: Record<string, string | number | boolean>): string {

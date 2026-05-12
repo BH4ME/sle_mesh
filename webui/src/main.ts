@@ -634,17 +634,17 @@ async function refresh(): Promise<void> {
   state.error = undefined;
   renderShell();
   try {
-    if (state.connection.mode === "serial") {
-      state.status = await api.getStatus();
-      state.nodes = await api.getNodes();
-      state.pending = isConfiguredStatus(state.status) && state.status.role === "leader" ? await api.getPending() : [];
-      state.events = await api.getEvents();
+    state.status = await api.getStatus();
+    state.nodes = await api.getNodes();
+    state.events = await api.getEvents();
+    if (isConfiguredStatus(state.status) && state.status.role === "leader") {
+      try {
+        state.pending = await api.getPending();
+      } catch {
+        state.pending = [];
+      }
     } else {
-      const [status, nodes, events] = await Promise.all([api.getStatus(), api.getNodes(), api.getEvents()]);
-      state.status = status;
-      state.nodes = nodes;
-      state.pending = isConfiguredStatus(status) && status.role === "leader" ? await api.getPending() : [];
-      state.events = events;
+      state.pending = [];
     }
   } catch (error) {
     state.error = error instanceof Error ? error.message : "refresh failed";
