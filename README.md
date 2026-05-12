@@ -8,6 +8,7 @@
 - [docs/v0/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/README.md)：V0（1vs2 / 1vs8）
 - [docs/v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay）
 - [docs/v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
+- [docs/v3/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v3/README.md)：V3（手机定位桥接）
 - [versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
 - [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md)：文档编写与维护流程
 
@@ -46,6 +47,7 @@ URL: http://192.168.43.1/
 - `GET /api/nodes`
 - `GET /api/events`
 - `GET /api/pending`
+- `GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...`
 - `GET /api/pairing?action=start|stop|approve&id=...&relay=0|1`
 - `GET /api/member/select?team=...&leader=...&channel=...`
 - `GET /api/member/leave`

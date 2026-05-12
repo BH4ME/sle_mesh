@@ -800,6 +800,11 @@ static int sle_team_handle_position(sle_team_node_t *node, const sle_team_app_pa
 
     member->battery_percent = pos.battery_percent;
     member->fix_status = pos.fix_status;
+    member->latitude_e6 = pos.latitude_e6;
+    member->longitude_e6 = pos.longitude_e6;
+    member->speed_cms = pos.speed_cms;
+    member->heading_deg = pos.heading_deg;
+    member->sat_count = pos.sat_count;
     member->last_seen_s = sle_team_now(node);
     member->last_seq = app->seq;
     sle_team_note_leader_seen(node);

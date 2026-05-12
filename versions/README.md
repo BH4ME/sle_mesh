@@ -4,6 +4,7 @@
 
 当前版本：
 
+- [v3.0.0-alpha1](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha1/VERSION.md)
 - [v2.0.0-alpha18](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha18/VERSION.md)
 - [v2.0.0-alpha17](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha17/VERSION.md)
 - [v2.0.0-alpha16](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v2.0.0-alpha16/VERSION.md)
@@ -39,6 +40,12 @@
 - `VERSION.md` 只写这个版本解决了什么。
 - `MANIFEST.md` 只写这个版本涉及哪些文件和怎么验证。
 - 不再在每个版本目录复制大量源码快照，避免版本目录膨胀。
-- 从 `v2.0.0-alpha1` 起，执行约束：
+
+### V3 起版本管理约束
+
+- 命名规则：`v3.0.0-alphaN`（功能开发阶段），后续按 `beta/rc/stable` 演进。
 - 每完成一批功能都要提交一次并更新对应版本目录。
-- 每次提交前至少跑 `SLE_TEAM_NETWORK_TEST` 与 `SLE_TEAM_PACKET_TEST`。
+- 每次提交前至少执行本次变更影响范围内的自动化验证：
+  - WebUI 变更：`npm --prefix webui test` 与 `npm --prefix webui run build`
+  - 协议/状态机变更：补充并执行对应 C 侧验证用例
+- `versions/README.md` 顶部“当前版本”必须指向最新版本。

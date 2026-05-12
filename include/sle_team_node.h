@@ -46,6 +46,11 @@ typedef struct {
     uint8_t battery_percent;
     uint8_t online;
     uint8_t fix_status;
+    int32_t latitude_e6;
+    int32_t longitude_e6;
+    uint16_t speed_cms;
+    uint16_t heading_deg;
+    uint8_t sat_count;
     uint8_t mac[6];
     uint8_t mac_ready;
     uint8_t relay_allowed;

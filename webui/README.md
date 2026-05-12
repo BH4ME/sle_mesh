@@ -240,6 +240,7 @@ GET /api/status
 GET /api/nodes
 GET /api/events
 GET /api/pending
+GET /api/location?lat=39908456&lon=116397128&dst=255&speed=0&heading=90&battery=88&fix=2&sat=0
 GET /api/role?role=leader
 GET /api/role?role=member&leader=C7E9&team=1&channel=17
 GET /api/pairing?action=start|stop|approve&id=2&relay=1

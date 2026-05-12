@@ -7,6 +7,7 @@
 - [v0/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/README.md)：V0（1vs2 / 1vs8 基线）
 - [v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay 批准）
 - [v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
+- [v3/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v3/README.md)：V3（手机定位桥接与位置分发）
 
 ## 审查与版本
 

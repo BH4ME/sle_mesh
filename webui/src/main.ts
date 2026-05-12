@@ -374,13 +374,6 @@ function renderRouteMetrics(): string {
 }
 
 function renderSendForm(): string {
-  if (state.connection.mode === "wifi") {
-    return `
-      <div class="send-form">
-        <div class="note">当前 WS63 HTTP 固件没有 /api/send；WiFi 模式请使用角色、配队和 member 控制，发送测试包请切到串口模式。</div>
-      </div>
-    `;
-  }
   return `
     <form class="send-form" data-form="send">
       <label>类型
@@ -402,6 +395,8 @@ function renderSendForm(): string {
         <label>航向<input name="headingDeg" type="number" min="0" value="90" /></label>
       </div>
       <button class="primary-button" type="submit">${icon(Send, 17)}发送</button>
+      <button class="text-button" type="button" data-action="send-phone-location">手机定位并发送</button>
+      <div class="note">手机定位需要浏览器允许位置权限；在 HTTP 页面上部分浏览器会拒绝定位，建议 HTTPS 页面使用。</div>
     </form>
   `;
 }
@@ -482,6 +477,7 @@ function renderSettings(): string {
 GET  /api/nodes
 GET  /api/events
 GET  /api/pending
+GET  /api/location?lat=39908456&lon=116397128&dst=255&speed=0&heading=90&battery=88&fix=2&sat=0
 GET  /api/role?role=leader
 GET  /api/role?role=member&leader=C7E9&team=1&channel=17
 GET  /api/pairing?action=start|stop|approve&id=2&relay=1
@@ -694,6 +690,49 @@ function bindEvents(): void {
         state.error = error instanceof Error ? error.message : "send failed";
         renderShell();
       });
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='send-phone-location']")?.addEventListener("click", () => {
+    if (!("geolocation" in navigator)) {
+      state.error = "当前浏览器不支持 geolocation";
+      renderShell();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitudeE6 = Math.round(position.coords.latitude * 1_000_000);
+        const longitudeE6 = Math.round(position.coords.longitude * 1_000_000);
+        const headingDeg =
+          typeof position.coords.heading === "number" && Number.isFinite(position.coords.heading)
+            ? Math.round(position.coords.heading)
+            : 0;
+        const speedCms =
+          typeof position.coords.speed === "number" && Number.isFinite(position.coords.speed)
+            ? Math.max(0, Math.round(position.coords.speed * 100))
+            : 0;
+        void api
+          .sendLocation({
+            latitudeE6,
+            longitudeE6,
+            headingDeg,
+            speedCms,
+            fixStatus: 2,
+            satCount: 0,
+          })
+          .then((eventResult) => {
+            state.events.unshift(eventResult);
+            return refresh();
+          })
+          .catch((error) => {
+            state.error = error instanceof Error ? error.message : "send location failed";
+            renderShell();
+          });
+      },
+      (error) => {
+        state.error = `定位失败：${error.message}`;
+        renderShell();
+      },
+      { enableHighAccuracy: true, timeout: 7000, maximumAge: 2000 },
+    );
   });
   document.querySelector<HTMLButtonElement>("[data-action='role-leader']")?.addEventListener("click", () => {
     void runAction(() => api.configureRole({ role: "leader" }), "set leader failed");

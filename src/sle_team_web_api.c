@@ -315,6 +315,10 @@ int sle_team_web_write_nodes_json(const sle_team_node_t *node, char *out, size_t
             member->member_id, sle_team_web_role_name(member->role), member->online != 0U ? "true" : "false",
             member->battery_percent, member->fix_status);
         json_append_mac_fields(&writer, member->mac, member->mac_ready);
+        json_append(&writer,
+            ",\"latitudeE6\":%ld,\"longitudeE6\":%ld,\"speedCms\":%u,\"headingDeg\":%u,\"satCount\":%u",
+            (long)member->latitude_e6, (long)member->longitude_e6,
+            member->speed_cms, member->heading_deg, member->sat_count);
         if (member->last_rssi_dbm == SLE_TEAM_RSSI_UNKNOWN) {
             json_append(&writer, ",\"lastRssiDbm\":null");
         } else {

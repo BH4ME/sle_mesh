@@ -4,6 +4,7 @@
     { "path": "/api/nodes", "method": "GET", "kind": "json" },
     { "path": "/api/events", "method": "GET", "kind": "json" },
     { "path": "/api/pending", "method": "GET", "kind": "json" },
+    { "path": "/api/location", "method": "GET", "kind": "json" },
     { "path": "/api/role", "method": "GET", "kind": "redirect" },
     { "path": "/api/pairing", "method": "GET", "kind": "redirect" },
     { "path": "/api/member/select", "method": "GET", "kind": "redirect" },

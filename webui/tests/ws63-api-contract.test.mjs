@@ -19,6 +19,7 @@ test("WS63 API contract lists the current board HTTP routes", () => {
       "/api/nodes",
       "/api/events",
       "/api/pending",
+      "/api/location",
       "/api/role",
       "/api/pairing",
       "/api/member/select",
@@ -46,4 +47,22 @@ test("cross-origin board actions expose redirect responses to hosted WebUI", () 
 test("firmware event API exposes uptime seconds", () => {
   assert.match(webApiSource, /\\"time\\":\\"%lu\\"/);
   assert.match(webApiSource, /event->time_s/);
+});
+
+test("firmware nodes API exposes member location fields", () => {
+  assert.match(webApiSource, /\\"latitudeE6\\":%ld/);
+  assert.match(webApiSource, /\\"longitudeE6\\":%ld/);
+});
+
+test("hosted webui integrates geolocation bridge API", () => {
+  assert.match(firmwareSource, /GET \/api\/location/);
+  assert.match(firmwareSource, /sle_team_node_send_position/);
+  assert.match(
+    fs.readFileSync(path.join(repoRoot, "webui/src/main.ts"), "utf8"),
+    /navigator\.geolocation/,
+  );
+  assert.match(
+    fs.readFileSync(path.join(repoRoot, "webui/src/api/client.ts"), "utf8"),
+    /\/api\/location/,
+  );
 });

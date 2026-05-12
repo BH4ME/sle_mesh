@@ -2633,6 +2633,83 @@ static int team_http_query_u8(const char *path, const char *key, uint8_t min_val
     return 0;
 }
 
+static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
+    uint16_t *out)
+{
+    char pattern[24];
+    const char *p;
+    unsigned long value = 0;
+    uint8_t digits = 0U;
+
+    if (path == NULL || key == NULL || out == NULL) {
+        return -1;
+    }
+    (void)snprintf(pattern, sizeof(pattern), "%s=", key);
+    p = strstr(path, pattern);
+    if (p == NULL) {
+        return -1;
+    }
+    p += strlen(pattern);
+    while (*p >= '0' && *p <= '9') {
+        value = value * 10UL + (unsigned long)(*p - '0');
+        p++;
+        digits++;
+        if (value > 65535UL) {
+            return -1;
+        }
+    }
+    if (digits == 0U || value < min_value || value > max_value) {
+        return -1;
+    }
+    *out = (uint16_t)value;
+    return 0;
+}
+
+static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
+    int32_t *out)
+{
+    char pattern[24];
+    const char *p;
+    long sign = 1L;
+    unsigned long abs_value = 0UL;
+    uint8_t digits = 0U;
+
+    if (path == NULL || key == NULL || out == NULL) {
+        return -1;
+    }
+    (void)snprintf(pattern, sizeof(pattern), "%s=", key);
+    p = strstr(path, pattern);
+    if (p == NULL) {
+        return -1;
+    }
+    p += strlen(pattern);
+    if (*p == '-') {
+        sign = -1L;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+    while (*p >= '0' && *p <= '9') {
+        abs_value = abs_value * 10UL + (unsigned long)(*p - '0');
+        p++;
+        digits++;
+        if (abs_value > 2147483648UL) {
+            return -1;
+        }
+    }
+    if (digits == 0U) {
+        return -1;
+    }
+    {
+        long signed_value = (long)abs_value * sign;
+        if (signed_value < (long)min_value || signed_value > (long)max_value) {
+            return -1;
+        }
+        *out = (int32_t)signed_value;
+    }
+    return 0;
+}
+
 static int team_http_query_hex16(const char *path, const char *key, uint16_t *out)
 {
     char pattern[24];
@@ -2727,6 +2804,25 @@ static void team_http_send_status_json_response(int fd)
     }
     team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
         ret < 0 ? "{\"error\":\"status\"}" : g_team_http_json_buf);
+}
+
+static void team_http_send_location_event(int fd, const char *summary, uint8_t dst_id, int send_ret)
+{
+    if (summary == NULL) {
+        summary = send_ret == SLE_TEAM_OK ? "location sent" : "location failed";
+    }
+    (void)snprintf(g_team_http_json_buf, sizeof(g_team_http_json_buf),
+        "{\"id\":\"ws63-location-%lu\",\"time\":\"%lu\",\"direction\":\"%s\","
+        "\"type\":\"POS_REPORT\",\"srcId\":%u,\"dstId\":%u,\"seq\":%u,\"summary\":\"%s\"}",
+        (unsigned long)team_now_s(NULL),
+        (unsigned long)team_now_s(NULL),
+        send_ret == SLE_TEAM_OK ? "tx" : "fail",
+        g_team_node.cfg.self_id,
+        dst_id,
+        g_team_node.next_seq == 0U ? 0U : (uint16_t)(g_team_node.next_seq - 1U),
+        summary);
+    team_http_send_response(fd, send_ret == SLE_TEAM_OK ? "200 OK" : "500 Internal Server Error",
+        "application/json", g_team_http_json_buf);
 }
 
 static void team_http_append_str(char *buf, size_t buf_size, size_t *used, const char *text)
@@ -3195,6 +3291,61 @@ static void team_http_handle_client(int fd)
         ret = sle_team_web_write_nodes_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
         team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
             ret < 0 ? "{\"error\":\"nodes\"}" : g_team_http_json_buf);
+    } else if (strncmp(g_team_http_req_buf, "GET /api/location", 17) == 0) {
+        sle_team_pos_body_t pos;
+        int send_ret;
+        int32_t lat = 0;
+        int32_t lon = 0;
+        uint16_t speed = 0U;
+        uint16_t heading = 0U;
+        uint8_t battery = 100U;
+        uint8_t fix = 2U;
+        uint8_t sat = 0U;
+        uint8_t dst = SLE_TEAM_BROADCAST_ID;
+
+        osal_printk("[team-wifi] http route api=location path=%s\r\n", path);
+        if (g_team_rt.role_configured == 0U) {
+            team_http_send_response(fd, "400 Bad Request", "application/json",
+                "{\"error\":\"role not configured\"}");
+            return;
+        }
+        if (team_http_query_i32(path, "lat", -90000000, 90000000, &lat) != 0 ||
+            team_http_query_i32(path, "lon", -180000000, 180000000, &lon) != 0) {
+            team_http_send_response(fd, "400 Bad Request", "application/json",
+                "{\"error\":\"lat/lon required\"}");
+            return;
+        }
+        (void)team_http_query_u16(path, "speed", 0U, 65535U, &speed);
+        (void)team_http_query_u16(path, "heading", 0U, 65535U, &heading);
+        (void)team_http_query_u8(path, "battery", 0U, 100U, &battery);
+        (void)team_http_query_u8(path, "fix", 0U, 255U, &fix);
+        (void)team_http_query_u8(path, "sat", 0U, 255U, &sat);
+        (void)team_http_query_u8(path, "dst", 1U, 255U, &dst);
+        if (dst == SLE_TEAM_BROADCAST_ID) {
+            dst = SLE_TEAM_BROADCAST_ID;
+        }
+
+        (void)memset_s(&pos, sizeof(pos), 0, sizeof(pos));
+        pos.latitude_e6 = lat;
+        pos.longitude_e6 = lon;
+        pos.speed_cms = speed;
+        pos.heading_deg = heading;
+        pos.battery_percent = battery;
+        pos.fix_status = fix;
+        pos.sat_count = sat;
+
+        send_ret = sle_team_node_send_position(&g_team_node, dst, &pos);
+        if (send_ret == SLE_TEAM_OK) {
+            char summary[SLE_TEAM_WEB_EVENT_SUMMARY_SIZE];
+            (void)snprintf(summary, sizeof(summary), "POS_REPORT %u->%u lat=%ld lon=%ld",
+                g_team_node.cfg.self_id, dst, (long)lat, (long)lon);
+            sle_team_web_event_push(&g_team_events, team_now_s(NULL), SLE_TEAM_WEB_EVENT_SYSTEM,
+                SLE_TEAM_APP_POS_REPORT, g_team_node.cfg.self_id, dst,
+                g_team_node.next_seq == 0U ? 0U : (uint16_t)(g_team_node.next_seq - 1U), summary);
+            team_http_send_location_event(fd, "location sent", dst, send_ret);
+        } else {
+            team_http_send_location_event(fd, "location send failed", dst, send_ret);
+        }
     } else if (strncmp(g_team_http_req_buf, "GET /api/pending", 16) == 0) {
         osal_printk("[team-wifi] http route api=pending\r\n");
         ret = sle_team_web_write_pending_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
