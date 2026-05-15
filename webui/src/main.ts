@@ -192,6 +192,7 @@ function renderOverview(): string {
       ${metric("消息", String(state.events.length), TerminalSquare)}
       ${metric("入网", isConfiguredStatus(state.status) && state.status.joined ? "Yes" : "No", CircleDot)}
     </section>
+    ${state.connection.mode === "wifi" ? renderPhoneLocationPanel() : ""}
     ${renderRouteMetrics()}
     <section class="two-column">
       <div class="panel">
@@ -374,6 +375,13 @@ function renderRouteMetrics(): string {
 }
 
 function renderSendForm(): string {
+  if (state.connection.mode === "wifi") {
+    return `
+      <div class="send-form">
+        <div class="note">WiFi 模式暂不提供 /api/send；请用上方“手机位置”面板，或者切到串口模式发送测试包。</div>
+      </div>
+    `;
+  }
   return `
     <form class="send-form" data-form="send">
       <label>类型
@@ -395,9 +403,21 @@ function renderSendForm(): string {
         <label>航向<input name="headingDeg" type="number" min="0" value="90" /></label>
       </div>
       <button class="primary-button" type="submit">${icon(Send, 17)}发送</button>
-      <button class="text-button" type="button" data-action="send-phone-location">手机定位并发送</button>
-      <div class="note">手机定位需要浏览器允许位置权限；在 HTTP 页面上部分浏览器会拒绝定位，建议 HTTPS 页面使用。</div>
     </form>
+  `;
+}
+
+function renderPhoneLocationPanel(): string {
+  return `
+    <section class="panel">
+      <div class="panel-head">
+        <h2>手机位置</h2>
+      </div>
+      <div class="connection-actions">
+        <button class="primary-button" type="button" data-action="send-phone-location">${icon(Compass, 17)}手机定位并发送</button>
+      </div>
+      <div class="note">手机定位需要浏览器允许位置权限；在 HTTP 页面上部分浏览器会拒绝定位。局域网调试请优先使用 HTTPS 页面，例如 https://你的电脑IP:5173/ 。</div>
+    </section>
   `;
 }
 

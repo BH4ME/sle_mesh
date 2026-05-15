@@ -2626,6 +2626,9 @@ static int team_http_query_u8(const char *path, const char *key, uint8_t min_val
             return -1;
         }
     }
+    if (*p != '\0' && *p != '&') {
+        return -1;
+    }
     if (digits == 0U || value < min_value || value > max_value) {
         return -1;
     }
@@ -2657,6 +2660,9 @@ static int team_http_query_u16(const char *path, const char *key, uint16_t min_v
         if (value > 65535UL) {
             return -1;
         }
+    }
+    if (*p != '\0' && *p != '&') {
+        return -1;
     }
     if (digits == 0U || value < min_value || value > max_value) {
         return -1;
@@ -2696,6 +2702,9 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
         if (abs_value > 2147483648UL) {
             return -1;
         }
+    }
+    if (*p != '\0' && *p != '&') {
+        return -1;
     }
     if (digits == 0U) {
         return -1;
