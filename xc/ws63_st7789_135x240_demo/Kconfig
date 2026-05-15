@@ -1,0 +1,81 @@
+config ST7789_SPI_BUS_ID
+    int "SPI bus id"
+    default 0
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_SPI_FREQ_MHZ
+    int "SPI clock frequency in MHz"
+    default 16
+    range 1 32
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_SCL_PIN
+    int "TFT SCL / SPI clock GPIO"
+    default 7
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_SDA_PIN
+    int "TFT SDA / SPI MOSI GPIO"
+    default 9
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_MISO_PIN
+    int "Optional SPI MISO GPIO, -1 when not wired"
+    default -1
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_CS_PIN
+    int "TFT CS GPIO"
+    default 8
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_DC_PIN
+    int "TFT RS/DC GPIO"
+    default 10
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_RESET_PIN
+    int "TFT RESET GPIO"
+    default 6
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TFT_X_OFFSET
+    int "ST7789 column offset"
+    default 52
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+    help
+        The common 1.14 inch 135x240 ST7789 panel is centered in a 240x320 RAM.
+        Adjust this if the picture is shifted left or right.
+
+config ST7789_TFT_Y_OFFSET
+    int "ST7789 row offset"
+    default 40
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+    help
+        Adjust this if the picture is shifted up or down.
+
+config ST7789_COLOR_ORDER_BGR
+    bool "Use ST7789 BGR color order"
+    default y
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_INVERSION_ON
+    bool "Enable ST7789 display inversion"
+    default y
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_FRAME_DELAY_MS
+    int "Animation frame delay in ms"
+    default 16
+    range 0 1000
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TASK_STACK_SIZE
+    int "Animation task stack size"
+    default 6144
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240
+
+config ST7789_TASK_PRIO
+    int "Animation task priority"
+    default 17
+    depends on SAMPLE_SUPPORT_WS63_ST7789_135X240

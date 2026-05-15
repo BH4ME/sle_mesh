@@ -6,6 +6,7 @@
 *.log
 logs/
 .DS_Store
+.cxresume_sessions*
 *冲突副本*
 *Mac.lan*
 build/
