@@ -9,6 +9,8 @@ typedef struct {
     uint32_t now_s;
     uint8_t last_tx[256];
     uint16_t last_tx_len;
+    uint8_t relay_offline_count;
+    uint8_t relay_offline_last_member;
     const char *name;
 } demo_runtime_t;
 
@@ -55,6 +57,18 @@ static void demo_position(void *user_ctx, uint8_t member_id, const sle_team_pos_
         (long)pos->latitude_e6,
         (long)pos->longitude_e6,
         pos->battery_percent);
+}
+
+static void demo_relay_offline(void *user_ctx, uint8_t member_id)
+{
+    demo_runtime_t *rt = (demo_runtime_t *)user_ctx;
+
+    if (rt == NULL) {
+        return;
+    }
+    rt->relay_offline_count++;
+    rt->relay_offline_last_member = member_id;
+    printf("[%s] relay offline event member=%u\n", rt->name, member_id);
 }
 
 static void relay_last_packet(demo_runtime_t *from, sle_team_node_t *to)
@@ -146,6 +160,7 @@ int main(void)
     leader_ops.log = demo_log;
     leader_ops.on_joined = demo_joined;
     leader_ops.on_position = demo_position;
+    leader_ops.on_relay_offline = demo_relay_offline;
     leader_ops.user_ctx = &leader_rt;
 
     relay_ops = leader_ops;
@@ -393,6 +408,62 @@ int main(void)
     relay_last_packet(&member_rt, &relay);
     assert(relay_rt.last_tx_len != 0U);
     relay_last_packet(&relay_rt, &leader);
+
+    {
+        demo_runtime_t cb_leader_rt = {.name = "cb-leader", .now_s = 20U};
+        sle_team_node_t cb_leader;
+        sle_team_node_cfg_t cb_cfg = leader_cfg;
+        sle_team_node_ops_t cb_ops = leader_ops;
+        uint8_t i;
+
+        cb_ops.user_ctx = &cb_leader_rt;
+        assert(sle_team_node_init(&cb_leader, &cb_cfg, &cb_ops) == SLE_TEAM_OK);
+        assert(sle_team_node_pairing_approve_with_relay(&cb_leader, 3U, 1U) == SLE_TEAM_OK);
+        for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+            if (cb_leader.members[i].member_id == 3U && cb_leader.members[i].online != 0U) {
+                cb_leader.members[i].last_seen_s = 1U;
+                break;
+            }
+        }
+        assert(cb_leader_rt.relay_offline_count == 0U);
+        sle_team_node_tick(&cb_leader);
+        assert(cb_leader_rt.relay_offline_count == 1U);
+        assert(cb_leader_rt.relay_offline_last_member == 3U);
+    }
+
+    {
+        sle_team_app_packet_t parent_switch_app;
+
+        member.joined = 1U;
+        member.state = SLE_TEAM_NET_ONLINE;
+        member.cfg.relay_allowed = 1U;
+        member.cfg.relay_enabled = 1U;
+        member.cfg.heartbeat_interval_s = 0U;
+        member.cfg.parent_timeout_s = 2U;
+        member.cfg.heartbeat_timeout_s = 10U;
+        member.upstream_parent_id = 3U;
+        member.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
+        member.upstream_parent_reselect_pending = 0U;
+        member.last_leader_seen_s = 4U;
+        member.last_parent_seen_s = 1U;
+        member.members[0].member_id = 9U;
+        member.members[0].online = 1U;
+        member_rt.now_s = 6U;
+        member_rt.last_tx_len = 0U;
+
+        sle_team_node_tick(&member);
+        assert(member.joined != 0U);
+        assert(member.state == SLE_TEAM_NET_ONLINE);
+        assert(member.cfg.relay_allowed != 0U);
+        assert(member.cfg.relay_enabled != 0U);
+        assert(member.members[0].online != 0U);
+        assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+        assert(member.upstream_parent_reselect_pending != 0U);
+        assert(member.last_parent_seen_s == 0U);
+        assert(demo_decode_last_app_packet(&member_rt, &parent_switch_app) != 0U);
+        assert(parent_switch_app.app_msg_type == SLE_TEAM_APP_HELLO);
+        assert(parent_switch_app.dst_id == member.cfg.leader_id);
+    }
 
     leader_cfg.default_ttl = 2U;
     leader.cfg.default_ttl = 2U;

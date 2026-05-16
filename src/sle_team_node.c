@@ -104,12 +104,20 @@ static void sle_team_note_leader_seen(sle_team_node_t *node)
 static void sle_team_set_parent_state(sle_team_node_t *node, uint8_t parent_id, sle_team_parent_state_t state,
     uint8_t reselect_pending)
 {
+    uint32_t now_s;
+
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
         return;
     }
     node->upstream_parent_id = parent_id;
     node->upstream_parent_state = state;
     node->upstream_parent_reselect_pending = reselect_pending;
+    now_s = sle_team_now(node);
+    if (parent_id == 0U || parent_id == SLE_TEAM_BROADCAST_ID) {
+        node->last_parent_seen_s = 0U;
+    } else if (state == SLE_TEAM_PARENT_CONNECTED && reselect_pending == 0U && now_s != 0U) {
+        node->last_parent_seen_s = now_s;
+    }
 }
 
 static void sle_team_member_rejoin(sle_team_node_t *node)
@@ -124,9 +132,30 @@ static void sle_team_member_rejoin(sle_team_node_t *node)
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    node->last_parent_seen_s = 0U;
     sle_team_node_disable_member_relay(node, 0U);
     sle_team_clear_members(node);
     sle_team_log(node, "leader timeout, rejoining");
+}
+
+int sle_team_node_try_parent_switch(sle_team_node_t *node)
+{
+    uint8_t old_parent_id;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    if (node->upstream_parent_id == 0U || node->upstream_parent_id == SLE_TEAM_BROADCAST_ID ||
+        node->upstream_parent_id == node->cfg.leader_id) {
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
+
+    old_parent_id = node->upstream_parent_id;
+    sle_team_set_parent_state(node, old_parent_id, SLE_TEAM_PARENT_RESELECTING, 1U);
+    node->upstream_parent_id = 0U;
+    node->last_parent_seen_s = 0U;
+    sle_team_log(node, "parent timeout, requesting new parent");
+    return sle_team_node_send_hello(node, node->cfg.leader_id);
 }
 
 static int sle_team_send_app(sle_team_node_t *node, uint8_t dst_id, const uint8_t *app_buf, uint16_t app_len)
@@ -257,6 +286,9 @@ static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
         }
         if ((now_s - member->last_seen_s) > timeout_s) {
             member->online = 0U;
+            if (member->relay_allowed != 0U && node->ops.on_relay_offline != NULL) {
+                node->ops.on_relay_offline(node->ops.user_ctx, member->member_id);
+            }
             sle_team_log(node, "member heartbeat timeout");
         }
     }
@@ -572,6 +604,7 @@ int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, u
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    node->last_parent_seen_s = 0U;
     sle_team_set_parent_state(node, 0U, SLE_TEAM_PARENT_DISCOVERING, 0U);
     sle_team_node_disable_member_relay(node, 1U);
     sle_team_clear_members(node);
@@ -589,6 +622,7 @@ int sle_team_node_member_leave(sle_team_node_t *node)
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
+    node->last_parent_seen_s = 0U;
     sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_DISCOVERING, 0U);
     sle_team_node_disable_member_relay(node, 1U);
     sle_team_clear_members(node);
@@ -701,6 +735,7 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
             node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
             SLE_TEAM_PARENT_CONNECTED, 0U);
         sle_team_note_leader_seen(node);
+        node->last_parent_seen_s = sle_team_now(node);
         sle_team_mark_joined(node, node->cfg.self_id);
     }
     return SLE_TEAM_OK;
@@ -744,6 +779,7 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
     }
     node->last_config_s = sle_team_now(node);
     sle_team_note_leader_seen(node);
+    node->last_parent_seen_s = sle_team_now(node);
     return SLE_TEAM_OK;
 }
 
@@ -852,6 +888,7 @@ static int sle_team_handle_route_update(sle_team_node_t *node, const sle_team_ap
         sle_team_set_parent_state(node,
             node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
             SLE_TEAM_PARENT_CONNECTED, 0U);
+        node->last_parent_seen_s = sle_team_now(node);
         if (route_update->parent_state != 0U) {
             node->cfg.relay_enabled = node->cfg.relay_allowed != 0U ? 1U : 0U;
         }
@@ -878,6 +915,7 @@ int sle_team_node_init(sle_team_node_t *node, const sle_team_node_cfg_t *cfg, co
     node->upstream_parent_reselect_pending = 0U;
     node->upstream_parent_state = (cfg->role == SLE_TEAM_ROLE_LEADER) ? SLE_TEAM_PARENT_IDLE :
         SLE_TEAM_PARENT_DISCOVERING;
+    node->last_parent_seen_s = 0U;
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER) {
         node->cfg.relay_allowed = 0U;
         node->cfg.relay_enabled = 0U;
@@ -904,6 +942,13 @@ void sle_team_node_tick(sle_team_node_t *node)
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined != 0U && node->cfg.heartbeat_timeout_s != 0U &&
         node->last_leader_seen_s != 0U && (now_s - node->last_leader_seen_s) > node->cfg.heartbeat_timeout_s) {
         sle_team_member_rejoin(node);
+    }
+
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined != 0U && node->cfg.parent_timeout_s != 0U &&
+        node->upstream_parent_id != 0U && node->upstream_parent_id != SLE_TEAM_BROADCAST_ID &&
+        node->upstream_parent_id != node->cfg.leader_id &&
+        node->last_parent_seen_s != 0U && (now_s - node->last_parent_seen_s) > node->cfg.parent_timeout_s) {
+        (void)sle_team_node_try_parent_switch(node);
     }
 
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined == 0U) {

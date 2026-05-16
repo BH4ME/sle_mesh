@@ -82,6 +82,7 @@ typedef void (*sle_team_log_fn)(void *user_ctx, const char *text);
 typedef void (*sle_team_joined_cb)(void *user_ctx, uint8_t member_id);
 typedef void (*sle_team_position_cb)(void *user_ctx, uint8_t member_id, const sle_team_pos_body_t *pos);
 typedef void (*sle_team_alert_cb)(void *user_ctx, uint8_t member_id, uint8_t reason);
+typedef void (*sle_team_relay_offline_cb)(void *user_ctx, uint8_t member_id);
 
 typedef struct {
     sle_team_send_fn send;
@@ -91,6 +92,7 @@ typedef struct {
     sle_team_joined_cb on_joined;
     sle_team_position_cb on_position;
     sle_team_alert_cb on_alert;
+    sle_team_relay_offline_cb on_relay_offline;
     void *user_ctx;
 } sle_team_node_ops_t;
 
@@ -117,6 +119,7 @@ typedef struct {
     uint16_t warn_distance_m;
     uint16_t lost_distance_m;
     uint16_t heartbeat_timeout_s;
+    uint16_t parent_timeout_s;
 } sle_team_node_cfg_t;
 
 struct sle_team_node {
@@ -128,6 +131,7 @@ struct sle_team_node {
     uint32_t last_heartbeat_s;
     uint32_t last_config_s;
     uint32_t last_leader_seen_s;
+    uint32_t last_parent_seen_s;
     uint8_t joined;
     uint8_t upstream_parent_id;
     uint8_t upstream_parent_reselect_pending;
@@ -164,6 +168,7 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
 int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, uint8_t leader_id,
     uint8_t channel_hash);
 int sle_team_node_member_leave(sle_team_node_t *node);
+int sle_team_node_try_parent_switch(sle_team_node_t *node);
 
 #ifdef __cplusplus
 }

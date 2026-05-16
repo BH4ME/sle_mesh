@@ -160,10 +160,10 @@
 #define SLE_TEAM_PAIRING_ROTATE_INTERVAL_S 6U
 #define SLE_TEAM_PAIRING_KEEP_CONNECTED 4U
 #define SLE_TEAM_AUTO_RELAY_MAX 3U
-#define SLE_TEAM_PARENT_SWITCH_COOLDOWN_S 10U
+#define SLE_TEAM_PARENT_SWITCH_COOLDOWN_S 5U
 #define SLE_TEAM_PARENT_SWITCH_RSSI_HYST_DBM 8
 #define SLE_TEAM_PARENT_CANDIDATE_MIN_RSSI (-95)
-#define SLE_TEAM_RELAY_REBALANCE_INTERVAL_S 8U
+#define SLE_TEAM_RELAY_REBALANCE_INTERVAL_S 3U
 #define SLE_TEAM_RELAY_REVOKE_STALE_FACTOR 2U
 #define SLE_TEAM_RELAY_CANDIDATE_MIN_RSSI (-92)
 #define SLE_TEAM_ROUTE_METRICS_INTERVAL_S 4U
@@ -1672,17 +1672,21 @@ static void team_upstream_parent_note(uint8_t parent_id, sle_team_parent_state_t
 {
     int8_t parent_rssi = SLE_TEAM_RSSI_UNKNOWN;
     team_conn_track_t *track;
+    uint32_t now_s;
 
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || parent_id == 0U || parent_id == SLE_TEAM_BROADCAST_ID) {
         return;
     }
+    now_s = team_now_s(NULL);
     if (g_team_node.upstream_parent_id == parent_id && g_team_node.upstream_parent_state == state &&
         g_team_node.upstream_parent_reselect_pending == 0U) {
+        g_team_node.last_parent_seen_s = now_s;
         return;
     }
     g_team_node.upstream_parent_id = parent_id;
     g_team_node.upstream_parent_state = state;
     g_team_node.upstream_parent_reselect_pending = 0U;
+    g_team_node.last_parent_seen_s = now_s;
     track = team_conn_track_find_by_route_id(parent_id);
     if (track != NULL) {
         if (track->dir == TEAM_CONN_DIR_UPSTREAM) {
@@ -1694,7 +1698,7 @@ static void team_upstream_parent_note(uint8_t parent_id, sle_team_parent_state_t
     }
     g_team_rt.parent_selected_id = parent_id;
     g_team_rt.parent_selected_rssi = parent_rssi;
-    g_team_rt.parent_switch_last_s = team_now_s(NULL);
+    g_team_rt.parent_switch_last_s = now_s;
     osal_printk("[team] upstream parent=%u state=%u reason=%s\r\n",
         parent_id, (uint8_t)state, reason != NULL ? reason : "unknown");
 }
@@ -2326,6 +2330,13 @@ static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
 {
     unused(user_ctx);
     osal_printk("[team] alert member=%u reason=%u\r\n", member_id, reason);
+}
+
+static void team_on_relay_offline(void *user_ctx, uint8_t member_id)
+{
+    unused(user_ctx);
+    osal_printk("[team] relay offline event member=%u trigger immediate rebalance\r\n", member_id);
+    team_leader_rebalance_relays();
 }
 
 static void team_web_record_packet(sle_team_web_event_direction_t direction, const uint8_t *buf, uint16_t len,
@@ -3957,6 +3968,7 @@ static void team_node_init(sle_team_node_role_t role, uint8_t leader_id)
     cfg.warn_distance_m = CONFIG_SLE_TEAM_WARN_DISTANCE_M;
     cfg.lost_distance_m = CONFIG_SLE_TEAM_LOST_DISTANCE_M;
     cfg.heartbeat_timeout_s = CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S;
+    cfg.parent_timeout_s = (uint16_t)(CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S / 2U);
     cfg.default_ttl = 4U;
 
     ops.send = team_sle_send;
@@ -3966,6 +3978,7 @@ static void team_node_init(sle_team_node_role_t role, uint8_t leader_id)
     ops.on_joined = team_joined;
     ops.on_position = team_position;
     ops.on_alert = team_alert;
+    ops.on_relay_offline = team_on_relay_offline;
 
     (void)sle_team_node_init(&g_team_node, &cfg, &ops);
     sle_uart_server_adv_set_route_id(g_team_node.cfg.self_id);
