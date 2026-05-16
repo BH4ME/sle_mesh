@@ -146,6 +146,10 @@ int sle_team_node_try_parent_switch(sle_team_node_t *node)
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U) {
         return SLE_TEAM_ERR_ARG;
     }
+    /*
+     * ERR_UNSUPPORTED means no relay parent is currently set (none/broadcast/leader),
+     * so parent-switch is not applicable for this state.
+     */
     if (node->upstream_parent_id == 0U || node->upstream_parent_id == SLE_TEAM_BROADCAST_ID ||
         node->upstream_parent_id == node->cfg.leader_id) {
         return SLE_TEAM_ERR_UNSUPPORTED;
@@ -584,11 +588,9 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
         }
         return SLE_TEAM_ERR_BUF;
     }
-    if (member != NULL) {
-        member->relay_allowed = relay_allowed != 0U ? 1U : 0U;
-        member->relay_tier = member->relay_allowed != 0U ? sle_team_node_relay_tier_for_member(member_id) : 0U;
-        member->max_downstream = member->relay_allowed != 0U ? SLE_TEAM_MAX_DIRECT_CONNECTIONS : 0U;
-    }
+    member->relay_allowed = relay_allowed != 0U ? 1U : 0U;
+    member->relay_tier = member->relay_allowed != 0U ? sle_team_node_relay_tier_for_member(member_id) : 0U;
+    member->max_downstream = member->relay_allowed != 0U ? SLE_TEAM_MAX_DIRECT_CONNECTIONS : 0U;
     cfg_ret = sle_team_node_send_config(node, member_id);
     ack_ret = sle_team_node_send_ack(node, member_id, 0U, SLE_TEAM_APP_HELLO, 0U);
     if (cfg_ret == SLE_TEAM_OK && ack_ret == SLE_TEAM_OK) {

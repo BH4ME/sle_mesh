@@ -3,6 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+/*
+ * Structural contract tests:
+ * Some assertions intentionally match source snippets to lock behavior/shape.
+ * If formatting/refactor changes these snippets, update the regex accordingly.
+ */
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const contract = JSON.parse(fs.readFileSync(path.join(repoRoot, "webui/shared/ws63-api.json"), "utf8"));
 const webPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "webui/package.json"), "utf8"));
