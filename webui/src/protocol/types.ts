@@ -72,7 +72,6 @@ export interface RouteMetrics {
   routeHintSentTotal: number;
   routeHintFailedTotal: number;
   routeHintCooldownSkippedTotal: number;
-  routeHintLastActivityS: number;
   routeUpdateRxTotal: number;
   routeReparentTotal: number;
   routeReparentLastS: number;

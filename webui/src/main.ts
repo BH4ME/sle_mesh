@@ -257,6 +257,10 @@ function renderNode(node: TeamNode): string {
 
 function renderControlPanel(): string {
   const status = state.status;
+  const factoryResetDisabled = state.connection.mode === "serial";
+  const factoryResetHint = factoryResetDisabled
+    ? `<div class="note">串口模式暂不支持 factory reset，请切换到 WiFi API 模式调用 /api/factory-reset。</div>`
+    : "";
   if (!status) return "";
   if (!isConfiguredStatus(status)) {
     return `
@@ -292,8 +296,9 @@ function renderControlPanel(): string {
         <div class="connection-actions control-actions">
           <button class="primary-button" type="button" data-action="pairing-start">${icon(Radio, 17)}开始配队</button>
           <button class="text-button" type="button" data-action="pairing-stop">停止并自动批准</button>
-          <button class="text-button" type="button" data-action="factory-reset">Factory reset</button>
+          <button class="text-button" type="button" data-action="factory-reset" ${factoryResetDisabled ? "disabled" : ""}>Factory reset</button>
         </div>
+        ${factoryResetHint}
         <div class="pending-list">
           ${state.pending.length === 0 ? `<div class="empty-state">暂无 pending member</div>` : state.pending.map(renderPendingMember).join("")}
         </div>
@@ -317,8 +322,9 @@ function renderControlPanel(): string {
         <label>Channel<input name="channel" type="number" min="0" max="255" value="17" /></label>
         <button class="primary-button" type="submit">${icon(GitBranch, 17)}选择 Leader</button>
         <button class="text-button" type="button" data-action="member-leave">Leave</button>
-        <button class="text-button" type="button" data-action="factory-reset">Factory reset</button>
+        <button class="text-button" type="button" data-action="factory-reset" ${factoryResetDisabled ? "disabled" : ""}>Factory reset</button>
       </form>
+      ${factoryResetHint}
     </section>
   `;
 }

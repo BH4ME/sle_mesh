@@ -71,6 +71,20 @@ test("webui keeps wifi send form gated and location button non-submit", () => {
   assert.match(mainSource, /type="button"[^>]*data-action="send-phone-location"/);
 });
 
+test("webui exposes serial-mode guidance for unsupported factory reset", () => {
+  assert.match(mainSource, /state\.connection\.mode === "serial"/);
+  assert.match(mainSource, /串口模式暂不支持 factory reset/);
+  assert.match(mainSource, /data-action="factory-reset"[^`]*factoryResetDisabled \? "disabled" : ""/);
+});
+
+test("route metrics payload drops routeHintLastActivityS to save firmware memory/json size", () => {
+  assert.doesNotMatch(webApiSource, /routeHintLastActivityS/);
+  assert.doesNotMatch(
+    fs.readFileSync(path.join(repoRoot, "webui/src/protocol/types.ts"), "utf8"),
+    /routeHintLastActivityS/,
+  );
+});
+
 test("firmware numeric query parsing requires a clean terminator", () => {
   assert.match(firmwareSource, /\*p != '\\0' && \*p != '&'/);
 });

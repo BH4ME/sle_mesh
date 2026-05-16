@@ -90,6 +90,11 @@ https://sleweb.mecho.top/?api=http://192.168.43.1
 
 注意：`https://sleweb.mecho.top` 是 HTTPS 页面。浏览器可能默认拦截它直接访问 `http://192.168.43.1` 这种私网 HTTP API。需要 WiFi 直连板端时，优先使用板端页面 `http://192.168.43.1/`；域名上位机更适合串口/WebSerial、后续 HTTPS 代理，或允许本地 HTTP 访问的浏览器环境。
 
+部署提示（非隔离网络）：
+
+- 外部门户 URL（例如 `sleweb.mecho.top`）应在发布后按运维策略轮换；
+- 轮换后同步更新本 README、发布说明和控制台入口配置，避免旧链接长期暴露。
+
 WiFi 入口不限定 leader。两种方式都可以落地：
 
 - leader 开 WiFi：WebUI 能看到 leader 汇总后的全队信息。
@@ -156,7 +161,6 @@ WiFi 入口不限定 leader。两种方式都可以落地：
     "routeHintSentTotal": 7,
     "routeHintFailedTotal": 1,
     "routeHintCooldownSkippedTotal": 4,
-    "routeHintLastActivityS": 126,
     "routeUpdateRxTotal": 19,
     "routeReparentTotal": 3,
     "routeReparentLastS": 125

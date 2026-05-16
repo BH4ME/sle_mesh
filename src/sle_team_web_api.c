@@ -224,7 +224,7 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
             "\"relayTarget\":%u,\"relayOnline\":%u,"
             "\"epoch\":%lu,\"lastChangeS\":%lu,\"lastConvergedS\":%lu,"
             "\"routeHintSentTotal\":%lu,\"routeHintFailedTotal\":%lu,"
-            "\"routeHintCooldownSkippedTotal\":%lu,\"routeHintLastActivityS\":%lu,"
+            "\"routeHintCooldownSkippedTotal\":%lu,"
             "\"routeUpdateRxTotal\":%lu,\"routeReparentTotal\":%lu,\"routeReparentLastS\":%lu}",
             route_metrics->active_count,
             route_metrics->direct_count,
@@ -240,7 +240,6 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
             (unsigned long)route_metrics->hint_sent_total,
             (unsigned long)route_metrics->hint_failed_total,
             (unsigned long)route_metrics->hint_cooldown_skipped_total,
-            (unsigned long)route_metrics->hint_last_activity_s,
             (unsigned long)route_metrics->route_update_rx_total,
             (unsigned long)route_metrics->route_reparent_total,
             (unsigned long)route_metrics->route_reparent_last_s);

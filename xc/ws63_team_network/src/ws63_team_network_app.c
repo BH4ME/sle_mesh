@@ -195,7 +195,6 @@ typedef struct {
     uint16_t conn_id;
     team_conn_dir_t dir;
     uint8_t route_id;
-    uint8_t bucket;
     sle_addr_t addr;
 } team_conn_track_t;
 
@@ -203,7 +202,6 @@ typedef struct {
     uint8_t active;
     sle_addr_t addr;
     uint8_t route_id;
-    uint8_t bucket;
     uint32_t last_seen_s;
 } team_pending_conn_t;
 
@@ -251,7 +249,6 @@ typedef struct {
     uint8_t pairing_rotate_index;
     uint32_t parent_switch_last_s;
     int8_t parent_selected_rssi;
-    uint8_t parent_selected_id;
     uint32_t relay_rebalance_last_s;
     uint8_t relay_online_count;
     uint8_t relay_target_count;
@@ -268,7 +265,6 @@ typedef struct {
     uint32_t route_hint_sent_total;
     uint32_t route_hint_failed_total;
     uint32_t route_hint_cooldown_skipped_total;
-    uint32_t route_hint_last_activity_s;
     uint32_t route_update_rx_total;
     uint32_t route_reparent_total;
     uint32_t route_reparent_last_s;
@@ -932,7 +928,7 @@ static team_pending_conn_t *team_pending_conn_find(const sle_addr_t *addr)
     return NULL;
 }
 
-static void team_pending_conn_note(const sle_addr_t *addr, uint8_t route_id, uint8_t bucket)
+static void team_pending_conn_note(const sle_addr_t *addr, uint8_t route_id)
 {
     team_pending_conn_t *slot;
     team_pending_conn_t *oldest = NULL;
@@ -967,7 +963,6 @@ static void team_pending_conn_note(const sle_addr_t *addr, uint8_t route_id, uin
     slot->active = 1U;
     (void)memcpy_s(&slot->addr, sizeof(slot->addr), addr, sizeof(*addr));
     slot->route_id = route_id;
-    slot->bucket = bucket;
     slot->last_seen_s = now_s;
 }
 
@@ -1206,7 +1201,7 @@ static void team_route_hint_mark_sent(uint8_t index, uint8_t member_id, uint8_t 
 static void team_route_hint_note_skip(uint32_t now_s)
 {
     g_team_rt.route_hint_cooldown_skipped_total++;
-    g_team_rt.route_hint_last_activity_s = now_s;
+    unused(now_s);
 }
 
 static void team_route_hint_note_send_result(uint32_t now_s, uint8_t success)
@@ -1216,7 +1211,7 @@ static void team_route_hint_note_send_result(uint32_t now_s, uint8_t success)
     } else {
         g_team_rt.route_hint_failed_total++;
     }
-    g_team_rt.route_hint_last_activity_s = now_s;
+    unused(now_s);
 }
 
 static void team_route_update_observe(const sle_team_app_packet_t *app_packet)
@@ -1456,11 +1451,9 @@ static void team_conn_track_update(uint16_t conn_id, team_conn_dir_t dir, const 
         pending = team_pending_conn_find(addr);
         if (pending != NULL) {
             track->route_id = pending->route_id;
-            track->bucket = pending->bucket;
             team_pending_conn_clear(addr);
         } else {
             track->route_id = team_route_id_from_sle_addr(addr->addr);
-            track->bucket = team_route_bucket_from_ids(track->route_id, g_team_node.cfg.leader_id);
         }
     }
 }
@@ -1488,7 +1481,6 @@ static void team_conn_track_note_packet(uint16_t conn_id, team_conn_dir_t dir, u
         }
     }
     track->route_id = route_id;
-    track->bucket = route_bucket;
 }
 
 static team_conn_dir_t team_conn_guess_direction_from_addr(const sle_addr_t *addr)
@@ -1696,7 +1688,6 @@ static void team_upstream_parent_note(uint8_t parent_id, sle_team_parent_state_t
             parent_rssi = sle_uart_client_get_last_rssi();
         }
     }
-    g_team_rt.parent_selected_id = parent_id;
     g_team_rt.parent_selected_rssi = parent_rssi;
     g_team_rt.parent_switch_last_s = now_s;
     osal_printk("[team] upstream parent=%u state=%u reason=%s\r\n",
@@ -1714,7 +1705,6 @@ static void team_upstream_parent_reset(const char *reason)
     }
     g_team_node.upstream_parent_state = SLE_TEAM_PARENT_RESELECTING;
     g_team_node.upstream_parent_reselect_pending = 1U;
-    g_team_rt.parent_selected_id = 0U;
     g_team_rt.parent_selected_rssi = SLE_TEAM_RSSI_UNKNOWN;
     g_team_rt.parent_switch_last_s = 0U;
     osal_printk("[team] upstream parent reselect parent=%u reason=%s\r\n",
@@ -1837,7 +1827,7 @@ static uint8_t team_client_seek_filter(const sle_seek_result_info_t *seek_result
     if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
         candidate_bucket = team_route_bucket_from_ids(candidate_id, g_team_node.cfg.leader_id);
         if (candidate_bucket == 1U) {
-            team_pending_conn_note(&seek_result_data->addr, candidate_id, candidate_bucket);
+            team_pending_conn_note(&seek_result_data->addr, candidate_id);
             return 1U;
         }
         return 0U;
@@ -1847,7 +1837,7 @@ static uint8_t team_client_seek_filter(const sle_seek_result_info_t *seek_result
     }
     candidate_bucket = team_route_bucket_from_ids(candidate_id, g_team_node.cfg.leader_id);
     if (candidate_bucket == (uint8_t)(self_bucket + 1U)) {
-        team_pending_conn_note(&seek_result_data->addr, candidate_id, candidate_bucket);
+        team_pending_conn_note(&seek_result_data->addr, candidate_id);
         return 1U;
     }
     return 0U;
@@ -2813,7 +2803,6 @@ static void team_http_send_status_json_response(int fd)
             metrics.hint_sent_total = g_team_rt.route_hint_sent_total;
             metrics.hint_failed_total = g_team_rt.route_hint_failed_total;
             metrics.hint_cooldown_skipped_total = g_team_rt.route_hint_cooldown_skipped_total;
-            metrics.hint_last_activity_s = g_team_rt.route_hint_last_activity_s;
             metrics.route_update_rx_total = g_team_rt.route_update_rx_total;
             metrics.route_reparent_total = g_team_rt.route_reparent_total;
             metrics.route_reparent_last_s = g_team_rt.route_reparent_last_s;
@@ -3043,14 +3032,6 @@ static void team_http_send_status_page(int fd)
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
             "<div class=\"row\"><span class=\"k\">Route Hint Cooldown Skip</span><span class=\"v\">%lu</span></div>",
             (unsigned long)g_team_rt.route_hint_cooldown_skipped_total);
-        if (g_team_rt.route_hint_last_activity_s == 0U) {
-            team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-                "<div class=\"row\"><span class=\"k\">Route Hint Last Activity</span><span class=\"v\">N/A</span></div>");
-        } else {
-            team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
-                "<div class=\"row\"><span class=\"k\">Route Hint Last Activity</span><span class=\"v\">%lus</span></div>",
-                (unsigned long)g_team_rt.route_hint_last_activity_s);
-        }
         team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
             "<div class=\"row\"><span class=\"k\">Route Update RX Total</span><span class=\"v\">%lu</span></div>",
             (unsigned long)g_team_rt.route_update_rx_total);

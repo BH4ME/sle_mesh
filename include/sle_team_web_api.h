@@ -52,7 +52,6 @@ typedef struct {
     uint32_t hint_sent_total;
     uint32_t hint_failed_total;
     uint32_t hint_cooldown_skipped_total;
-    uint32_t hint_last_activity_s;
     uint32_t route_update_rx_total;
     uint32_t route_reparent_total;
     uint32_t route_reparent_last_s;

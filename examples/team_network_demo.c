@@ -562,7 +562,6 @@ int main(void)
         web_metrics.hint_sent_total = 7U;
         web_metrics.hint_failed_total = 1U;
         web_metrics.hint_cooldown_skipped_total = 4U;
-        web_metrics.hint_last_activity_s = 126U;
         web_metrics.route_update_rx_total = 19U;
         web_metrics.route_reparent_total = 3U;
         web_metrics.route_reparent_last_s = 125U;
@@ -577,7 +576,7 @@ int main(void)
         assert(strstr(status_json, "\"routeHintSentTotal\":7") != NULL);
         assert(strstr(status_json, "\"routeHintFailedTotal\":1") != NULL);
         assert(strstr(status_json, "\"routeHintCooldownSkippedTotal\":4") != NULL);
-        assert(strstr(status_json, "\"routeHintLastActivityS\":126") != NULL);
+        assert(strstr(status_json, "\"routeHintLastActivityS\"") == NULL);
         assert(strstr(status_json, "\"routeUpdateRxTotal\":19") != NULL);
         assert(strstr(status_json, "\"routeReparentTotal\":3") != NULL);
         assert(strstr(status_json, "\"routeReparentLastS\":125") != NULL);
