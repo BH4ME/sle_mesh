@@ -23,3 +23,16 @@
 
 4. 部署提示补充：
 - 在 `webui/README.md` 增加“非隔离网络部署后轮换外部门户 URL”的运维提示。
+
+## 评审结论归档（alpha5）
+
+- 本轮评审确认 `alpha4` 反馈项已完成闭环：
+  - 已处理：Python 模拟器 `batch_fail_relay_ticks` 长度校验；
+  - 已处理：串口模式 `factory reset` 可见引导（禁用 + 提示）；
+  - 已处理：连接跟踪/路由提示冗余字段精简（`bucket`、`parent_selected_id`、`routeHintLastActivityS`）；
+  - 已处理：外部门户 URL 轮换要求写入交付文档。
+- 评审结论：当前改动聚焦输出边界与静态状态，未引入新的运行时行为路径风险；在现阶段未发现新的问题。
+
+## alpha6 候选项
+
+- `team_conn_track_t.addr` 可继续评估是否移除（约可再节省 112B 级别 RAM），但需先补等价可观测替代，避免削弱现场追踪能力。
