@@ -85,6 +85,13 @@ test("route metrics payload drops routeHintLastActivityS to save firmware memory
   );
 });
 
+test("firmware trims conn track addr while preserving pending lookup addr", () => {
+  const connTrackStruct = firmwareSource.match(/typedef struct \{[\s\S]*?\n\} team_conn_track_t;/)?.[0] ?? "";
+  const pendingStruct = firmwareSource.match(/typedef struct \{[\s\S]*?\n\} team_pending_conn_t;/)?.[0] ?? "";
+  assert.doesNotMatch(connTrackStruct, /\bsle_addr_t addr;/);
+  assert.match(pendingStruct, /\bsle_addr_t addr;/);
+});
+
 test("firmware numeric query parsing requires a clean terminator", () => {
   assert.match(firmwareSource, /\*p != '\\0' && \*p != '&'/);
 });

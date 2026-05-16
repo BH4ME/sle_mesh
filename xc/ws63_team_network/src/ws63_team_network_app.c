@@ -195,7 +195,6 @@ typedef struct {
     uint16_t conn_id;
     team_conn_dir_t dir;
     uint8_t route_id;
-    sle_addr_t addr;
 } team_conn_track_t;
 
 typedef struct {
@@ -1447,7 +1446,6 @@ static void team_conn_track_update(uint16_t conn_id, team_conn_dir_t dir, const 
     }
     track->dir = dir;
     if (addr != NULL) {
-        (void)memcpy_s(&track->addr, sizeof(track->addr), addr, sizeof(*addr));
         pending = team_pending_conn_find(addr);
         if (pending != NULL) {
             track->route_id = pending->route_id;
