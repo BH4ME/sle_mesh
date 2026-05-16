@@ -1560,7 +1560,10 @@ static void team_connection_state_changed_cbk(uint16_t conn_id, const sle_addr_t
                     disconnect_parent = 1U;
                 }
                 if (disconnect_parent != 0U && g_team_node.joined != 0U) {
-                    (void)sle_team_node_member_leave(&g_team_node);
+                    int switch_ret = sle_team_node_try_parent_switch(&g_team_node);
+                    if (switch_ret != SLE_TEAM_OK && switch_ret != SLE_TEAM_ERR_UNSUPPORTED) {
+                        (void)sle_team_node_member_leave(&g_team_node);
+                    }
                     team_upstream_parent_reset("disconnect");
                     if (g_team_rt.relay_client_started != 0U) {
                         sle_uart_client_force_rescan();
@@ -2096,7 +2099,8 @@ static sle_team_member_record_t *team_leader_pick_worst_active_relay(uint32_t no
     return worst;
 }
 
-static int team_leader_set_member_relay_allowed(sle_team_member_record_t *member, uint8_t relay_allowed, const char *reason)
+static int team_leader_set_member_relay_allowed(sle_team_member_record_t *member, uint8_t relay_allowed,
+    const char *reason, uint8_t notify_member)
 {
     uint8_t old_allowed;
     int ret;
@@ -2116,25 +2120,30 @@ static int team_leader_set_member_relay_allowed(sle_team_member_record_t *member
         member->relay_tier = 0U;
         member->max_downstream = 0U;
     }
-    ret = sle_team_node_send_config(&g_team_node, member->member_id);
-    if (ret != SLE_TEAM_OK) {
-        member->relay_allowed = old_allowed;
-        if (old_allowed != 0U) {
-            member->relay_tier = team_route_bucket_from_ids(member->member_id, g_team_node.cfg.leader_id);
-            member->max_downstream = SLE_TEAM_MAX_DIRECT_CONNECTIONS;
-        } else {
-            member->relay_tier = 0U;
-            member->max_downstream = 0U;
+    if (notify_member != 0U) {
+        ret = sle_team_node_send_config(&g_team_node, member->member_id);
+        if (ret != SLE_TEAM_OK) {
+            member->relay_allowed = old_allowed;
+            if (old_allowed != 0U) {
+                member->relay_tier = team_route_bucket_from_ids(member->member_id, g_team_node.cfg.leader_id);
+                member->max_downstream = SLE_TEAM_MAX_DIRECT_CONNECTIONS;
+            } else {
+                member->relay_tier = 0U;
+                member->max_downstream = 0U;
+            }
+            osal_printk("[team] relay set member=%u allow=%u notify=%u reason=%s ret=%d\r\n",
+                member->member_id, relay_allowed != 0U ? 1U : 0U, notify_member,
+                reason != NULL ? reason : "unknown", ret);
+            return ret;
         }
-        osal_printk("[team] relay set member=%u allow=%u reason=%s ret=%d\r\n",
-            member->member_id, relay_allowed != 0U ? 1U : 0U, reason != NULL ? reason : "unknown", ret);
-        return ret;
+    } else {
+        ret = SLE_TEAM_OK;
     }
     if (member->relay_allowed == 0U) {
         team_route_clear_by_next_hop(member->member_id);
     }
-    osal_printk("[team] relay set member=%u allow=%u reason=%s ret=%d\r\n",
-        member->member_id, member->relay_allowed, reason != NULL ? reason : "unknown", ret);
+    osal_printk("[team] relay set member=%u allow=%u notify=%u reason=%s ret=%d\r\n",
+        member->member_id, member->relay_allowed, notify_member, reason != NULL ? reason : "unknown", ret);
     return SLE_TEAM_OK;
 }
 
@@ -2171,17 +2180,14 @@ static void team_leader_rebalance_relays(void)
             continue;
         }
         if (member->online == 0U) {
-            member->relay_allowed = 0U;
-            member->relay_tier = 0U;
-            member->max_downstream = 0U;
-            team_route_clear_by_next_hop(member->member_id);
-            changed = 1U;
-            osal_printk("[team] relay revoke member=%u reason=offline\r\n", member->member_id);
+            if (team_leader_set_member_relay_allowed(member, 0U, "offline", 0U) == SLE_TEAM_OK) {
+                changed = 1U;
+            }
             continue;
         }
         if (team_elapsed_exceeds(now_s, member->last_seen_s,
                 (uint32_t)timeout_s * SLE_TEAM_RELAY_REVOKE_STALE_FACTOR) != 0U) {
-            if (team_leader_set_member_relay_allowed(member, 0U, "stale") == SLE_TEAM_OK) {
+            if (team_leader_set_member_relay_allowed(member, 0U, "stale", 1U) == SLE_TEAM_OK) {
                 changed = 1U;
             }
         }
@@ -2210,7 +2216,7 @@ static void team_leader_rebalance_relays(void)
         if (victim == NULL) {
             break;
         }
-        if (team_leader_set_member_relay_allowed(victim, 0U, "auto-demote") != SLE_TEAM_OK) {
+        if (team_leader_set_member_relay_allowed(victim, 0U, "auto-demote", 1U) != SLE_TEAM_OK) {
             break;
         }
         relay_count--;
@@ -2223,7 +2229,7 @@ static void team_leader_rebalance_relays(void)
         if (candidate == NULL) {
             break;
         }
-        if (team_leader_set_member_relay_allowed(candidate, 1U, "auto-promote") != SLE_TEAM_OK) {
+        if (team_leader_set_member_relay_allowed(candidate, 1U, "auto-promote", 1U) != SLE_TEAM_OK) {
             break;
         }
         relay_count++;
@@ -2675,8 +2681,9 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
 {
     char pattern[24];
     const char *p;
-    long sign = 1L;
+    uint8_t negative = 0U;
     unsigned long abs_value = 0UL;
+    int64_t signed_value;
     uint8_t digits = 0U;
 
     if (path == NULL || key == NULL || out == NULL) {
@@ -2689,7 +2696,7 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
     }
     p += strlen(pattern);
     if (*p == '-') {
-        sign = -1L;
+        negative = 1U;
         p++;
     } else if (*p == '+') {
         p++;
@@ -2698,7 +2705,8 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
         abs_value = abs_value * 10UL + (unsigned long)(*p - '0');
         p++;
         digits++;
-        if (abs_value > 2147483648UL) {
+        if ((negative != 0U && abs_value > 2147483648UL) ||
+            (negative == 0U && abs_value > 2147483647UL)) {
             return -1;
         }
     }
@@ -2708,13 +2716,11 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
     if (digits == 0U) {
         return -1;
     }
-    {
-        long signed_value = (long)abs_value * sign;
-        if (signed_value < (long)min_value || signed_value > (long)max_value) {
-            return -1;
-        }
-        *out = (int32_t)signed_value;
+    signed_value = negative != 0U ? -(int64_t)abs_value : (int64_t)abs_value;
+    if (signed_value < (int64_t)min_value || signed_value > (int64_t)max_value) {
+        return -1;
     }
+    *out = (int32_t)signed_value;
     return 0;
 }
 
@@ -3320,9 +3326,6 @@ static void team_http_handle_client(int fd)
         (void)team_http_query_u8(path, "fix", 0U, 255U, &fix);
         (void)team_http_query_u8(path, "sat", 0U, 255U, &sat);
         (void)team_http_query_u8(path, "dst", 1U, 255U, &dst);
-        if (dst == SLE_TEAM_BROADCAST_ID) {
-            dst = SLE_TEAM_BROADCAST_ID;
-        }
 
         (void)memset_s(&pos, sizeof(pos), 0, sizeof(pos));
         pos.latitude_e6 = lat;

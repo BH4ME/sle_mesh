@@ -92,6 +92,54 @@ test("firmware trims conn track addr while preserving pending lookup addr", () =
   assert.match(pendingStruct, /\bsle_addr_t addr;/);
 });
 
+test("relay rebalance offline revoke is explicit no-notify path and active paths notify", () => {
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(member,\s*0U,\s*"offline",\s*0U\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(member,\s*0U,\s*"stale",\s*1U\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(victim,\s*0U,\s*"auto-demote",\s*1U\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(candidate,\s*1U,\s*"auto-promote",\s*1U\)/,
+  );
+});
+
+test("firmware i32 query parser avoids 32-bit signed overflow at bounds", () => {
+  const i32Parser = firmwareSource.match(/static int team_http_query_i32[\s\S]+?\n}\n/)?.[0] ?? "";
+  assert.match(i32Parser, /int64_t signed_value;/);
+  assert.match(i32Parser, /abs_value > 2147483648UL/);
+  assert.match(i32Parser, /abs_value > 2147483647UL/);
+  assert.match(i32Parser, /signed_value = negative != 0U \? -\(int64_t\)abs_value : \(int64_t\)abs_value;/);
+});
+
+test("firmware /api/location removes redundant broadcast no-op", () => {
+  const locationHandler = firmwareSource.match(/GET \/api\/location[\s\S]+?sle_team_node_send_position/)?.[0] ?? "";
+  assert.doesNotMatch(locationHandler, /if \(dst == SLE_TEAM_BROADCAST_ID\)/);
+});
+
+test("hello ack path keeps relay_enabled sync when config is cached before ack", () => {
+  const ackHandler = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8").match(
+    /static int sle_team_handle_ack[\s\S]+?\n}\n\nstatic int sle_team_handle_config/,
+  )?.[0] ?? "";
+  assert.match(ackHandler, /node->cfg\.relay_enabled = node->cfg\.relay_allowed != 0U \? 1U : 0U;/);
+});
+
+test("upstream disconnect prefers lightweight parent switch before full leave", () => {
+  const firmware = firmwareSource;
+  assert.match(firmware, /switch_ret = sle_team_node_try_parent_switch\(&g_team_node\)/);
+  assert.match(
+    firmware,
+    /if \(switch_ret != SLE_TEAM_OK && switch_ret != SLE_TEAM_ERR_UNSUPPORTED\) \{\s*\(void\)sle_team_node_member_leave\(&g_team_node\);/s,
+  );
+});
+
 test("firmware numeric query parsing requires a clean terminator", () => {
   assert.match(firmwareSource, /\*p != '\\0' && \*p != '&'/);
 });

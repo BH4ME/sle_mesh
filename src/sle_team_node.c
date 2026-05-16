@@ -570,6 +570,9 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
     } else {
         member = sle_team_get_member_slot(node, member_id, 1U);
     }
+    if (member == NULL) {
+        return SLE_TEAM_ERR_BUF;
+    }
     if (member != NULL) {
         member->relay_allowed = relay_allowed != 0U ? 1U : 0U;
         member->relay_tier = member->relay_allowed != 0U ? sle_team_node_relay_tier_for_member(member_id) : 0U;
@@ -735,6 +738,7 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
         }
         node->joined = 1U;
         node->state = SLE_TEAM_NET_ONLINE;
+        /* CONFIG may arrive before ACK; ACK marks final join and enables relay when permission is already cached. */
         node->cfg.relay_enabled = node->cfg.relay_allowed != 0U ? 1U : 0U;
         sle_team_set_parent_state(node,
             node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
