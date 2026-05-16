@@ -9,6 +9,7 @@
 
 ## 当前里程碑
 
+- `v3.0.0-alpha7`：修复配队审批成员槽位不足时 allowlist 残留（失败回滚），并让 relay-offline 回调触发强制 rebalance（绕过 cooldown）；补充 parent-switch 返回码语义与结构契约测试说明。
 - `v3.0.0-alpha6`：移除 `team_conn_track_t.addr` 冗余字段并保持 pending 地址映射链路，进一步缩减连接跟踪 RAM 占用；补充合同测试锁定结构体边界。
 - `v3.0.0-alpha5`：串口模式 factory reset 明确引导（禁用按钮+提示），并精简 route hint/连接跟踪冗余字段以降低状态内存与 JSON 负担。
 - `v3.0.0-alpha4`：修复 member parent timeout 轻量切换中 HELLO 发送失败导致的悬挂态，改为失败保留旧 parent 并自动重试。
