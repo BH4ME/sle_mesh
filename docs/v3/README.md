@@ -9,6 +9,7 @@
 
 ## 当前里程碑
 
+- `v3.0.0-alpha5`：串口模式 factory reset 明确引导（禁用按钮+提示），并精简 route hint/连接跟踪冗余字段以降低状态内存与 JSON 负担。
 - `v3.0.0-alpha4`：修复 member parent timeout 轻量切换中 HELLO 发送失败导致的悬挂态，改为失败保留旧 parent 并自动重试。
 - `v3.0.0-alpha3`：故障恢复优化（relay 掉线即时重平衡 + member parent 健康超时切换）与参数调优。
 - `v3.0.0-alpha2`：HTTPS 局域网定位可用性增强 + HTTP 参数解析加固 + WebUI 定位入口收敛。
