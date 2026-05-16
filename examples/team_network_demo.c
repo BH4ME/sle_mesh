@@ -465,6 +465,46 @@ int main(void)
         assert(parent_switch_app.dst_id == member.cfg.leader_id);
     }
 
+    {
+        sle_team_app_packet_t parent_switch_retry_app;
+        sle_team_send_fn original_send = member.ops.send;
+
+        member.joined = 1U;
+        member.state = SLE_TEAM_NET_ONLINE;
+        member.cfg.relay_allowed = 1U;
+        member.cfg.relay_enabled = 1U;
+        member.cfg.heartbeat_interval_s = 0U;
+        member.cfg.parent_timeout_s = 2U;
+        member.cfg.heartbeat_timeout_s = 10U;
+        member.upstream_parent_id = 3U;
+        member.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
+        member.upstream_parent_reselect_pending = 0U;
+        member.last_leader_seen_s = 4U;
+        member.last_parent_seen_s = 1U;
+        member_rt.now_s = 6U;
+        member_rt.last_tx_len = 0U;
+
+        member.ops.send = demo_send_fail_once;
+        member_rt.last_tx_len = 0xFFFFU; /* fail first parent-switch hello once */
+        sle_team_node_tick(&member);
+
+        assert(member.joined != 0U);
+        assert(member.state == SLE_TEAM_NET_ONLINE);
+        assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+        assert(member.upstream_parent_reselect_pending != 0U);
+        assert(member.upstream_parent_id == 3U);
+        assert(member.last_parent_seen_s == 1U);
+        assert(member_rt.last_tx_len == 0U);
+
+        member.ops.send = original_send;
+        sle_team_node_tick(&member);
+        assert(member.upstream_parent_id == 0U);
+        assert(member.last_parent_seen_s == 0U);
+        assert(demo_decode_last_app_packet(&member_rt, &parent_switch_retry_app) != 0U);
+        assert(parent_switch_retry_app.app_msg_type == SLE_TEAM_APP_HELLO);
+        assert(parent_switch_retry_app.dst_id == member.cfg.leader_id);
+    }
+
     leader_cfg.default_ttl = 2U;
     leader.cfg.default_ttl = 2U;
     assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);

@@ -141,6 +141,7 @@ static void sle_team_member_rejoin(sle_team_node_t *node)
 int sle_team_node_try_parent_switch(sle_team_node_t *node)
 {
     uint8_t old_parent_id;
+    int ret;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U) {
         return SLE_TEAM_ERR_ARG;
@@ -152,10 +153,14 @@ int sle_team_node_try_parent_switch(sle_team_node_t *node)
 
     old_parent_id = node->upstream_parent_id;
     sle_team_set_parent_state(node, old_parent_id, SLE_TEAM_PARENT_RESELECTING, 1U);
+    sle_team_log(node, "parent timeout, requesting new parent");
+    ret = sle_team_node_send_hello(node, node->cfg.leader_id);
+    if (ret != SLE_TEAM_OK) {
+        return ret;
+    }
     node->upstream_parent_id = 0U;
     node->last_parent_seen_s = 0U;
-    sle_team_log(node, "parent timeout, requesting new parent");
-    return sle_team_node_send_hello(node, node->cfg.leader_id);
+    return SLE_TEAM_OK;
 }
 
 static int sle_team_send_app(sle_team_node_t *node, uint8_t dst_id, const uint8_t *app_buf, uint16_t app_len)
