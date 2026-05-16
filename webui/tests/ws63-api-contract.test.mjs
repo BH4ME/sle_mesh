@@ -109,6 +109,18 @@ test("relay rebalance offline revoke is explicit no-notify path and active paths
     firmwareSource,
     /team_leader_set_member_relay_allowed\(candidate,\s*1U,\s*"auto-promote",\s*1U\)/,
   );
+  assert.match(
+    firmwareSource,
+    /static void team_leader_rebalance_relays\(uint8_t force_now\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /if \(force_now == 0U[\s\S]*team_interval_not_reached\(/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_rebalance_relays\(1U\)/,
+  );
 });
 
 test("firmware i32 query parser avoids 32-bit signed overflow at bounds", () => {
@@ -138,6 +150,13 @@ test("upstream disconnect prefers lightweight parent switch before full leave", 
     firmware,
     /if \(switch_ret != SLE_TEAM_OK && switch_ret != SLE_TEAM_ERR_UNSUPPORTED\) \{\s*\(void\)sle_team_node_member_leave\(&g_team_node\);/s,
   );
+});
+
+test("pair approve rolls back newly-added allowlist entry when member slot allocation fails", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  const approveFn = nodeSource.match(/int sle_team_node_pairing_approve_with_relay[\s\S]+?\n}\n\nint sle_team_node_member_select_leader/)?.[0] ?? "";
+  assert.match(approveFn, /had_allowed_before = 0U/);
+  assert.match(approveFn, /sle_team_node_remove_allowed_member\(node,\s*member_id\)/);
 });
 
 test("firmware numeric query parsing requires a clean terminator", () => {

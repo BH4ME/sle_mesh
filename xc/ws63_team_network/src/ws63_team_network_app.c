@@ -316,7 +316,7 @@ static void team_upstream_parent_reset(const char *reason);
 static void team_leader_pairing_rotate_connections(void);
 static void team_leader_auto_approve_pending(void);
 static void team_member_autoselect_parent(void);
-static void team_leader_rebalance_relays(void);
+static void team_leader_rebalance_relays(uint8_t force_now);
 static void team_leader_route_metrics_update(void);
 static void team_leader_route_convergence_hint(uint32_t now_s, uint8_t trigger_state_change,
     uint8_t stale_count, uint8_t unreachable_count);
@@ -2147,7 +2147,7 @@ static int team_leader_set_member_relay_allowed(sle_team_member_record_t *member
     return SLE_TEAM_OK;
 }
 
-static void team_leader_rebalance_relays(void)
+static void team_leader_rebalance_relays(uint8_t force_now)
 {
     uint32_t now_s;
     uint16_t timeout_s;
@@ -2162,8 +2162,9 @@ static void team_leader_rebalance_relays(void)
         return;
     }
     now_s = team_now_s(NULL);
-    if (team_interval_not_reached(now_s, g_team_rt.relay_rebalance_last_s, SLE_TEAM_RELAY_REBALANCE_INTERVAL_S) !=
-        0U) {
+    if (force_now == 0U &&
+        team_interval_not_reached(now_s, g_team_rt.relay_rebalance_last_s, SLE_TEAM_RELAY_REBALANCE_INTERVAL_S) !=
+            0U) {
         return;
     }
     g_team_rt.relay_rebalance_last_s = now_s;
@@ -2330,7 +2331,7 @@ static void team_on_relay_offline(void *user_ctx, uint8_t member_id)
 {
     unused(user_ctx);
     osal_printk("[team] relay offline event member=%u trigger immediate rebalance\r\n", member_id);
-    team_leader_rebalance_relays();
+    team_leader_rebalance_relays(1U);
 }
 
 static void team_web_record_packet(sle_team_web_event_direction_t direction, const uint8_t *buf, uint16_t len,
@@ -4313,7 +4314,7 @@ static void *team_network_task(const char *arg)
             team_member_autoselect_parent();
             team_request_sle_rssi();
             sle_team_node_tick(&g_team_node);
-            team_leader_rebalance_relays();
+            team_leader_rebalance_relays(0U);
             team_leader_route_metrics_update();
             if (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && joined_before != 0U && g_team_node.joined == 0U) {
                 team_upstream_parent_reset("heartbeat timeout");

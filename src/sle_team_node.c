@@ -546,14 +546,22 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
 {
     sle_team_pending_member_t *pending;
     sle_team_member_record_t *member;
+    uint8_t had_allowed_before = 0U;
     int cfg_ret;
     int ack_ret;
     int ret;
+    uint8_t i;
 
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
         return SLE_TEAM_ERR_ARG;
     }
     pending = sle_team_get_pending_slot(node, member_id, 0U);
+    for (i = 0U; i < node->cfg.allowed_member_count; i++) {
+        if (node->cfg.allowed_member_ids[i] == member_id) {
+            had_allowed_before = 1U;
+            break;
+        }
+    }
     ret = sle_team_node_add_allowed_member(node, member_id);
     if (ret != SLE_TEAM_OK) {
         return ret;
@@ -571,6 +579,9 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
         member = sle_team_get_member_slot(node, member_id, 1U);
     }
     if (member == NULL) {
+        if (had_allowed_before == 0U) {
+            (void)sle_team_node_remove_allowed_member(node, member_id);
+        }
         return SLE_TEAM_ERR_BUF;
     }
     if (member != NULL) {
