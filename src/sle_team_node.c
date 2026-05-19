@@ -295,10 +295,20 @@ static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
             continue;
         }
         if ((now_s - member->last_seen_s) > timeout_s) {
+            sle_team_alert_body_t alert;
+            uint8_t member_id = member->member_id;
+
+            (void)memset(&alert, 0, sizeof(alert));
+            alert.lost_member_id = member_id;
+            alert.reason = SLE_TEAM_ALERT_TIMEOUT;
+            alert.last_latitude_e6 = member->latitude_e6;
+            alert.last_longitude_e6 = member->longitude_e6;
+            alert.last_report_s = member->last_seen_s;
             member->online = 0U;
             if (member->relay_allowed != 0U && node->ops.on_relay_offline != NULL) {
-                node->ops.on_relay_offline(node->ops.user_ctx, member->member_id);
+                node->ops.on_relay_offline(node->ops.user_ctx, member_id);
             }
+            (void)sle_team_node_send_alert(node, SLE_TEAM_BROADCAST_ID, &alert);
             sle_team_log(node, "member heartbeat timeout");
         }
     }

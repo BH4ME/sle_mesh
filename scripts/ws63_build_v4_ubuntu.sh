@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/ws63_build_v4_ubuntu.sh unified
+
+Builds the v4 WS63 team firmware on a LAN Ubuntu build machine.
+
+Environment is the same as scripts/ws63_build_team_ubuntu.sh:
+  UBUNTU_HOST=192.168.1.50
+  UBUNTU_PORT=22
+  UBUNTU_USER=codex
+  UBUNTU_PASS=codex
+  UBUNTU_SDK=/home/codex/workspace/bearpi-pico_h3863_fresh
+  OUT_ROOT=/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm
+  BUILD_JOBS=4
+USAGE
+}
+
+role="${1:-unified}"
+case "$role" in
+  unified|leader|member)
+    self_id=1
+    out_dir="team_network_v4_unified_runtime_role"
+    out_name="ws63-liteos-app_v4_unified_all.fwpkg"
+    ;;
+  -h|--help|"")
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown role: $role" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+UBUNTU_HOST="${UBUNTU_HOST:-}"
+UBUNTU_PORT="${UBUNTU_PORT:-22}"
+UBUNTU_USER="${UBUNTU_USER:-codex}"
+UBUNTU_PASS="${UBUNTU_PASS:-}"
+UBUNTU_SDK="${UBUNTU_SDK:-/home/codex/workspace/bearpi-pico_h3863_fresh}"
+OUT_ROOT="${OUT_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
+BUILD_JOBS="${BUILD_JOBS:-4}"
+
+if [[ -z "$UBUNTU_HOST" ]]; then
+  echo "UBUNTU_HOST is required, for example: UBUNTU_HOST=192.168.1.50 $0 $role" >&2
+  exit 2
+fi
+
+CONFIG_PATH="$UBUNTU_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
+REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
+REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
+REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
+LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
+
+ssh_opts=(
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
+)
+
+if [[ -n "$UBUNTU_PASS" ]]; then
+  ssh_base=(sshpass -p "$UBUNTU_PASS" ssh "${ssh_opts[@]}")
+  rsync_ssh=(sshpass -p "$UBUNTU_PASS" ssh "${ssh_opts[@]}" -p "$UBUNTU_PORT")
+else
+  ssh_base=(ssh "${ssh_opts[@]}")
+  rsync_ssh=(ssh "${ssh_opts[@]}" -p "$UBUNTU_PORT")
+fi
+
+ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
+
+echo "WS63 Ubuntu build"
+echo "profile:    v4 unified runtime role"
+echo "fallback id:$self_id"
+echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
+echo "sdk:        $UBUNTU_SDK"
+echo "local out:  $LOCAL_OUT"
+echo
+
+"${ssh_cmd[@]}" "test -f '$CONFIG_PATH' && mkdir -p '$REMOTE_PROTO' '$REMOTE_APP'"
+
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/include/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PROTO/include/"
+
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/src/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PROTO/src/"
+
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/v4/ws63_team_network/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_APP/"
+
+"${ssh_cmd[@]}" "python3 - '$CONFIG_PATH' '$self_id'" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+self_id = sys.argv[2]
+s = path.read_text()
+
+def set_kconfig_value(text, key, value):
+    lines = text.splitlines()
+    found = False
+    out = []
+    for line in lines:
+        if line.startswith(key + "=") or line.startswith(f"# {key} is not set"):
+            if not found:
+                out.append(f"{key}={value}")
+                found = True
+            continue
+        out.append(line)
+    if not found:
+        out.append(f"{key}={value}")
+    return "\n".join(out) + "\n"
+
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_SELF_ID", self_id)
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LEADER_ID", "1")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_BUS", "0")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_TXD_PIN", "21")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_RXD_PIN", "22")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LED_PIN", "255")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SPI_BUS", "0")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "6")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "8")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "7")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "9")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_X_OFFSET", "52")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_Y_OFFSET", "40")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_WIDTH", "135")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_HEIGHT", "240")
+s = set_kconfig_value(s, "CONFIG_SPI_SUPPORT_MASTER", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
+s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
+s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
+path.write_text(s)
+print("configured v4 unified runtime role with ST7789 and central+peripheral enabled")
+PY
+
+"${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py ws63-liteos-app -j'$BUILD_JOBS'"
+
+mkdir -p "$(dirname "$LOCAL_OUT")"
+rsync -az -e "${rsync_ssh[*]}" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PKG" "$LOCAL_OUT"
+ls -lh "$LOCAL_OUT"

@@ -11,6 +11,9 @@ typedef struct {
     uint16_t last_tx_len;
     uint8_t relay_offline_count;
     uint8_t relay_offline_last_member;
+    uint8_t alert_count;
+    uint8_t alert_last_member;
+    uint8_t alert_last_reason;
     const char *name;
 } demo_runtime_t;
 
@@ -69,6 +72,19 @@ static void demo_relay_offline(void *user_ctx, uint8_t member_id)
     rt->relay_offline_count++;
     rt->relay_offline_last_member = member_id;
     printf("[%s] relay offline event member=%u\n", rt->name, member_id);
+}
+
+static void demo_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
+{
+    demo_runtime_t *rt = (demo_runtime_t *)user_ctx;
+
+    if (rt == NULL) {
+        return;
+    }
+    rt->alert_count++;
+    rt->alert_last_member = member_id;
+    rt->alert_last_reason = reason;
+    printf("[%s] alert event member=%u reason=%u\n", rt->name, member_id, reason);
 }
 
 static void relay_last_packet(demo_runtime_t *from, sle_team_node_t *to)
@@ -160,6 +176,7 @@ int main(void)
     leader_ops.log = demo_log;
     leader_ops.on_joined = demo_joined;
     leader_ops.on_position = demo_position;
+    leader_ops.on_alert = demo_alert;
     leader_ops.on_relay_offline = demo_relay_offline;
     leader_ops.user_ctx = &leader_rt;
 
@@ -445,6 +462,37 @@ int main(void)
         sle_team_node_tick(&cb_leader);
         assert(cb_leader_rt.relay_offline_count == 1U);
         assert(cb_leader_rt.relay_offline_last_member == 3U);
+    }
+
+    {
+        sle_team_app_packet_t lost_alert_app;
+        const sle_team_alert_body_t *lost_alert;
+
+        (void)sle_team_node_allow_all_members(&leader);
+        (void)memset(leader.members, 0, sizeof(leader.members));
+        leader_rt.last_tx_len = 0U;
+        leader_rt.alert_count = 0U;
+        leader_rt.now_s = 30U;
+        assert(sle_team_node_send_position(&member, 1U, &pos) == SLE_TEAM_OK);
+        relay_last_packet(&member_rt, &leader);
+        assert(sle_team_node_find_member(&leader, 2U) != NULL);
+
+        leader_rt.now_s = 41U;
+        sle_team_node_tick(&leader);
+        assert(demo_decode_last_app_packet(&leader_rt, &lost_alert_app) != 0U);
+        assert(lost_alert_app.app_msg_type == SLE_TEAM_APP_ALERT);
+        assert(lost_alert_app.dst_id == SLE_TEAM_BROADCAST_ID);
+        assert(lost_alert_app.body_len == sizeof(sle_team_alert_body_t));
+        lost_alert = (const sle_team_alert_body_t *)lost_alert_app.body;
+        assert(lost_alert->lost_member_id == 2U);
+        assert(lost_alert->reason == SLE_TEAM_ALERT_TIMEOUT);
+        assert(lost_alert->last_latitude_e6 == pos.latitude_e6);
+        assert(lost_alert->last_longitude_e6 == pos.longitude_e6);
+        assert(lost_alert->last_report_s == 30U);
+        relay_last_packet(&leader_rt, &member);
+        assert(member_rt.alert_count == 1U);
+        assert(member_rt.alert_last_member == 2U);
+        assert(member_rt.alert_last_reason == SLE_TEAM_ALERT_TIMEOUT);
     }
 
     {
