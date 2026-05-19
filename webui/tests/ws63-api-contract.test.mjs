@@ -168,6 +168,52 @@ test("firmware numeric query parsing requires a clean terminator", () => {
   assert.match(firmwareSource, /\*p != '\\0' && \*p != '&'/);
 });
 
+test("config body base size derives from struct layout instead of a hardcoded byte count", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  assert.match(
+    nodeSource,
+    /#define SLE_TEAM_CONFIG_BODY_BASE_SIZE offsetof\(sle_team_config_body_t,\s*relay_allowed\)/,
+  );
+});
+
+test("route update parser and alert parser use memcpy instead of pointer casts", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  const routeHandler = nodeSource.match(/static int sle_team_handle_route_update[\s\S]+?\n}\n\nint sle_team_node_init/)?.[0] ?? "";
+  const alertHandler = nodeSource.match(/static int sle_team_handle_alert[\s\S]+?\n}\n\nstatic int sle_team_handle_route_update/)?.[0] ?? "";
+
+  assert.match(routeHandler, /memcpy\(&route_update,\s*app->body,\s*sizeof\(route_update\)\)/);
+  assert.doesNotMatch(routeHandler, /\(const sle_team_route_update_body_t \*\)app->body/);
+  assert.match(alertHandler, /memcpy\(&alert,\s*app->body,\s*sizeof\(alert\)\)/);
+  assert.doesNotMatch(alertHandler, /\(const sle_team_alert_body_t \*\)app->body/);
+});
+
+test("route update relay enable sync uses explicit relay-grant flag", () => {
+  const packetHeader = fs.readFileSync(path.join(repoRoot, "include/sle_team_packet.h"), "utf8");
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  const routeSendFn = nodeSource.match(/int sle_team_node_send_route_update[\s\S]+?\n}\n\nconst sle_team_member_record_t \*sle_team_node_find_member/)?.[0] ?? "";
+
+  assert.match(packetHeader, /#define SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT 0x01U/);
+  assert.match(nodeSource, /route_update\.reserved & SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT/);
+  assert.match(routeSendFn, /if \(node->cfg\.role == SLE_TEAM_ROLE_LEADER && parent_state != 0U\) \{\s*route_update\.reserved \|= SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT;/s);
+});
+
+test("relay discovery-only nodes ignore non-discovery local broadcasts", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  const onPacketFn = nodeSource.match(/int sle_team_node_on_packet[\s\S]+?\n}\n\nint sle_team_node_send_hello/)?.[0] ?? "";
+
+  assert.match(
+    onPacketFn,
+    /relay_discovery_only != 0U[\s\S]*app_packet\.dst_id == SLE_TEAM_BROADCAST_ID[\s\S]*app_packet\.app_msg_type != SLE_TEAM_APP_HELLO[\s\S]*app_packet\.app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE/,
+  );
+});
+
+test("relay tier bucket count is a named constant", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  assert.match(nodeSource, /#define SLE_TEAM_MAX_RELAY_TIERS 3U/);
+  assert.match(nodeSource, /member_id == leader_id/);
+  assert.match(nodeSource, /% SLE_TEAM_MAX_RELAY_TIERS\)/);
+});
+
 test("webui provides an https lan dev script for phone geolocation", () => {
   assert.equal(typeof webPackage.scripts["dev:https"], "string");
   assert.match(webPackage.scripts["dev:https"], /--host 0\.0\.0\.0/);
@@ -179,6 +225,11 @@ test("vite config enables basic ssl in both dev and preview", () => {
   assert.match(viteConfigSource, /plugins:\s*\[\s*basicSsl\(/);
   assert.match(viteConfigSource, /server:\s*\{[\s\S]*https:\s*true/);
   assert.match(viteConfigSource, /preview:\s*\{[\s\S]*https:\s*true/);
+});
+
+test("webui readme local dev URL matches the https dev server", () => {
+  assert.match(webReadmeSource, /https:\/\/localhost:5173\//);
+  assert.doesNotMatch(webReadmeSource, /http:\/\/localhost:5173\//);
 });
 
 test("webui readme documents lan https access and cert acceptance", () => {

@@ -45,7 +45,7 @@ typedef struct {
     uint8_t role;
     uint8_t battery_percent;
     uint8_t online;
-    uint8_t fix_status;
+    uint8_t fix_status; /* fix_status==0 means latitude/longitude are not valid */
     int32_t latitude_e6;
     int32_t longitude_e6;
     uint16_t speed_cms;

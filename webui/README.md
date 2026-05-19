@@ -56,7 +56,7 @@ npm run dev
 打开：
 
 ```text
-http://localhost:5173/
+https://localhost:5173/
 ```
 
 手机局域网定位建议使用 HTTPS（解决 geolocation 在 HTTP 页面被拒绝）：

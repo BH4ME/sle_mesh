@@ -344,6 +344,15 @@ int main(void)
     leader.cfg.default_ttl = 2U;
     leader_rt.last_tx_len = 0U;
     assert(sle_team_node_send_route_update(&leader, 2U, 3U, 2U, 3U) == SLE_TEAM_OK);
+    {
+        sle_team_app_packet_t route_app;
+        const sle_team_route_update_body_t *route_body;
+
+        assert(demo_decode_last_app_packet(&leader_rt, &route_app) != 0U);
+        assert(route_app.body_len == sizeof(sle_team_route_update_body_t));
+        route_body = (const sle_team_route_update_body_t *)route_app.body;
+        assert((route_body->reserved & SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT) != 0U);
+    }
     relay_last_packet(&leader_rt, &member);
     assert(member.upstream_parent_state == SLE_TEAM_PARENT_CONNECTED);
     assert(member.upstream_parent_id == 3U);
@@ -382,6 +391,13 @@ int main(void)
     relay_rt.last_tx_len = 0U;
     relay.cfg.relay_enabled = 1U;
     relay.cfg.relay_discovery_only = 1U;
+    relay.last_leader_seen_s = 77U;
+    leader_rt.last_tx_len = 0U;
+    assert(sle_team_node_send_heartbeat(&leader, SLE_TEAM_BROADCAST_ID, 95U, -65, 1U) == SLE_TEAM_OK);
+    assert(leader_rt.last_tx_len != 0U);
+    assert(sle_team_node_on_packet(&relay, leader_rt.last_tx, leader_rt.last_tx_len) == SLE_TEAM_ERR_UNSUPPORTED);
+    assert(relay.last_leader_seen_s == 77U);
+    leader_rt.last_tx_len = 0U;
     assert(sle_team_node_send_position(&member, 1U, &pos) == SLE_TEAM_OK);
     relay_last_packet(&member_rt, &relay);
     assert(relay_rt.last_tx_len == 0U);

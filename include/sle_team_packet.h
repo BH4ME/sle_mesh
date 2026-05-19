@@ -140,6 +140,7 @@ typedef struct {
 } sle_team_config_body_t;
 
 #define SLE_TEAM_CONFIG_FLAG_RELAY_DISCOVERY_ONLY 0x01U
+#define SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT 0x01U
 
 typedef struct {
     uint16_t ack_seq;
@@ -151,7 +152,7 @@ typedef struct {
     uint8_t parent_id;
     uint8_t next_hop_id;
     uint8_t parent_state;
-    uint8_t reserved;
+    uint8_t reserved; /* bit0: leader grants relay-enable sync */
 } sle_team_route_update_body_t;
 
 uint8_t sle_team_make_header(uint8_t version, uint8_t payload_type, uint8_t route_type);
