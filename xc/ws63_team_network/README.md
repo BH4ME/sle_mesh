@@ -1,8 +1,8 @@
-# WS63 SLE Team Network Sample
+# V4 WS63 SLE Team Network + ST7789
 
-这是把 `sle_mesh` 协议骨架接到小熊派 `BearPi-Pico H3863 / WS63` 的上板样例。
+这是 v4 上板工程，基于 v3 组网样例改出，目标板主控为 WS63 模块，显示器为 1.14 寸 ST7789。
 
-当前目标很务实：先跑通两块板的最小组网闭环，并让现场只靠手机内置 WebUI 就能完成角色选择和配队。
+主线仍然是组网：leader 负责配队和汇总 member 状态，member 失联时保留最后一次位置并生成 timeout alert。
 
 ```text
 member --HELLO--> leader
@@ -14,18 +14,44 @@ member --HB/POS--> leader
 ## 当前能力
 
 - 一个统一固件包，所有 WS63 都烧同一份 `.fwpkg`。
+- 按 v4 原理图更新默认引脚。
+- 接入 ST7789 显示，用于显示角色、节点数、失联次数和最后失联位置。
+- 普通子节点心跳超时后，leader 会广播 `ALERT_TIMEOUT`，alert 内包含最后一次位置和最后上报时间。
 - 开机默认 `unconfigured`，SLE 暂不启动；先启动 SoftAP、HTTP WebUI 和串口 CLI。
 - WebUI 或串口选择角色后，leader 启动 SLE UART client/central，member 启动 SLE UART server/peripheral。
 - WebUI 选择的角色、队伍号、leader MAC 后四位和 channel 会写入 WS63 NV flash；断电/复位后自动恢复。
-- WiFi SSID 和页面自标识使用 WiFi MAC 后四位，适合批量烧录：`SLE-TEAM-WS63-XXXX`、`UXXXX`、`LXXXX`、`MXXXX`。
+- WiFi SSID 和页面自标识使用 WiFi MAC 后四位，适合批量烧录：`SLE-TEAM-V4-XXXX`、`UXXXX`、`LXXXX`、`MXXXX`。
 - SLE 收到二进制包后进入 `sle_team_node_on_packet`，周期任务调用 `sle_team_node_tick`。
 - leader 可开/关配队窗口、批准 pending member；member 可选择 leader 或退出队伍。
 - 板端 WebUI 用 C 端 SSR 输出完整 HTML，不烧录 Vite 产物，不依赖前端 JS，优先保护 RAM 和手机兼容性。
 
+## V4 引脚
+
+原理图关键映射：
+
+| 信号 | WS63 IO | 用途 |
+|------|---------|------|
+| `U0TX` | `IO21` | 串口调试 TX |
+| `U0RX` | `IO22` | 串口调试 RX |
+| `RGB` | `IO0` | WS2812C 数据脚，预留 |
+| `CHRG` | `IO2` | 充电状态，不作为 LED 驱动 |
+| `ADC_CTRL` | `IO5` | 电池采样控制，预留 |
+| `SCL` | `IO6` | ST7789 SPI SCLK |
+| `CS` | `IO7` | ST7789 CS |
+| `SDA` | `IO8` | ST7789 SPI MOSI |
+| `RS` | `IO9` | ST7789 DC/RS |
+| `ADC_VBAT` | `IO12` | 电池 ADC，预留 |
+| `RESET` | `IO13` | ST7789 RESET |
+| `BUZZ` | `IO14` | 蜂鸣器，预留 |
+| `U1TX` | `IO17` | GPS UART TXD1 |
+| `U1RX` | `IO18` | GPS UART RXD1 |
+
+`CONFIG_SLE_TEAM_LED_PIN` 默认是 `255`，表示禁用 v3 的 GPIO2 活动灯，避免驱动 v4 原理图里的 `CHRG` 信号。
+
 ## WiFi 控制台
 
 ```text
-SSID: SLE-TEAM-WS63-XXXX
+SSID: SLE-TEAM-V4-XXXX
 Password: 123456789
 URL: http://192.168.43.1/
 ```
@@ -53,7 +79,7 @@ GET /api/factory-reset
 
 手机调试注意：
 
-- WS63 SoftAP 没有外网，手机可能自动切蜂窝；如果浏览器请求失败，先确认手机仍连在 `SLE-TEAM-WS63-XXXX`。
+- WS63 SoftAP 没有外网，手机可能自动切蜂窝；如果浏览器请求失败，先确认手机仍连在 `SLE-TEAM-V4-XXXX`。
 - Safari 或微信内置浏览器刷新页面会取消旧 HTTP 连接，串口可能出现 `errno=104`。这通常是客户端断开，不代表板端 HTTP 服务崩溃。
 - `v1.2.7 / ssr=v5` 起，每个 HTTP 连接都有 1.2 秒收发超时，手机半开连接不会长期占住板端 Web 服务。
 - `set leader` / `set member` 后会先返回页面，SLE 初始化在后台主任务执行；页面可能短暂显示 `starting SLE`。
@@ -65,14 +91,14 @@ GET /api/factory-reset
 
 leader：
 
-1. 手机连该板 `SLE-TEAM-WS63-XXXX`。
+1. 手机连该板 `SLE-TEAM-V4-XXXX`。
 2. 打开 `http://192.168.43.1/pairing`。
 3. 点 `set leader`。
 4. 页面标识变为 `LXXXX`，leader 开始 SLE 广播/server。
 
 member：
 
-1. 手机连该板 `SLE-TEAM-WS63-YYYY`。
+1. 手机连该板 `SLE-TEAM-V4-YYYY`。
 2. 打开 `http://192.168.43.1/pairing`。
 3. 在 member 表单里填 leader 的后四位 `XXXX`、队伍号和 channel。
 4. 点 `set member`。
@@ -95,13 +121,13 @@ UBUNTU_HOST=192.168.6.5 \
 UBUNTU_USER=owen \
 UBUNTU_PASS='67215837' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
-scripts/ws63_build_team_ubuntu.sh unified
+scripts/ws63_build_v4_ubuntu.sh unified
 ```
 
 输出统一固件包：
 
 ```text
-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 烧录脚本里的 `leader/member` 只用于选择默认串口和二次确认，实际烧的是同一个统一固件包：

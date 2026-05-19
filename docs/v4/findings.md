@@ -8,7 +8,7 @@
 - 需要先给计划书，再开始改代码
 
 ## Research Findings
-- 当前仓库里，WS63 组网样例主要在 `xc/ws63_team_network/`
+- 当前仓库里，WS63 组网样例主入口在 `xc/ws63_team_network/`
 - 当前 v3 基线是 `v3.0.0-alpha8`
 - 现有工程已经有串口 CLI、WebUI、节点状态、位置上报和路由记录框架
 - WS63 SDK 里有 SPI master 样例，使用 `uapi_spi_init` 和 `uapi_spi_master_write`
@@ -46,7 +46,7 @@
 |----------|-----------|
 | 先按原理图整理引脚，再改代码 | 先把硬件边界弄准，后面不会来回返工 |
 | 保留组网主流程 | 你说工程主要做组网，不想把显示喧宾夺主 |
-| 用 `v4/` 作为工作区 | 方便把计划、发现和后续实现集中起来 |
+| 文档归档到 `docs/v4/`，上板工程落在 `xc/ws63_team_network/` | 对齐既有 v1/v3 的目录治理方式 |
 | ST7789 单独做 `ws63_st7789_display` 模块 | 让显示失败不影响组网核心 |
 | 失联上报放在协议核心超时剪枝处 | 根因是超时剪枝只标离线不发 alert，从源头补最小逻辑 |
 | ST7789 初始化放在 v4 主任务启动早期 | 开机即可显示 `idle` 状态，角色配置后刷新为 leader/member |
@@ -60,7 +60,7 @@
 |-------|------------|
 | `python` 命令不可用 | 用 `python3` 替代 |
 | macOS 本地 WS63 SDK 头链语法检查缺平台宏/porting include | 不作为板级结论，实际以 Ubuntu SDK 交叉构建为准 |
-| Ubuntu 编译机 `192.168.6.5` SSH 超时 | 记录为环境阻塞；待主机可达后重跑 v4 构建脚本 |
+| Ubuntu 编译机 `192.168.6.5` SSH 超时 | 改走 Tailscale 主机 `100.91.84.124`，v4 构建已通过 |
 
 ## Resources
 - `/Users/bh4me_macair/Desktop/SCH_Schematic1_2026-05-19.pdf`

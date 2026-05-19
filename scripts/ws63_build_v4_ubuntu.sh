@@ -105,7 +105,7 @@ rsync -az --delete \
   --exclude 'dist' \
   --exclude 'node_modules' \
   -e "${rsync_ssh[*]}" \
-  "$ROOT_DIR/v4/ws63_team_network/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_APP/"
+  "$ROOT_DIR/xc/ws63_team_network/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_APP/"
 
 "${ssh_cmd[@]}" "python3 - '$CONFIG_PATH' '$self_id'" <<'PY'
 from pathlib import Path

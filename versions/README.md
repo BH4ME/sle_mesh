@@ -1,9 +1,10 @@
 # Versions
 
-这个目录用于保存协议和代码版本记录。详细阶段说明统一在 `docs/v0`、`docs/v1`、`docs/v2`。
+这个目录用于保存协议和代码版本记录。详细阶段说明统一在 `docs/v0`、`docs/v1`、`docs/v2`、`docs/v3`、`docs/v4`。
 
 当前版本：
 
+- [v4.0.0-alpha1](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.0.0-alpha1/VERSION.md)
 - [v3.0.0-alpha8](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha8/VERSION.md)
 - [v3.0.0-alpha7](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha7/VERSION.md)
 - [v3.0.0-alpha6](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha6/VERSION.md)

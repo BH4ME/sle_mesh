@@ -27,23 +27,85 @@ config SLE_TEAM_UART_BUS
 
 config SLE_TEAM_UART_TXD_PIN
     int "UART TXD pin"
-    default 17
+    default 21
 
 config SLE_TEAM_UART_RXD_PIN
     int "UART RXD pin"
-    default 18
+    default 22
 
 config SLE_TEAM_LED_PIN
     int "SLE activity LED GPIO"
-    default 2
+    default 255
     help
-        BearPi-Pico H3863 onboard user LED is normally GPIO_2.
+        Set to 255 to disable the legacy single-color activity LED.
+        On the v4 schematic, IO2 is CHRG and must not be driven as an LED.
 
 config SLE_TEAM_LED_ACTIVE_LOW
     bool "SLE activity LED is active low"
     default n
     help
         The tested BearPi WS63 blue user LED turns on when GPIO_2 is driven high.
+
+config SLE_TEAM_ST7789_ENABLE
+    bool "Enable v4 ST7789 display"
+    default y
+    select SPI_SUPPORT_MASTER
+
+config SLE_TEAM_ST7789_SPI_BUS
+    int "ST7789 SPI bus"
+    default 0
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_SCLK_PIN
+    int "ST7789 SCL/SCLK pin"
+    default 6
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_MOSI_PIN
+    int "ST7789 SDA/MOSI pin"
+    default 8
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_CS_PIN
+    int "ST7789 CS pin"
+    default 7
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_DC_PIN
+    int "ST7789 RS/DC pin"
+    default 9
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_RESET_PIN
+    int "ST7789 RESET pin"
+    default 13
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_X_OFFSET
+    int "ST7789 column offset"
+    default 52
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Typical 1.14 inch 135x240 ST7789 modules are centered in a 240x320
+        controller RAM window, so the visible area starts at column 52.
+
+config SLE_TEAM_ST7789_Y_OFFSET
+    int "ST7789 row offset"
+    default 40
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Typical 1.14 inch 135x240 ST7789 modules are centered in a 240x320
+        controller RAM window, so the visible area starts at row 40.
+
+config SLE_TEAM_ST7789_WIDTH
+    int "ST7789 visible width"
+    default 135
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_HEIGHT
+    int "ST7789 visible height"
+    default 240
+    depends on SLE_TEAM_ST7789_ENABLE
 
 config SLE_TEAM_HEARTBEAT_INTERVAL_S
     int "Heartbeat interval in seconds"
@@ -72,15 +134,14 @@ config SLE_TEAM_HEARTBEAT_TIMEOUT_S
 
 config SLE_TEAM_WIFI_AP_ENABLE
     bool "Enable WiFi SoftAP coexistence smoke test"
-    default n
+    default y
     help
-        Start a local WiFi SoftAP while the SLE team network is running.
-        This is only the coexistence smoke test; HTTP/WebUI comes after
-        SLE traffic is verified to keep working.
+        Start the local WiFi SoftAP and HTTP WebUI used for runtime role
+        selection while the SLE team network is running.
 
 config SLE_TEAM_WIFI_AP_SSID
     string "WiFi SoftAP SSID"
-    default "SLE-TEAM-WS63"
+    default "SLE-TEAM-V4"
     depends on SLE_TEAM_WIFI_AP_ENABLE
 
 config SLE_TEAM_WIFI_AP_PSK

@@ -1,5 +1,6 @@
 #include "sle_team_cli.h"
 #include "sle_team_web_api.h"
+#include "ws63_st7789_display.h"
 #include "ws63_console_pages.h"
 
 #include <errno.h>
@@ -59,19 +60,63 @@
 #endif
 
 #ifndef CONFIG_SLE_TEAM_UART_TXD_PIN
-#define CONFIG_SLE_TEAM_UART_TXD_PIN 17
+#define CONFIG_SLE_TEAM_UART_TXD_PIN 21
 #endif
 
 #ifndef CONFIG_SLE_TEAM_UART_RXD_PIN
-#define CONFIG_SLE_TEAM_UART_RXD_PIN 18
+#define CONFIG_SLE_TEAM_UART_RXD_PIN 22
 #endif
 
 #ifndef CONFIG_SLE_TEAM_LED_PIN
-#define CONFIG_SLE_TEAM_LED_PIN 2
+#define CONFIG_SLE_TEAM_LED_PIN 255
 #endif
 
 #ifndef CONFIG_SLE_TEAM_LED_ACTIVE_LOW
 #define CONFIG_SLE_TEAM_LED_ACTIVE_LOW 0
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_ENABLE
+#define CONFIG_SLE_TEAM_ST7789_ENABLE 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_SPI_BUS
+#define CONFIG_SLE_TEAM_ST7789_SPI_BUS 0
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_SCLK_PIN
+#define CONFIG_SLE_TEAM_ST7789_SCLK_PIN 6
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_MOSI_PIN
+#define CONFIG_SLE_TEAM_ST7789_MOSI_PIN 8
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_CS_PIN
+#define CONFIG_SLE_TEAM_ST7789_CS_PIN 7
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_DC_PIN
+#define CONFIG_SLE_TEAM_ST7789_DC_PIN 9
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_RESET_PIN
+#define CONFIG_SLE_TEAM_ST7789_RESET_PIN 13
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_X_OFFSET
+#define CONFIG_SLE_TEAM_ST7789_X_OFFSET 52
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_Y_OFFSET
+#define CONFIG_SLE_TEAM_ST7789_Y_OFFSET 40
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_WIDTH
+#define CONFIG_SLE_TEAM_ST7789_WIDTH 135
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_HEIGHT
+#define CONFIG_SLE_TEAM_ST7789_HEIGHT 240
 #endif
 
 #ifndef CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S
@@ -96,7 +141,7 @@
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
 #ifndef CONFIG_SLE_TEAM_WIFI_AP_SSID
-#define CONFIG_SLE_TEAM_WIFI_AP_SSID "SLE-TEAM-WS63"
+#define CONFIG_SLE_TEAM_WIFI_AP_SSID "SLE-TEAM-V4"
 #endif
 
 #ifndef CONFIG_SLE_TEAM_WIFI_AP_PSK
@@ -216,9 +261,9 @@ typedef struct {
 typedef struct {
     uint8_t uart_rx_buf[SLE_TEAM_UART_RX_BUF_SIZE];
     char line_buf[SLE_TEAM_CLI_LINE_SIZE];
-#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
     char self_label[8];
     char leader_label[8];
+#if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
     char softap_ssid[32];
     uint8_t self_mac[6];
     uint8_t self_mac_ready;
@@ -230,6 +275,8 @@ typedef struct {
     uint8_t led_queue_ready;
     uint8_t led_pin;
     uint8_t led_active_low;
+    uint8_t display_ready;
+    uint8_t display_lost_count;
     uint32_t last_seek_led_ms;
     uint8_t route_id;
     uint8_t role_configured;
@@ -258,6 +305,7 @@ typedef struct {
     uint8_t route_metrics_unreachable;
     uint8_t route_metrics_stale;
     uint8_t route_metrics_converged;
+    uint8_t last_online_member_count;
     uint32_t route_metrics_epoch;
     uint32_t route_metrics_last_change_s;
     uint32_t route_metrics_last_converged_s;
@@ -320,6 +368,7 @@ static void team_leader_rebalance_relays(uint8_t force_now);
 static void team_leader_route_metrics_update(void);
 static void team_leader_route_convergence_hint(uint32_t now_s, uint8_t trigger_state_change,
     uint8_t stale_count, uint8_t unreachable_count);
+static uint32_t team_now_s(void *user_ctx);
 
 static uint16_t team_nv_checksum(const sle_team_web_config_nv_t *cfg)
 {
@@ -419,8 +468,119 @@ static void team_print(const char *text)
     osal_printk("[state] %s\r\n", text);
 }
 
+static uint8_t team_online_member_count(void)
+{
+    uint8_t i;
+    uint8_t count = 0U;
+
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return g_team_node.joined != 0U ? 1U : 0U;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (g_team_node.members[i].online != 0U) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static void team_display_refresh_status(void)
+{
+#if CONFIG_SLE_TEAM_ST7789_ENABLE
+    const char *role = "idle";
+
+    if (g_team_rt.display_ready == 0U) {
+        return;
+    }
+    if (g_team_rt.role_configured != 0U) {
+        role = g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? "leader" : "member";
+    }
+    (void)ws63_st7789_show_status(role, g_team_rt.self_label, team_online_member_count(),
+        g_team_rt.display_lost_count);
+#endif
+}
+
+static void team_display_show_lost(uint8_t member_id, int32_t latitude_e6, int32_t longitude_e6,
+    uint32_t last_seen_s)
+{
+#if CONFIG_SLE_TEAM_ST7789_ENABLE
+    if (g_team_rt.display_ready == 0U) {
+        return;
+    }
+    g_team_rt.display_lost_count++;
+    (void)ws63_st7789_show_alert(member_id, latitude_e6, longitude_e6, last_seen_s);
+    team_display_refresh_status();
+#else
+    unused(member_id);
+    unused(latitude_e6);
+    unused(longitude_e6);
+    unused(last_seen_s);
+#endif
+}
+
+static void team_display_note_offline_delta(void)
+{
+    uint8_t online_now;
+    uint8_t i;
+    const sle_team_member_record_t *latest_lost = NULL;
+
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER) {
+        g_team_rt.last_online_member_count = team_online_member_count();
+        return;
+    }
+    online_now = team_online_member_count();
+    if (online_now >= g_team_rt.last_online_member_count) {
+        g_team_rt.last_online_member_count = online_now;
+        return;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &g_team_node.members[i];
+
+        if (member->online != 0U || member->member_id == 0U) {
+            continue;
+        }
+        if (latest_lost == NULL || member->last_seen_s > latest_lost->last_seen_s) {
+            latest_lost = member;
+        }
+    }
+    if (latest_lost != NULL) {
+        team_display_show_lost(latest_lost->member_id, latest_lost->latitude_e6, latest_lost->longitude_e6,
+            latest_lost->last_seen_s);
+    }
+    g_team_rt.last_online_member_count = online_now;
+}
+
+static void team_display_init(void)
+{
+#if CONFIG_SLE_TEAM_ST7789_ENABLE
+    ws63_st7789_config_t cfg;
+
+    (void)memset_s(&cfg, sizeof(cfg), 0, sizeof(cfg));
+    cfg.spi_bus = (uint8_t)CONFIG_SLE_TEAM_ST7789_SPI_BUS;
+    cfg.sclk_pin = (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN;
+    cfg.mosi_pin = (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN;
+    cfg.cs_pin = (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_PIN;
+    cfg.dc_pin = (uint8_t)CONFIG_SLE_TEAM_ST7789_DC_PIN;
+    cfg.reset_pin = (uint8_t)CONFIG_SLE_TEAM_ST7789_RESET_PIN;
+    cfg.x_offset = (uint16_t)CONFIG_SLE_TEAM_ST7789_X_OFFSET;
+    cfg.y_offset = (uint16_t)CONFIG_SLE_TEAM_ST7789_Y_OFFSET;
+    cfg.width = (uint16_t)CONFIG_SLE_TEAM_ST7789_WIDTH;
+    cfg.height = (uint16_t)CONFIG_SLE_TEAM_ST7789_HEIGHT;
+    if (ws63_st7789_init(&cfg) == 0) {
+        g_team_rt.display_ready = 1U;
+        team_display_refresh_status();
+    } else {
+        g_team_rt.display_ready = 0U;
+        osal_printk("[display] disabled after init failure\r\n");
+    }
+#endif
+}
+
 static void team_led_set(uint8_t on)
 {
+    if (g_team_rt.led_pin > 31U) {
+        return;
+    }
     if (g_team_rt.led_active_low != 0U) {
         (void)uapi_gpio_set_val(g_team_rt.led_pin, on != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH);
     } else {
@@ -432,6 +592,10 @@ static void team_led_configure(uint8_t pin, uint8_t active_low)
 {
     g_team_rt.led_pin = pin;
     g_team_rt.led_active_low = active_low != 0U ? 1U : 0U;
+    if (g_team_rt.led_pin > 31U) {
+        osal_printk("[state] led disabled pin=%u\r\n", g_team_rt.led_pin);
+        return;
+    }
     (void)uapi_pin_set_mode(g_team_rt.led_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_gpio_set_dir(g_team_rt.led_pin, GPIO_DIRECTION_OUTPUT);
     team_led_set(0U);
@@ -725,6 +889,7 @@ static void team_identity_init_from_wifi_mac(void)
     g_team_rt.route_id = team_route_id_from_mac(g_team_rt.self_mac);
     team_identity_apply_to_node();
     team_identity_format_from_mac(g_team_rt.self_mac);
+    team_display_refresh_status();
     osal_printk("[team-wifi] identity label=%s mac=%02X:%02X:%02X:%02X:%02X:%02X ssid=%s route=%u\r\n",
         g_team_rt.self_label,
         g_team_rt.self_mac[0], g_team_rt.self_mac[1], g_team_rt.self_mac[2],
@@ -1957,7 +2122,8 @@ static void team_leader_pairing_rotate_connections(void)
             keep_count++;
         }
     }
-    for (i = 0U; i < conn_count && (conn_count - keep_count) > SLE_TEAM_PAIRING_KEEP_CONNECTED; i++) {
+    for (i = 0U; i < conn_count &&
+        ((int32_t)conn_count - (int32_t)keep_count) > (int32_t)SLE_TEAM_PAIRING_KEEP_CONNECTED; i++) {
         uint8_t index = (uint8_t)((g_team_rt.pairing_rotate_index + i) % conn_count);
         uint8_t member_id = 0U;
 
@@ -2296,6 +2462,7 @@ static void team_joined(void *user_ctx, uint8_t member_id)
 
     unused(user_ctx);
     osal_printk("[team] joined member=%u\r\n", member_id);
+    team_display_refresh_status();
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || member_id != g_team_node.cfg.self_id) {
         return;
     }
@@ -2319,12 +2486,22 @@ static void team_position(void *user_ctx, uint8_t member_id, const sle_team_pos_
         pos->battery_percent,
         pos->fix_status,
         pos->sat_count);
+    team_display_refresh_status();
 }
 
 static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
 {
     unused(user_ctx);
     osal_printk("[team] alert member=%u reason=%u\r\n", member_id, reason);
+    if (reason == SLE_TEAM_ALERT_TIMEOUT) {
+        const sle_team_member_record_t *member = sle_team_node_find_member(&g_team_node, member_id);
+
+        if (member != NULL) {
+            team_display_show_lost(member_id, member->latitude_e6, member->longitude_e6, member->last_seen_s);
+        } else {
+            team_display_show_lost(member_id, 0, 0, team_now_s(NULL));
+        }
+    }
 }
 
 static void team_on_relay_offline(void *user_ctx, uint8_t member_id)
@@ -4100,6 +4277,7 @@ static int team_configure_role(sle_team_node_role_t role, uint8_t leader_id)
     }
     g_team_rt.role_configured = 1U;
     team_identity_refresh_labels();
+    team_display_refresh_status();
     sle_team_cli_print_help(&g_team_cli);
     osal_printk("[team] configured self=%u leader=%u role=%u team=%u label=%s\r\n",
         g_team_node.cfg.self_id,
@@ -4283,6 +4461,7 @@ static void *team_network_task(const char *arg)
         identity_wait_ms += 100U;
     }
 #endif
+    team_display_init();
     team_uart_init();
     team_uart_cli_start();
 
@@ -4314,6 +4493,7 @@ static void *team_network_task(const char *arg)
             team_member_autoselect_parent();
             team_request_sle_rssi();
             sle_team_node_tick(&g_team_node);
+            team_display_note_offline_delta();
             team_leader_rebalance_relays(0U);
             team_leader_route_metrics_update();
             if (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && joined_before != 0U && g_team_node.joined == 0U) {

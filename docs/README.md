@@ -8,6 +8,7 @@
 - [v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay 批准）
 - [v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
 - [v3/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v3/README.md)：V3（手机定位桥接与位置分发）
+- [v4/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/README.md)：V4（WS63 模块 + ST7789 + 失联上报）
 
 ## 审查与版本
 
@@ -21,4 +22,4 @@
 
 ## 清理说明
 
-- 历史讨论草案、重复协议拆分文档、临时审查副本已删除或整合进 v0/v1/v2。
+- 历史讨论草案、重复协议拆分文档、临时审查副本已删除或整合进对应阶段文档（v0~v4）。

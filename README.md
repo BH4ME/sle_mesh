@@ -9,6 +9,7 @@
 - [docs/v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay）
 - [docs/v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
 - [docs/v3/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v3/README.md)：V3（手机定位桥接）
+- [docs/v4/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/README.md)：V4（WS63 模块 + ST7789）
 - [versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
 - [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md)：文档编写与维护流程
 
@@ -19,7 +20,7 @@
 - [examples/](/Users/bh4me_macair/Documents/Codex/sle_intercom/examples)：本地协议测试和接入示例。
 - [xc/ws63_team_network/](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network)：WS63 上板样例。
 - [webui/](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui)：域名上位机 WebUI。
-- [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：按 v0/v1/v2 分组的协议与组网文档。
+- [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：按 v0~v4 分组的协议与组网文档。
 - [versions/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions)：版本记录。
 - [scripts/](/Users/bh4me_macair/Documents/Codex/sle_intercom/scripts)：编译和烧录脚本。
 - [automation/ws63/](/Users/bh4me_macair/Documents/Codex/sle_intercom/automation/ws63)：自动化烧录、角色绑定与回归测试（独立目录）。

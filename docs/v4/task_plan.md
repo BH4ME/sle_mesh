@@ -35,9 +35,9 @@ Phase 5
 ### Phase 4：测试与验证
 - [x] 先做本地格式/配置检查
 - [x] 再做协议/状态机回归
-- [ ] Ubuntu 交叉构建
+- [x] Ubuntu 交叉构建
 - [ ] 最后做上板验证
-- **Status:** blocked_on_ubuntu
+- **Status:** in_progress
 
 ### Phase 5：交付
 - [x] 汇总变更点
@@ -55,7 +55,7 @@ Phase 5
 | Decision | Rationale |
 |----------|-----------|
 | 以 `v3.0.0-alpha8` 为基线 | 当前仓库 HEAD 就在这个版本，适合作为 v4 起点 |
-| 先建 `v4/` 工作区，再动代码 | 先把计划和发现落盘，避免后面改乱 |
+| 文档归档到 `docs/v4/`，代码汇总到 `xc/ws63_team_network/` | 与现有版本目录规范对齐，避免根目录临时区长期漂移 |
 | 组网优先，显示其次 | 你明确说工程主线是组网 |
 | `CONFIG_SLE_TEAM_LED_PIN=255` 禁用旧 LED | v4 原理图里 IO2 是 `CHRG`，不能作为活动灯输出 |
 | 普通 member 超时也广播 `ALERT_TIMEOUT` | 满足“子节点丢失向主节点上报，并有最后位置”的核心闭环 |
@@ -67,4 +67,4 @@ Phase 5
 |-------|---------|------------|
 | `python` 命令不存在 | 1 | 改用 `python3` 跑 session catchup |
 | macOS 直接用 WS63 SDK 头链做语法检查时持续缺平台宏/porting 头 | 1 | 记录为本地 SDK 限制，实际验证走 Ubuntu 交叉构建 |
-| Ubuntu 编译机 `192.168.6.5:22` 连接超时 | 1 | 不是代码编译失败；等待编译机网络/电源恢复后重跑 `scripts/ws63_build_v4_ubuntu.sh unified` |
+| Ubuntu 编译机 `192.168.6.5:22` 连接超时 | 1 | 改用 Tailscale 主机 `100.91.84.124`，`scripts/ws63_build_v4_ubuntu.sh unified` 已构建通过 |
