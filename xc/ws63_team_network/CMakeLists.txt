@@ -26,6 +26,7 @@ set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_server/sle_uart_server.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_uart_client/sle_uart_client.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ws63_st7789_display.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ws63_ws2812.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ws63_team_network_app.c
 )
 

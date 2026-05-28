@@ -46,6 +46,67 @@ config SLE_TEAM_LED_ACTIVE_LOW
     help
         The tested BearPi WS63 blue user LED turns on when GPIO_2 is driven high.
 
+config SLE_TEAM_WS2812_ENABLE
+    bool "Enable v4 WS2812 RGB status LED"
+    default n
+    help
+        Enable the v4 single WS2812C RGB LED connected to RGB/IO0.
+
+config SLE_TEAM_WS2812_PIN
+    int "WS2812 RGB data GPIO"
+    default 0
+    depends on SLE_TEAM_WS2812_ENABLE
+    help
+        On the v4 schematic, RGB is routed to WS63 IO0.
+
+config SLE_TEAM_BUZZER_ENABLE
+    bool "Enable v4 buzzer output"
+    default n
+    help
+        Enable BUZZ output on the v4 board.
+
+config SLE_TEAM_BUZZER_PIN
+    int "Buzzer GPIO"
+    default 14
+    depends on SLE_TEAM_BUZZER_ENABLE
+    help
+        On the v4 schematic, BUZZ is routed to WS63 IO14.
+
+config SLE_TEAM_BUZZER_ACTIVE_HIGH
+    bool "Buzzer active high"
+    default y
+    depends on SLE_TEAM_BUZZER_ENABLE
+    help
+        Set to y when BUZZER turns on at high level.
+
+config SLE_TEAM_GPS_ENABLE
+    bool "Enable v4 GPS UART pinmap"
+    default n
+    help
+        Keep this off when GPS module is not soldered. This option currently
+        records/logs UART pin mapping only; NMEA parsing is not enabled yet.
+
+config SLE_TEAM_GPS_UART_BUS
+    int "GPS UART bus"
+    default 1
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, GPS uses UART1.
+
+config SLE_TEAM_GPS_UART_TXD_PIN
+    int "GPS UART TXD pin"
+    default 17
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, U1TX is routed to WS63 IO17.
+
+config SLE_TEAM_GPS_UART_RXD_PIN
+    int "GPS UART RXD pin"
+    default 18
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, U1RX is routed to WS63 IO18.
+
 config SLE_TEAM_ST7789_ENABLE
     bool "Enable v4 ST7789 display"
     default y

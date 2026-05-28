@@ -23,16 +23,6 @@ export interface TeamApi {
   leaveMember(): Promise<void>;
   factoryReset(): Promise<void>;
   send(command: SendCommand): Promise<TeamEvent>;
-  sendLocation(command: {
-    latitudeE6: number;
-    longitudeE6: number;
-    dstId?: number;
-    speedCms?: number;
-    headingDeg?: number;
-    batteryPercent?: number;
-    fixStatus?: number;
-    satCount?: number;
-  }): Promise<TeamEvent>;
   configureAllow(command: AllowMembersCommand): Promise<TeamEvent>;
 }
 
@@ -154,30 +144,6 @@ export class HttpTeamApi implements TeamApi {
       method: "POST",
       body: JSON.stringify(command),
     });
-  }
-
-  sendLocation(command: {
-    latitudeE6: number;
-    longitudeE6: number;
-    dstId?: number;
-    speedCms?: number;
-    headingDeg?: number;
-    batteryPercent?: number;
-    fixStatus?: number;
-    satCount?: number;
-  }): Promise<TeamEvent> {
-    return fetchJson(
-      `${this.baseUrl}/api/location?${qs({
-        lat: command.latitudeE6,
-        lon: command.longitudeE6,
-        dst: command.dstId ?? 255,
-        speed: command.speedCms ?? 0,
-        heading: command.headingDeg ?? 0,
-        battery: command.batteryPercent ?? 100,
-        fix: command.fixStatus ?? 2,
-        sat: command.satCount ?? 0,
-      })}`,
-    );
   }
 
   configureAllow(_command: AllowMembersCommand): Promise<TeamEvent> {
@@ -472,29 +438,6 @@ export class SerialTeamApi implements TeamApi {
     await this.runCli(cli, 700);
     const latest = [...this.lastLines].reverse().find((line) => line.includes("[sle-tx-")) ?? `[cli-tx] ${cli}`;
     return serialLineToEvent(latest, Date.now());
-  }
-
-  sendLocation(command: {
-    latitudeE6: number;
-    longitudeE6: number;
-    dstId?: number;
-    speedCms?: number;
-    headingDeg?: number;
-    batteryPercent?: number;
-    fixStatus?: number;
-    satCount?: number;
-  }): Promise<TeamEvent> {
-    return this.send({
-      type: "position",
-      dstId: command.dstId ?? 255,
-      latitudeE6: command.latitudeE6,
-      longitudeE6: command.longitudeE6,
-      speedCms: command.speedCms ?? 0,
-      headingDeg: command.headingDeg ?? 0,
-      batteryPercent: command.batteryPercent ?? 100,
-      fixStatus: command.fixStatus ?? 2,
-      satCount: command.satCount ?? 0,
-    });
   }
 
   async configureAllow(command: AllowMembersCommand): Promise<TeamEvent> {

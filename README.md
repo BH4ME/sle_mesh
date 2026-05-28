@@ -27,20 +27,25 @@
 
 ## WS63 使用
 
-板端 WiFi：
+板端 WiFi（`v4.3`）：
 
 ```text
-SSID: SLE-TEAM-WS63-XXXX
+SSID: SLE-TEAM-V4-XXXX
 Password: 123456789
 URL: http://192.168.43.1/
 ```
+
+版本命名说明：
+
+- 当前固件版本是 `v4.3`。
+- `v4.3` 继续按原理图固定 `显示/ST7789 + 蜂鸣器 + WS 灯 + GPS` 四项映射，并同步收敛 WiFi 入网与烧录流程。
 
 常用页面：
 
 - `/`：状态。
 - `/nodes`：已入队节点。
 - `/events`：最近收发事件。
-- `/pairing`：角色选择、leader 配队、member 选择 leader。
+- `/pairing`：角色选择、leader 配队、member 选择 leader，以及手机定位手动/自动上报。
 
 常用 API：
 
@@ -54,6 +59,20 @@ URL: http://192.168.43.1/
 - `GET /api/member/leave`
 - `GET /api/factory-reset`
 
+`v4.3` 手机定位快速手册：
+
+1. 先把队伍配好（至少 `1 leader + 1 member`），并确认 leader 的 `/nodes` 里 member 是 `online`。
+2. 手机连 leader 的 WiFi，打开 `http://192.168.43.1/pairing`。
+3. 在 `Phone Location` 区域先点 `use phone gps`，首次会弹权限，建议选“使用 App 期间允许”。
+4. 单次发送就点 `send location`；持续上报就点 `start auto`（默认约 2.5s 节流），停止点 `stop auto`。
+5. 持续上报时页面要保持前台，锁屏/切后台可能被系统暂停。
+
+`/api/location` 返回结果判读：
+
+- `ret=0 reason=OK`：本次 POS_REPORT 已发出。
+- `reason=NOT_READY_OR_NO_ROUTE`：当前还没入网完成，或目标节点当前无路由/不在线。
+- `reason=WRITE_FAIL`：SLE 写链路失败，先看 `/events` 和串口日志里的 `sle-tx-fail`。
+
 ## 编译和烧录
 
 优先使用局域网 Ubuntu 编译机：
@@ -64,13 +83,13 @@ UBUNTU_USER=owen \
 UBUNTU_PASS='67215837' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
 BUILD_JOBS=4 \
-scripts/ws63_build_team_ubuntu.sh unified
+scripts/ws63_build_v4_ubuntu.sh unified
 ```
 
 输出统一固件：
 
 ```text
-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg
+/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 本机烧 leader：

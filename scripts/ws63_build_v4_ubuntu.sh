@@ -74,7 +74,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4 unified runtime role"
+echo "profile:    v4.2.3 unified runtime role (schematic pinmap)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -130,12 +130,38 @@ def set_kconfig_value(text, key, value):
         out.append(f"{key}={value}")
     return "\n".join(out) + "\n"
 
+def unset_kconfig_bool(text, key):
+    lines = text.splitlines()
+    found = False
+    out = []
+    for line in lines:
+        if line.startswith(key + "=") or line.startswith(f"# {key} is not set"):
+            if not found:
+                out.append(f"# {key} is not set")
+                found = True
+            continue
+        out.append(line)
+    if not found:
+        out.append(f"# {key} is not set")
+    return "\n".join(out) + "\n"
+
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_SELF_ID", self_id)
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LEADER_ID", "1")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_BUS", "0")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_TXD_PIN", "21")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_RXD_PIN", "22")
+s = set_kconfig_value(s, "CONFIG_AT_UART", "3")
+s = unset_kconfig_bool(s, "CONFIG_DYNAMIC_UART_ID_BINDDING")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LED_PIN", "255")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_PIN", "0")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_PIN", "14")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_GPS_ENABLE")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_BUS", "1")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_TXD_PIN", "17")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_RXD_PIN", "18")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SPI_BUS", "0")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "6")
@@ -153,7 +179,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4 unified runtime role with ST7789 and central+peripheral enabled")
+print("configured v4.2.3 schematic pinmap: AT UART disabled, ws2812 IO0, buzzer IO14 toggles every 3s, gps UART1(IO17/18) mapped, central+peripheral enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py ws63-liteos-app -j'$BUILD_JOBS'"

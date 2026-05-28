@@ -1,6 +1,7 @@
 #include "sle_team_cli.h"
 #include "sle_team_web_api.h"
 #include "ws63_st7789_display.h"
+#include "ws63_ws2812.h"
 #include "ws63_console_pages.h"
 
 #include <errno.h>
@@ -26,6 +27,7 @@
 #include "lwip/sockets.h"
 #include "lwip/tcpip.h"
 #include "wifi_device.h"
+#include "wifi_device_config.h"
 #include "wifi_hotspot.h"
 #include "wifi_hotspot_config.h"
 #endif
@@ -77,6 +79,42 @@
 
 #ifndef CONFIG_SLE_TEAM_ST7789_ENABLE
 #define CONFIG_SLE_TEAM_ST7789_ENABLE 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_WS2812_ENABLE
+#define CONFIG_SLE_TEAM_WS2812_ENABLE 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_WS2812_PIN
+#define CONFIG_SLE_TEAM_WS2812_PIN 0
+#endif
+
+#ifndef CONFIG_SLE_TEAM_BUZZER_ENABLE
+#define CONFIG_SLE_TEAM_BUZZER_ENABLE 0
+#endif
+
+#ifndef CONFIG_SLE_TEAM_BUZZER_PIN
+#define CONFIG_SLE_TEAM_BUZZER_PIN 14
+#endif
+
+#ifndef CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH
+#define CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_GPS_ENABLE
+#define CONFIG_SLE_TEAM_GPS_ENABLE 0
+#endif
+
+#ifndef CONFIG_SLE_TEAM_GPS_UART_BUS
+#define CONFIG_SLE_TEAM_GPS_UART_BUS 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_GPS_UART_TXD_PIN
+#define CONFIG_SLE_TEAM_GPS_UART_TXD_PIN 17
+#endif
+
+#ifndef CONFIG_SLE_TEAM_GPS_UART_RXD_PIN
+#define CONFIG_SLE_TEAM_GPS_UART_RXD_PIN 18
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_SPI_BUS
@@ -178,6 +216,16 @@
 #define SLE_TEAM_LED_SEEK_OFF_MS 80
 #define SLE_TEAM_LED_SEEK_PULSES 1
 #define SLE_TEAM_LED_SEEK_INTERVAL_MS 1000U
+#define SLE_TEAM_WS2812_FORCE_CLEAR_COUNT 8U
+#define SLE_TEAM_WS2812_FORCE_CLEAR_DELAY_MS 10U
+#define SLE_TEAM_WS2812_BOOT_R 0U
+#define SLE_TEAM_WS2812_BOOT_G 24U
+#define SLE_TEAM_WS2812_BOOT_B 64U
+#define SLE_TEAM_BUZZER_FORCE_OFF_LEVEL GPIO_LEVEL_LOW
+#define SLE_TEAM_BUZZER_FORCE_ON_LEVEL GPIO_LEVEL_HIGH
+#define SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS 3000U
+#define SLE_TEAM_BUZZ_ON_MS 120U
+#define SLE_TEAM_BUZZ_OFF_MS 120U
 
 #define SLE_TEAM_WIFI_AP_TASK_STACK_SIZE 0x1000
 #define SLE_TEAM_WIFI_AP_TASK_PRIO 13
@@ -190,13 +238,13 @@
 #define SLE_TEAM_HTTP_RETRY_MS 5000
 #define SLE_TEAM_HTTP_PORT 80
 #define SLE_TEAM_HTTP_BACKLOG 4
-#define SLE_TEAM_HTTP_RECV_TIMEOUT_MS 3000
+#define SLE_TEAM_HTTP_RECV_TIMEOUT_MS 800
 #define SLE_TEAM_HTTP_SEND_TIMEOUT_MS 3000
 #define SLE_TEAM_FACTORY_RESET_TASK_STACK_SIZE 0x800
 #define SLE_TEAM_FACTORY_RESET_TASK_PRIO 12
-#define SLE_TEAM_HTTP_REQ_BUF_SIZE 192
+#define SLE_TEAM_HTTP_REQ_BUF_SIZE 768
 #define SLE_TEAM_HTTP_JSON_BUF_SIZE 1024
-#define SLE_TEAM_HTTP_HTML_BUF_SIZE 3072
+#define SLE_TEAM_HTTP_HTML_BUF_SIZE 8192
 #define SLE_TEAM_HTTP_PATH_BUF_SIZE 160
 #define SLE_TEAM_ROUTE_ID_FALLBACK 1U
 #define TEAM_CONN_TRACK_MAX 16U
@@ -218,6 +266,16 @@
 #define SLE_TEAM_NV_CONFIG_MAGIC 0x534C4554U
 #define SLE_TEAM_NV_CONFIG_VERSION 1U
 #define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 12U
+#define SLE_TEAM_WIFI_SECURITY_COMPAT_MIX ((wifi_security_enum)WIFI_SEC_TYPE_WPA2_WPA_PSK_MIX)
+#define SLE_TEAM_WIFI_PROTOCOL_COMPAT_AX WIFI_MODE_11B_G_N_AX
+#define SLE_TEAM_FW_VERSION "v4.2.3"
+#define SLE_TEAM_HW_CONSTRAINTS "v4.2.3 board map"
+
+#if defined(__GNUC__)
+#define SLE_TEAM_UNUSED_FUNC __attribute__((unused))
+#else
+#define SLE_TEAM_UNUSED_FUNC
+#endif
 
 typedef struct {
     char line[SLE_TEAM_CLI_LINE_SIZE];
@@ -275,6 +333,16 @@ typedef struct {
     uint8_t led_queue_ready;
     uint8_t led_pin;
     uint8_t led_active_low;
+    uint8_t ws2812_ready;
+    uint8_t ws2812_pin;
+    uint8_t ws2812_r;
+    uint8_t ws2812_g;
+    uint8_t ws2812_b;
+    uint8_t buzzer_ready;
+    uint8_t buzzer_pin;
+    uint8_t buzzer_active_high;
+    uint8_t buzzer_level_on;
+    uint32_t buzzer_toggle_last_ms;
     uint8_t display_ready;
     uint8_t display_lost_count;
     uint32_t last_seek_led_ms;
@@ -576,6 +644,187 @@ static void team_display_init(void)
 #endif
 }
 
+static void team_ws2812_force_off(void)
+{
+    uint8_t i;
+
+    if (g_team_rt.ws2812_ready == 0U) {
+        return;
+    }
+    for (i = 0U; i < SLE_TEAM_WS2812_FORCE_CLEAR_COUNT; i++) {
+        (void)ws63_ws2812_clear();
+        osal_msleep(SLE_TEAM_WS2812_FORCE_CLEAR_DELAY_MS);
+    }
+    g_team_rt.ws2812_r = 0U;
+    g_team_rt.ws2812_g = 0U;
+    g_team_rt.ws2812_b = 0U;
+    (void)uapi_gpio_set_val(g_team_rt.ws2812_pin, GPIO_LEVEL_LOW);
+    osal_printk("[diag] ws2812 force-off pin=%u clear_count=%u\r\n",
+        g_team_rt.ws2812_pin, SLE_TEAM_WS2812_FORCE_CLEAR_COUNT);
+}
+
+static int team_ws2812_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+{
+#if CONFIG_SLE_TEAM_WS2812_ENABLE
+    if (g_team_rt.ws2812_ready == 0U) {
+        return -1;
+    }
+    if (ws63_ws2812_set_rgb(red, green, blue) != 0) {
+        return -1;
+    }
+    g_team_rt.ws2812_r = red;
+    g_team_rt.ws2812_g = green;
+    g_team_rt.ws2812_b = blue;
+    return 0;
+#else
+    unused(red);
+    unused(green);
+    unused(blue);
+    team_ws2812_force_off();
+    return -1;
+#endif
+}
+
+static void team_ws2812_show_boot_marker(void)
+{
+    if (team_ws2812_set_rgb(SLE_TEAM_WS2812_BOOT_R, SLE_TEAM_WS2812_BOOT_G, SLE_TEAM_WS2812_BOOT_B) == 0) {
+        osal_printk("[diag] ws2812 startup marker on pin=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_pin, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+    }
+}
+
+static void team_ws2812_test_pattern(void)
+{
+#if CONFIG_SLE_TEAM_WS2812_ENABLE
+    if (g_team_rt.ws2812_ready == 0U) {
+        osal_printk("[diag] ws2812 not ready; test pattern ignored\r\n");
+        return;
+    }
+    (void)team_ws2812_set_rgb(64U, 0U, 0U);
+    osal_msleep(180U);
+    (void)team_ws2812_set_rgb(0U, 64U, 0U);
+    osal_msleep(180U);
+    (void)team_ws2812_set_rgb(0U, 0U, 64U);
+    osal_msleep(180U);
+    team_ws2812_show_boot_marker();
+#else
+    team_ws2812_force_off();
+    osal_printk("[diag] ws2812 disabled; test pattern ignored\r\n");
+#endif
+}
+
+static void team_ws2812_init(void)
+{
+    g_team_rt.ws2812_pin = (uint8_t)CONFIG_SLE_TEAM_WS2812_PIN;
+    if (ws63_ws2812_init(g_team_rt.ws2812_pin) == 0) {
+        g_team_rt.ws2812_ready = 1U;
+        g_team_rt.ws2812_r = 0U;
+        g_team_rt.ws2812_g = 0U;
+        g_team_rt.ws2812_b = 0U;
+#if CONFIG_SLE_TEAM_WS2812_ENABLE
+        team_ws2812_show_boot_marker();
+#else
+        team_ws2812_force_off();
+        osal_printk("[diag] ws2812 disabled by %s (fw=%s), pin=%u cleared and held idle\r\n",
+            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.ws2812_pin);
+#endif
+    } else {
+        g_team_rt.ws2812_ready = 0U;
+        osal_printk("[diag] ws2812 disabled by %s (fw=%s), pin=%u clear failed\r\n",
+            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.ws2812_pin);
+    }
+}
+
+static void team_gps_diag_print(void)
+{
+#if CONFIG_SLE_TEAM_GPS_ENABLE
+    osal_printk("[diag] gps pinmap (fw=%s) uart_bus=%u tx=%u rx=%u mode=enabled(no-nmea-parser)\r\n",
+        SLE_TEAM_FW_VERSION,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_BUS,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_TXD_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_RXD_PIN);
+#else
+    osal_printk("[diag] gps disabled by %s (fw=%s) uart_bus=%u tx=%u rx=%u\r\n",
+        SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_BUS,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_TXD_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_RXD_PIN);
+#endif
+}
+
+static void team_buzzer_force_pin_off(uint8_t pin)
+{
+    if (pin > 31U) {
+        return;
+    }
+    (void)uapi_pin_set_mode(pin, HAL_PIO_FUNC_GPIO);
+    (void)uapi_pin_set_pull(pin, PIN_PULL_TYPE_DOWN);
+    (void)uapi_gpio_set_val(pin, SLE_TEAM_BUZZER_FORCE_OFF_LEVEL);
+    (void)uapi_gpio_set_dir(pin, GPIO_DIRECTION_OUTPUT);
+    (void)uapi_gpio_set_val(pin, SLE_TEAM_BUZZER_FORCE_OFF_LEVEL);
+}
+
+static void team_buzzer_apply_level(uint8_t level)
+{
+    if (g_team_rt.buzzer_pin > 31U) {
+        return;
+    }
+    (void)uapi_pin_set_mode(g_team_rt.buzzer_pin, HAL_PIO_FUNC_GPIO);
+    (void)uapi_pin_set_pull(g_team_rt.buzzer_pin, PIN_PULL_TYPE_DOWN);
+    (void)uapi_gpio_set_dir(g_team_rt.buzzer_pin, GPIO_DIRECTION_OUTPUT);
+    (void)uapi_gpio_set_val(g_team_rt.buzzer_pin, level != 0U ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
+}
+
+static void team_buzzer_set(uint8_t on)
+{
+    g_team_rt.buzzer_level_on = on != 0U ? 1U : 0U;
+    team_buzzer_apply_level(g_team_rt.buzzer_level_on != 0U ? SLE_TEAM_BUZZER_FORCE_ON_LEVEL :
+        SLE_TEAM_BUZZER_FORCE_OFF_LEVEL);
+}
+
+static void team_buzzer_toggle_tick(void)
+{
+    uint32_t now_ms;
+
+    if (g_team_rt.buzzer_ready == 0U) {
+        return;
+    }
+    now_ms = uapi_tcxo_get_ms();
+    if (g_team_rt.buzzer_toggle_last_ms != 0U &&
+        (now_ms - g_team_rt.buzzer_toggle_last_ms) < SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS) {
+        return;
+    }
+    g_team_rt.buzzer_toggle_last_ms = now_ms;
+    team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
+    osal_printk("[diag] buzzer io14 toggled level=%u interval_ms=%u\r\n",
+        g_team_rt.buzzer_level_on, (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
+}
+
+static void team_buzzer_init(void)
+{
+    g_team_rt.buzzer_pin = (uint8_t)CONFIG_SLE_TEAM_BUZZER_PIN;
+    g_team_rt.buzzer_active_high = 1U;
+    g_team_rt.buzzer_ready = 0U;
+    g_team_rt.buzzer_level_on = 0U;
+    g_team_rt.buzzer_toggle_last_ms = 0U;
+    if (g_team_rt.buzzer_pin > 31U) {
+        osal_printk("[diag] buzzer disabled by %s (fw=%s) pin=%u\r\n",
+            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.buzzer_pin);
+        return;
+    }
+    team_buzzer_set(0U);
+    g_team_rt.buzzer_ready = 1U;
+    g_team_rt.buzzer_toggle_last_ms = uapi_tcxo_get_ms();
+    osal_printk("[diag] buzzer io14 toggle mode by %s (fw=%s) pin=%u interval_ms=%u start_level=%u\r\n",
+        SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.buzzer_pin,
+        (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS, g_team_rt.buzzer_level_on);
+}
+
+void OHOS_SystemInit(void)
+{
+    team_buzzer_force_pin_off((uint8_t)CONFIG_SLE_TEAM_BUZZER_PIN);
+}
+
 static void team_led_set(uint8_t on)
 {
     if (g_team_rt.led_pin > 31U) {
@@ -674,6 +923,140 @@ static void *team_led_task(const char *arg)
 static void team_led_cli_status(void)
 {
     osal_printk("[cli] led pin=%u active_low=%u\r\n", g_team_rt.led_pin, g_team_rt.led_active_low);
+}
+
+static int team_ws2812_cli_handle(const char *line)
+{
+    unsigned int r;
+    unsigned int g;
+    unsigned int b;
+
+    if (strcmp(line, "rgb") == 0 || strcmp(line, "rgb status") == 0) {
+        osal_printk("[cli] rgb status %s (fw=%s) ready=%u pin=%u color=%u,%u,%u\r\n",
+            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.ws2812_ready, g_team_rt.ws2812_pin,
+            g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb off") == 0) {
+        team_ws2812_force_off();
+        return 1;
+    }
+    if (strcmp(line, "rgb red") == 0) {
+        (void)team_ws2812_set_rgb(64U, 0U, 0U);
+        osal_printk("[cli] rgb red ready=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb green") == 0) {
+        (void)team_ws2812_set_rgb(0U, 64U, 0U);
+        osal_printk("[cli] rgb green ready=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb blue") == 0) {
+        (void)team_ws2812_set_rgb(0U, 0U, 64U);
+        osal_printk("[cli] rgb blue ready=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb white") == 0) {
+        (void)team_ws2812_set_rgb(40U, 40U, 40U);
+        osal_printk("[cli] rgb white ready=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb test") == 0) {
+        team_ws2812_test_pattern();
+        return 1;
+    }
+    if (sscanf(line, "rgb set %u %u %u", &r, &g, &b) == 3 && r <= 255U && g <= 255U && b <= 255U) {
+        (void)team_ws2812_set_rgb((uint8_t)r, (uint8_t)g, (uint8_t)b);
+        osal_printk("[cli] rgb set ready=%u color=%u,%u,%u\r\n",
+            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+        return 1;
+    }
+    if (strcmp(line, "rgb help") == 0) {
+        osal_printk("[cli] rgb disabled by %s (fw=%s); only rgb status|off are no-op\r\n",
+            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION);
+        return 1;
+    }
+    return 0;
+}
+
+static int team_buzzer_cli_handle(const char *line)
+{
+    unsigned int ms;
+
+    if (strcmp(line, "buzz") == 0 || strcmp(line, "buzz status") == 0) {
+        osal_printk("[cli] buzz toggle mode fw=%s ready=%u pin=%u active_high=%u level_on=%u interval_ms=%u\r\n",
+            SLE_TEAM_FW_VERSION, g_team_rt.buzzer_ready, g_team_rt.buzzer_pin, g_team_rt.buzzer_active_high,
+            g_team_rt.buzzer_level_on, (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
+        return 1;
+    }
+    if (strcmp(line, "buzz on") == 0) {
+        team_buzzer_set(1U);
+        osal_printk("[cli] buzz set on pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        return 1;
+    }
+    if (strcmp(line, "buzz off") == 0) {
+        team_buzzer_set(0U);
+        osal_printk("[cli] buzz set off pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        return 1;
+    }
+    if (strcmp(line, "buzz beep") == 0) {
+        team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
+        osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        return 1;
+    }
+    if (strcmp(line, "buzz test") == 0) {
+        team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
+        osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        return 1;
+    }
+    if (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U) {
+        unused(ms);
+        team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
+        osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        return 1;
+    }
+    if (strcmp(line, "buzz help") == 0) {
+        osal_printk("[cli] buzz cmds: status|on|off|beep|test (auto toggles every %u ms)\r\n",
+            (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
+        return 1;
+    }
+    return 0;
+}
+
+static int team_display_cli_handle(const char *line)
+{
+    if (strcmp(line, "disp") == 0 || strcmp(line, "disp status") == 0) {
+        osal_printk("[cli] disp ready=%u spi=%u sclk=%u mosi=%u cs=%u dc=%u rst=%u size=%ux%u off=%u,%u\r\n",
+            g_team_rt.display_ready,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_SPI_BUS,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_PIN,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_DC_PIN,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_RESET_PIN,
+            (uint16_t)CONFIG_SLE_TEAM_ST7789_WIDTH,
+            (uint16_t)CONFIG_SLE_TEAM_ST7789_HEIGHT,
+            (uint16_t)CONFIG_SLE_TEAM_ST7789_X_OFFSET,
+            (uint16_t)CONFIG_SLE_TEAM_ST7789_Y_OFFSET);
+        return 1;
+    }
+    if (strcmp(line, "disp refresh") == 0) {
+        team_display_refresh_status();
+        return 1;
+    }
+    if (strcmp(line, "disp demo") == 0) {
+        team_display_show_lost(99U, 31123456, 121987654, team_now_s(NULL));
+        return 1;
+    }
+    if (strcmp(line, "disp help") == 0) {
+        osal_printk("[cli] disp commands: disp status|refresh|demo\r\n");
+        return 1;
+    }
+    return 0;
 }
 
 static int team_led_cli_handle(const char *line)
@@ -2571,6 +2954,7 @@ static int team_wifi_ap_start(void)
 {
     softap_config_stru ap_config = {0};
     softap_config_advance_stru advance_config = {0};
+    softap_config_advance_stru advance_fallback = {0};
     char ifname[SLE_TEAM_WIFI_IFNAME_MAX_SIZE + 1] = "ap0";
     struct netif *netif_p = NULL;
     ip4_addr_t gw;
@@ -2594,15 +2978,16 @@ static int team_wifi_ap_start(void)
     (void)snprintf((char *)ap_config.ssid, sizeof(ap_config.ssid), "%s", g_team_rt.softap_ssid);
     (void)snprintf((char *)ap_config.pre_shared_key, sizeof(ap_config.pre_shared_key), "%s",
         CONFIG_SLE_TEAM_WIFI_AP_PSK);
-    ap_config.security_type = 3;
+    ap_config.security_type = SLE_TEAM_WIFI_SECURITY_COMPAT_MIX;
     ap_config.channel_num = CONFIG_SLE_TEAM_WIFI_AP_CHANNEL;
-    ap_config.wifi_psk_type = 0;
+    ap_config.wifi_psk_type = WIFI_WPA_PSK_NOT_USE;
 
     advance_config.beacon_interval = 100;
     advance_config.dtim_period = 2;
     advance_config.gi = 0;
     advance_config.group_rekey = 86400;
-    advance_config.protocol_mode = 4;
+    /* v2 baseline used ax mix mode (value 4) and is field-proven stable. */
+    advance_config.protocol_mode = SLE_TEAM_WIFI_PROTOCOL_COMPAT_AX;
     advance_config.hidden_ssid_flag = 1;
 
     ret = wifi_set_softap_config_advance(&advance_config);
@@ -2612,10 +2997,21 @@ static int team_wifi_ap_start(void)
     }
     ret = wifi_softap_enable(&ap_config);
     if (ret != ERRCODE_SUCC) {
-        osal_printk("[team-wifi] softap enable failed ret=0x%x\r\n", ret);
-        return -1;
+        osal_printk("[team-wifi] softap enable failed ret=0x%x with mix/ax, fallback to wpa2+11bgn\r\n", ret);
+        ap_config.security_type = WIFI_SEC_TYPE_WPA2PSK;
+        advance_fallback = advance_config;
+        advance_fallback.protocol_mode = WIFI_MODE_11B_G_N;
+        ret = wifi_set_softap_config_advance(&advance_fallback);
+        if (ret != ERRCODE_SUCC) {
+            osal_printk("[team-wifi] softap fallback advance config failed ret=0x%x\r\n", ret);
+            return -1;
+        }
+        ret = wifi_softap_enable(&ap_config);
+        if (ret != ERRCODE_SUCC) {
+            osal_printk("[team-wifi] softap fallback enable failed ret=0x%x\r\n", ret);
+            return -1;
+        }
     }
-
     netif_p = netif_find(ifname);
     if (netif_p == NULL) {
         team_wifi_print("softap netif ap0 not found");
@@ -2672,6 +3068,41 @@ static void team_http_set_client_timeouts(int fd)
 
     (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
     (void)setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+}
+
+static int team_http_recv_request_line(int fd)
+{
+    size_t used = 0U;
+    size_t cap = sizeof(g_team_http_req_buf) - 1U;
+
+    while (used < cap) {
+        int ret = recv(fd, g_team_http_req_buf + used, cap - used, 0);
+        if (ret < 0) {
+            g_team_http_last_errno = errno;
+            if (used == 0U) {
+                osal_printk("[team-wifi] http recv failed fd=%d ret=%d errno=%d\r\n", fd, ret, g_team_http_last_errno);
+                return -1;
+            }
+            break;
+        }
+        if (ret == 0) {
+            if (used == 0U) {
+                osal_printk("[team-wifi] http recv peer closed fd=%d\r\n", fd);
+                return -1;
+            }
+            break;
+        }
+        used += (size_t)ret;
+        g_team_http_req_buf[used] = '\0';
+        if (strstr(g_team_http_req_buf, "\r\n") != NULL || strchr(g_team_http_req_buf, '\n') != NULL) {
+            break;
+        }
+    }
+
+    if (used == 0U) {
+        return -1;
+    }
+    return (int)used;
 }
 
 static void team_http_send_response(int fd, const char *status, const char *content_type, const char *body)
@@ -2820,6 +3251,9 @@ static int team_http_query_u8(const char *path, const char *key, uint8_t min_val
 }
 
 static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
+    uint16_t *out) SLE_TEAM_UNUSED_FUNC;
+
+static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
     uint16_t *out)
 {
     char pattern[24];
@@ -2853,6 +3287,9 @@ static int team_http_query_u16(const char *path, const char *key, uint16_t min_v
     *out = (uint16_t)value;
     return 0;
 }
+
+static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
+    int32_t *out) SLE_TEAM_UNUSED_FUNC;
 
 static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
     int32_t *out)
@@ -2997,23 +3434,61 @@ static void team_http_send_status_json_response(int fd)
         ret < 0 ? "{\"error\":\"status\"}" : g_team_http_json_buf);
 }
 
-static void team_http_send_location_event(int fd, const char *summary, uint8_t dst_id, int send_ret)
+static const char *team_location_send_reason(int send_ret)
 {
-    if (summary == NULL) {
-        summary = send_ret == SLE_TEAM_OK ? "location sent" : "location failed";
+    switch (send_ret) {
+        case SLE_TEAM_OK:
+            return "OK";
+        case SLE_TEAM_ERR_UNSUPPORTED:
+            return "NOT_READY_OR_NO_ROUTE";
+        case SLE_TEAM_ERR_FORMAT:
+            return "WRITE_FAIL";
+        case SLE_TEAM_ERR_ARG:
+            return "BAD_ARG";
+        case SLE_TEAM_ERR_BUF:
+            return "BUF";
+        default:
+            return "SEND_FAIL";
     }
+}
+
+static void team_http_send_location_event(int fd, uint8_t dst_id, int send_ret, int32_t lat, int32_t lon)
+{
+    const uint32_t now_s = team_now_s(NULL);
+    const uint16_t seq = g_team_node.next_seq == 0U ? 0U : (uint16_t)(g_team_node.next_seq - 1U);
+    const char *direction = send_ret == SLE_TEAM_OK ? "tx" : "fail";
+    const char *summary = send_ret == SLE_TEAM_OK ? "location sent" : "location send failed";
+    const char *reason = team_location_send_reason(send_ret);
+    const char *status = send_ret == SLE_TEAM_OK ? "200 OK" : "500 Internal Server Error";
+
     (void)snprintf(g_team_http_json_buf, sizeof(g_team_http_json_buf),
         "{\"id\":\"ws63-location-%lu\",\"time\":\"%lu\",\"direction\":\"%s\","
-        "\"type\":\"POS_REPORT\",\"srcId\":%u,\"dstId\":%u,\"seq\":%u,\"summary\":\"%s\"}",
-        (unsigned long)team_now_s(NULL),
-        (unsigned long)team_now_s(NULL),
-        send_ret == SLE_TEAM_OK ? "tx" : "fail",
+        "\"type\":\"POS_REPORT\",\"srcId\":%u,\"dstId\":%u,\"seq\":%u,"
+        "\"summary\":\"%s\",\"ret\":%d,\"reason\":\"%s\"}",
+        (unsigned long)now_s,
+        (unsigned long)now_s,
+        direction,
         g_team_node.cfg.self_id,
         dst_id,
-        g_team_node.next_seq == 0U ? 0U : (uint16_t)(g_team_node.next_seq - 1U),
-        summary);
-    team_http_send_response(fd, send_ret == SLE_TEAM_OK ? "200 OK" : "500 Internal Server Error",
-        "application/json", g_team_http_json_buf);
+        seq,
+        summary,
+        send_ret,
+        reason);
+    team_http_send_response(fd, status, "application/json", g_team_http_json_buf);
+
+    if (send_ret == SLE_TEAM_OK) {
+        char event_summary[SLE_TEAM_WEB_EVENT_SUMMARY_SIZE];
+        (void)snprintf(event_summary, sizeof(event_summary), "POS_REPORT %u->%u lat=%ld lon=%ld",
+            g_team_node.cfg.self_id, dst_id, (long)lat, (long)lon);
+        sle_team_web_event_push(&g_team_events, now_s, SLE_TEAM_WEB_EVENT_SYSTEM, SLE_TEAM_APP_POS_REPORT,
+            g_team_node.cfg.self_id, dst_id, seq, event_summary);
+    } else {
+        char event_summary[SLE_TEAM_WEB_EVENT_SUMMARY_SIZE];
+        (void)snprintf(event_summary, sizeof(event_summary), "POS_REPORT fail dst=%u ret=%d reason=%s",
+            dst_id, send_ret, reason);
+        sle_team_web_event_push(&g_team_events, now_s, SLE_TEAM_WEB_EVENT_SYSTEM, SLE_TEAM_APP_POS_REPORT,
+            g_team_node.cfg.self_id, dst_id, seq, event_summary);
+    }
 }
 
 static void team_http_append_str(char *buf, size_t buf_size, size_t *used, const char *text)
@@ -3092,7 +3567,7 @@ static void team_http_append_html_shell_start(char *buf, size_t buf_size, size_t
     *used = 0U;
     for (i = 0; i < sizeof(chunks) / sizeof(chunks[0]); i++) {
         team_http_append_str(buf, buf_size, used, chunks[i]);
-        if (i == 0U && strcmp(active, "pairing") != 0) {
+        if (i == 0U && strcmp(active, "status") == 0) {
             team_http_append_str(buf, buf_size, used, "<meta http-equiv=\"refresh\" content=\"3\">");
         }
     }
@@ -3447,6 +3922,93 @@ static void team_http_send_pairing_page(int fd)
             "<div class=\"bar\"><a href=\"/api/factory-reset\">factory reset</a></div>");
     }
     team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used, "</section>");
+    team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
+        "<section class=\"card\"><h2 style=\"font-size:16px;margin:0 0 10px\">Phone Location</h2>"
+        "<div class=\"tag\">Use phone gps once, or start auto mode for continuous POS_REPORT upload.</div>"
+        "<form id=\"pairing-location-form\" action=\"/api/location\" method=\"get\">"
+        "<label>lat_e6</label><input name=\"lat\" type=\"number\" value=\"0\">"
+        "<label>lon_e6</label><input name=\"lon\" type=\"number\" value=\"0\">"
+        "<label>dst</label><input name=\"dst\" type=\"number\" min=\"1\" max=\"255\" value=\"255\">"
+        "<label>battery</label><input name=\"battery\" type=\"number\" min=\"0\" max=\"100\" value=\"88\">"
+        "<label>fix</label><input name=\"fix\" type=\"number\" min=\"0\" max=\"255\" value=\"1\">"
+        "<label>sat</label><input name=\"sat\" type=\"number\" min=\"0\" max=\"255\" value=\"0\">"
+        "<label>speed(cm/s)</label><input name=\"speed\" type=\"number\" min=\"0\" max=\"65535\" value=\"0\">"
+        "<label>heading</label><input name=\"heading\" type=\"number\" min=\"0\" max=\"65535\" value=\"0\">"
+        "<button type=\"submit\">send location</button>"
+        "<button id=\"pairing-location-usegps\" type=\"button\">use phone gps</button>"
+        "<button id=\"pairing-location-auto\" type=\"button\" data-run=\"0\">start auto</button>"
+        "</form>"
+        "<pre id=\"pairing-location-result\" style=\"margin-top:8px\">idle</pre>"
+        "<script>(function(){"
+        "var form=document.getElementById('pairing-location-form');"
+        "var result=document.getElementById('pairing-location-result');"
+        "var useGps=document.getElementById('pairing-location-usegps');"
+        "var autoBtn=document.getElementById('pairing-location-auto');"
+        "if(!form||!result||!useGps||!autoBtn){return;}"
+        "if(!navigator.geolocation){result.textContent='geolocation not supported';return;}"
+        "var lat=form.elements.namedItem('lat');"
+        "var lon=form.elements.namedItem('lon');"
+        "var speed=form.elements.namedItem('speed');"
+        "var heading=form.elements.namedItem('heading');"
+        "var sat=form.elements.namedItem('sat');"
+        "var fix=form.elements.namedItem('fix');"
+        "var watchId=null;"
+        "var lastSendMs=0;"
+        "var minGapMs=2500;"
+        "function fillFromCoords(c){"
+        "if(!c){return;}"
+        "if(lat){lat.value=String(Math.round(c.latitude*1000000));}"
+        "if(lon){lon.value=String(Math.round(c.longitude*1000000));}"
+        "if(speed){"
+        "var s=(typeof c.speed==='number'&&!Number.isNaN(c.speed)&&c.speed>0)?Math.round(c.speed*100):0;"
+        "speed.value=String(s);"
+        "}"
+        "if(heading){"
+        "var h=(typeof c.heading==='number'&&!Number.isNaN(c.heading)&&c.heading>=0)?Math.round(c.heading):0;"
+        "heading.value=String(h);"
+        "}"
+        "if(sat&&(!sat.value||sat.value==='0')){sat.value='0';}"
+        "if(fix){fix.value='1';}"
+        "}"
+        "function sendNow(fromAuto){"
+        "var query=new URLSearchParams(new FormData(form)).toString();"
+        "result.textContent=(fromAuto?'auto ':'manual ')+'sending...';"
+        "return fetch('/api/location?'+query,{cache:'no-store'})"
+        ".then(function(resp){return resp.text().then(function(t){result.textContent=t;return resp.ok;});})"
+        ".catch(function(err){result.textContent='send error: '+err;return false;});"
+        "}"
+        "form.addEventListener('submit',function(ev){ev.preventDefault();sendNow(false);});"
+        "useGps.addEventListener('click',function(){"
+        "result.textContent='gps locating...';"
+        "navigator.geolocation.getCurrentPosition(function(pos){fillFromCoords(pos.coords);sendNow(false);},"
+        "function(err){result.textContent='gps error: '+(err&&err.message?err.message:'unknown');},"
+        "{enableHighAccuracy:true,timeout:12000,maximumAge:0});"
+        "});"
+        "autoBtn.addEventListener('click',function(){"
+        "if(watchId!==null){"
+        "navigator.geolocation.clearWatch(watchId);"
+        "watchId=null;"
+        "autoBtn.textContent='start auto';"
+        "autoBtn.dataset.run='0';"
+        "result.textContent='auto location stopped';"
+        "return;"
+        "}"
+        "result.textContent='auto location starting...';"
+        "watchId=navigator.geolocation.watchPosition(function(pos){"
+        "var now=Date.now();"
+        "fillFromCoords(pos.coords);"
+        "if(now-lastSendMs<minGapMs){return;}"
+        "lastSendMs=now;"
+        "sendNow(true);"
+        "},function(err){"
+        "result.textContent='auto gps error: '+(err&&err.message?err.message:'unknown');"
+        "},"
+        "{enableHighAccuracy:true,timeout:12000,maximumAge:1000});"
+        "autoBtn.textContent='stop auto';"
+        "autoBtn.dataset.run='1';"
+        "});"
+        "})();</script>"
+        "</section>");
     team_http_append_html_end(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
     team_http_send_response(fd, "200 OK", "text/html; charset=utf-8", g_team_http_html_buf);
 }
@@ -3456,14 +4018,16 @@ static void team_http_handle_client(int fd)
     int ret;
     char path[SLE_TEAM_HTTP_PATH_BUF_SIZE];
 
-    ret = recv(fd, g_team_http_req_buf, sizeof(g_team_http_req_buf) - 1U, 0);
+    ret = team_http_recv_request_line(fd);
     if (ret <= 0) {
-        g_team_http_last_errno = errno;
-        osal_printk("[team-wifi] http recv failed fd=%d ret=%d errno=%d\r\n", fd, ret, g_team_http_last_errno);
         return;
     }
-    g_team_http_req_buf[ret] = '\0';
     team_http_get_path(path, sizeof(path));
+    if (path[0] == '\0') {
+        osal_printk("[team-wifi] http bad request line len=%d\r\n", ret);
+        team_http_send_response(fd, "400 Bad Request", "text/plain", "bad request");
+        return;
+    }
     osal_printk("[team-wifi] http recv fd=%d len=%d path=%s\r\n", fd, ret, path);
 
     if (strncmp(g_team_http_req_buf, "GET /api/status", 15) == 0) {
@@ -3482,7 +4046,7 @@ static void team_http_handle_client(int fd)
         uint16_t speed = 0U;
         uint16_t heading = 0U;
         uint8_t battery = 100U;
-        uint8_t fix = 2U;
+        uint8_t fix = 1U;
         uint8_t sat = 0U;
         uint8_t dst = SLE_TEAM_BROADCAST_ID;
 
@@ -3515,17 +4079,7 @@ static void team_http_handle_client(int fd)
         pos.sat_count = sat;
 
         send_ret = sle_team_node_send_position(&g_team_node, dst, &pos);
-        if (send_ret == SLE_TEAM_OK) {
-            char summary[SLE_TEAM_WEB_EVENT_SUMMARY_SIZE];
-            (void)snprintf(summary, sizeof(summary), "POS_REPORT %u->%u lat=%ld lon=%ld",
-                g_team_node.cfg.self_id, dst, (long)lat, (long)lon);
-            sle_team_web_event_push(&g_team_events, team_now_s(NULL), SLE_TEAM_WEB_EVENT_SYSTEM,
-                SLE_TEAM_APP_POS_REPORT, g_team_node.cfg.self_id, dst,
-                g_team_node.next_seq == 0U ? 0U : (uint16_t)(g_team_node.next_seq - 1U), summary);
-            team_http_send_location_event(fd, "location sent", dst, send_ret);
-        } else {
-            team_http_send_location_event(fd, "location send failed", dst, send_ret);
-        }
+        team_http_send_location_event(fd, dst, send_ret, lat, lon);
     } else if (strncmp(g_team_http_req_buf, "GET /api/pending", 16) == 0) {
         osal_printk("[team-wifi] http route api=pending\r\n");
         ret = sle_team_web_write_pending_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
@@ -4346,6 +4900,13 @@ static void team_handle_role_request_once(void)
         team_refresh_relay_mode();
         osal_printk("[team] member initial hello ret=%d, retry by tick if not ready\r\n", hello_ret);
     }
+    if (ret == SLE_TEAM_OK && role == SLE_TEAM_ROLE_LEADER) {
+        team_ws2812_show_boot_marker();
+        team_buzzer_set(0U);
+    } else if (ret == SLE_TEAM_OK && role == SLE_TEAM_ROLE_MEMBER) {
+        team_ws2812_show_boot_marker();
+        team_buzzer_set(0U);
+    }
     if (ret == SLE_TEAM_OK && save_nv != 0U) {
         if (role == SLE_TEAM_ROLE_LEADER) {
             (void)team_nv_config_save(SLE_TEAM_ROLE_LEADER, g_team_node.cfg.team_id, team_self_mac_suffix(),
@@ -4419,6 +4980,10 @@ static void team_handle_cli_queue_once(void)
         if (strcmp(msg.line, "role leader") == 0) {
             int ret = team_configure_role(SLE_TEAM_ROLE_LEADER, g_team_rt.route_id);
             osal_printk("[cli] role leader ret=%d\r\n", ret);
+            if (ret == SLE_TEAM_OK) {
+                team_ws2812_show_boot_marker();
+                team_buzzer_set(0U);
+            }
             return;
         }
         if (strncmp(msg.line, "role member ", 12) == 0) {
@@ -4431,8 +4996,19 @@ static void team_handle_cli_queue_once(void)
             ret = team_configure_role(SLE_TEAM_ROLE_MEMBER, team_route_id_from_suffix((uint16_t)suffix));
             if (ret == SLE_TEAM_OK) {
                 (void)snprintf(g_team_rt.leader_label, sizeof(g_team_rt.leader_label), "L%04X", suffix);
+                team_ws2812_show_boot_marker();
+                team_buzzer_set(0U);
             }
             osal_printk("[cli] role member leader_suffix=%04X ret=%d\r\n", suffix, ret);
+            return;
+        }
+        if (team_ws2812_cli_handle(msg.line) != 0) {
+            return;
+        }
+        if (team_buzzer_cli_handle(msg.line) != 0) {
+            return;
+        }
+        if (team_display_cli_handle(msg.line) != 0) {
             return;
         }
         if (team_led_cli_handle(msg.line) != 0) {
@@ -4461,7 +5037,11 @@ static void *team_network_task(const char *arg)
         identity_wait_ms += 100U;
     }
 #endif
+    team_gps_diag_print();
+    team_ws2812_init();
+    team_buzzer_init();
     team_display_init();
+    team_ws2812_show_boot_marker();
     team_uart_init();
     team_uart_cli_start();
 
@@ -4472,6 +5052,7 @@ static void *team_network_task(const char *arg)
     team_restore_web_config();
 
     while (1) {
+        team_buzzer_toggle_tick();
         team_handle_cli_queue_once();
         team_handle_role_request_once();
         if (g_team_rt.role_configured != 0U) {
@@ -4512,6 +5093,7 @@ static void team_network_entry(void)
 {
     osal_task *task = NULL;
 
+    team_buzzer_init();
     team_led_start();
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)

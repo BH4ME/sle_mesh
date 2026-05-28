@@ -39,7 +39,11 @@ class ControlStep:
 @dataclass(frozen=True)
 class ResetConfig:
     command: str = "reboot"
+    fallback_command: str = "reset"
+    compatibility_command: str = ""
     command_delay_s: float = 0.3
+    command_retries: int = 2
+    retry_gap_s: float = 0.2
     sequence: Iterable[ControlStep] = ()
 
 
@@ -94,12 +98,23 @@ def perform_auto_reset(
     sleep_fn: SleepFn = time.sleep,
     log_fn: LogFn = logging.info,
 ) -> None:
-    if config.command:
-        command = config.command.encode("ascii") + b"\r\n"
-        log_fn(f"Auto reset: sending CLI command '{config.command}'")
-        ser.write(command)
-        ser.flush()
-        sleep_fn(config.command_delay_s)
+    command_list: List[str] = []
+    for raw_command in (config.command, config.fallback_command, config.compatibility_command):
+        command = raw_command.strip()
+        if command and command not in command_list:
+            command_list.append(command)
+
+    retries = max(1, config.command_retries)
+    for attempt in range(retries):
+        for command in command_list:
+            payload = command.encode("ascii") + b"\r\n"
+            log_fn(f"Auto reset: sending CLI command '{command}'")
+            ser.write(payload)
+            ser.flush()
+            if config.command_delay_s > 0.0:
+                sleep_fn(config.command_delay_s)
+        if attempt + 1 < retries and config.retry_gap_s > 0.0:
+            sleep_fn(config.retry_gap_s)
 
     for step in config.sequence:
         parts = []
@@ -198,8 +213,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("-s", "--show", action="store_true", help="show firmware information only")
     parser.add_argument("--no-auto-reset", action="store_true", help="disable CLI/DTR/RTS reset before burn")
     parser.add_argument("--reset-command", default="reboot", help="CLI command to send before handshaking")
+    parser.add_argument("--reset-command-fallback", default="reset", help="fallback CLI command before handshaking")
+    parser.add_argument(
+        "--compat-reset-command",
+        default="AT+RST",
+        help="compatibility reset command for AT-style firmware",
+    )
+    parser.add_argument(
+        "--no-compat-reset-command",
+        action="store_true",
+        help="do not send compatibility reset command",
+    )
+    parser.add_argument(
+        "--no-reset-command-fallback",
+        action="store_true",
+        help="do not send fallback CLI reset command",
+    )
     parser.add_argument("--no-reset-command", action="store_true", help="do not send a CLI reboot command")
     parser.add_argument("--reset-command-delay", type=float, default=0.3, help="delay after reset command, seconds")
+    parser.add_argument(
+        "--reset-command-retries",
+        type=int,
+        default=2,
+        help="how many times to send reset command sequence before burn handshake",
+    )
+    parser.add_argument(
+        "--reset-command-retry-gap",
+        type=float,
+        default=0.2,
+        help="delay between repeated reset command sequences, seconds",
+    )
+    parser.add_argument(
+        "--software-reset-only",
+        action="store_true",
+        help="do not drive DTR/RTS, use serial CLI reset commands only",
+    )
     parser.add_argument(
         "--control-sequence",
         default=DEFAULT_CONTROL_SEQUENCE,
@@ -219,16 +267,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if not args.port:
         parser.error("the following arguments are required for burning: -p/--port")
+    if args.reset_command_retries < 1:
+        parser.error("--reset-command-retries must be >= 1")
+    if args.reset_command_delay < 0.0:
+        parser.error("--reset-command-delay must be >= 0")
+    if args.reset_command_retry_gap < 0.0:
+        parser.error("--reset-command-retry-gap must be >= 0")
 
     reset_config = None
     if not args.no_auto_reset:
-        try:
-            sequence = parse_control_sequence(args.control_sequence)
-        except ValueError as exc:
-            parser.error(str(exc))
+        sequence = []
+        if not args.software_reset_only:
+            try:
+                sequence = parse_control_sequence(args.control_sequence)
+            except ValueError as exc:
+                parser.error(str(exc))
         reset_config = ResetConfig(
             command="" if args.no_reset_command else args.reset_command,
+            fallback_command="" if args.no_reset_command_fallback else args.reset_command_fallback,
+            compatibility_command="" if args.no_compat_reset_command else args.compat_reset_command,
             command_delay_s=args.reset_command_delay,
+            command_retries=args.reset_command_retries,
+            retry_gap_s=args.reset_command_retry_gap,
             sequence=sequence,
         )
 

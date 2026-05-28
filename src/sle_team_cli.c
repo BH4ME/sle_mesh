@@ -119,6 +119,9 @@ void sle_team_cli_print_help(sle_team_cli_t *cli)
     sle_team_cli_puts(cli, "  join <team> <leader> <channel>");
     sle_team_cli_puts(cli, "  leave");
     sle_team_cli_puts(cli, "  led help");
+    sle_team_cli_puts(cli, "  rgb help");
+    sle_team_cli_puts(cli, "  buzz help");
+    sle_team_cli_puts(cli, "  disp help");
     sle_team_cli_puts(cli, "  state");
 }
 

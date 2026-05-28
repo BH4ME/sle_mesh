@@ -1,4 +1,4 @@
-# V4 WS63 SLE Team Network + ST7789
+# V4.3 WS63 SLE Team Network + ST7789
 
 这是 v4 上板工程，基于 v3 组网样例改出，目标板主控为 WS63 模块，显示器为 1.14 寸 ST7789。
 
@@ -10,6 +10,11 @@ member <--ACK----- leader
 member <--CONFIG-- leader
 member --HB/POS--> leader
 ```
+
+## 版本命名说明
+
+- 当前固件版本：`v4.3`。
+- 本版按你的原理图固定映射：显示(ST7789) / 蜂鸣器 / WS 灯 / GPS。
 
 ## 当前能力
 
@@ -33,7 +38,7 @@ member --HB/POS--> leader
 |------|---------|------|
 | `U0TX` | `IO21` | 串口调试 TX |
 | `U0RX` | `IO22` | 串口调试 RX |
-| `RGB` | `IO0` | WS2812C 数据脚，预留 |
+| `RGB` | `IO0` | WS2812C 数据脚 |
 | `CHRG` | `IO2` | 充电状态，不作为 LED 驱动 |
 | `ADC_CTRL` | `IO5` | 电池采样控制，预留 |
 | `SCL` | `IO6` | ST7789 SPI SCLK |
@@ -42,11 +47,18 @@ member --HB/POS--> leader
 | `RS` | `IO9` | ST7789 DC/RS |
 | `ADC_VBAT` | `IO12` | 电池 ADC，预留 |
 | `RESET` | `IO13` | ST7789 RESET |
-| `BUZZ` | `IO14` | 蜂鸣器，预留 |
+| `BUZZ` | `IO14` | 蜂鸣器 |
 | `U1TX` | `IO17` | GPS UART TXD1 |
 | `U1RX` | `IO18` | GPS UART RXD1 |
 
 `CONFIG_SLE_TEAM_LED_PIN` 默认是 `255`，表示禁用 v3 的 GPIO2 活动灯，避免驱动 v4 原理图里的 `CHRG` 信号。
+
+`v4.3` 固化四项映射：
+
+- ST7789：`IO6/7/8/9/13`
+- 蜂鸣器：`IO14`
+- WS2812：`IO0`
+- GPS UART：`IO17/IO18`（当前默认仅做映射与日志，不启用 NMEA 解析）
 
 ## WiFi 控制台
 
@@ -63,6 +75,7 @@ GET /api/status
 GET /api/nodes
 GET /api/events
 GET /api/pending
+GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...
 GET /api/pairing?action=start|stop|approve&id=...
 GET /api/member/select?team=...&leader=...&channel=...
 GET /api/member/leave
@@ -75,6 +88,7 @@ GET /api/factory-reset
 - `/nodes`：节点列表。空数组 `[]` 表示当前还没有 member 入队。
 - `/events`：收发事件。空数组 `[]` 表示还没有真实 SLE 包。
 - `/pairing`：角色选择、leader 配队、member 选择 leader。
+- `/pairing` 里的 `Phone Location` 支持手机定位手动发送和自动持续上报（前台运行）。
 - `/api/factory-reset`：清除 WebUI 写入 flash 的配置并重启，恢复到 `UXXXX` 未配置状态。
 
 手机调试注意：
@@ -84,6 +98,14 @@ GET /api/factory-reset
 - `v1.2.7 / ssr=v5` 起，每个 HTTP 连接都有 1.2 秒收发超时，手机半开连接不会长期占住板端 Web 服务。
 - `set leader` / `set member` 后会先返回页面，SLE 初始化在后台主任务执行；页面可能短暂显示 `starting SLE`。
 - 操作类按钮会自动回到 `/pairing`，不会停在 JSON 页面。
+- 手机定位属于浏览器权限能力，首次必须授权；iOS 如果选“仅一次”会反复弹窗，建议改成“使用 App 期间允许”。
+- 网页自动定位上报在手机锁屏或切后台时可能被系统挂起；恢复前台后会继续。
+
+Phone Location 返回值判读：
+
+- `ret=0 reason=OK`：本次 `POS_REPORT` 已发送。
+- `reason=NOT_READY_OR_NO_ROUTE`：SLE 尚未 ready，或没有到目标的可用路由。
+- `reason=WRITE_FAIL`：SLE 下发失败，优先看串口是否有 `sle-tx-fail`。
 
 ## 角色选择逻辑
 
@@ -180,6 +202,16 @@ led rx
 led active_high
 led active_low
 led pin <0-31>
+
+rgb status
+rgb off
+
+buzz status
+buzz off
+
+disp status
+disp refresh
+disp demo
 ```
 
 ## 串口命令
@@ -194,6 +226,9 @@ http
 role leader
 role member <leader_mac_suffix>
 led status
+rgb status
+buzz status
+disp status
 reboot
 reset
 ```
@@ -213,6 +248,9 @@ leave
 hello [dst]
 hb [dst] [battery] [rssi] [fix]
 pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
+rgb status|off
+buzz status|off
+disp status|refresh|demo
 reboot
 reset
 ```

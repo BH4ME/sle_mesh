@@ -53,6 +53,14 @@ test("cross-origin board actions expose redirect responses to hosted WebUI", () 
   assert.match(redirectFunction, /Access-Control-Allow-Origin: \*/);
 });
 
+test("firmware softap defaults to v2-compatible mix+ax and includes wpa2 fallback", () => {
+  const softapStart = firmwareSource.match(/static int team_wifi_ap_start[\s\S]+?\n}\n/)?.[0] ?? "";
+  assert.match(softapStart, /ap_config\.security_type\s*=\s*SLE_TEAM_WIFI_SECURITY_COMPAT_MIX;/);
+  assert.match(softapStart, /advance_config\.protocol_mode\s*=\s*SLE_TEAM_WIFI_PROTOCOL_COMPAT_AX;/);
+  assert.match(softapStart, /ap_config\.security_type\s*=\s*WIFI_SEC_TYPE_WPA2PSK;/);
+  assert.match(softapStart, /advance_fallback\.protocol_mode\s*=\s*WIFI_MODE_11B_G_N;/);
+});
+
 test("firmware event API exposes uptime seconds", () => {
   assert.match(webApiSource, /\\"time\\":\\"%lu\\"/);
   assert.match(webApiSource, /event->time_s/);
@@ -63,17 +71,46 @@ test("firmware nodes API exposes member location fields", () => {
   assert.match(webApiSource, /\\"longitudeE6\\":%ld/);
 });
 
-test("hosted webui integrates geolocation bridge API", () => {
+test("firmware pairing page exposes phone GPS upload and auto-report bridge", () => {
   assert.match(firmwareSource, /GET \/api\/location/);
-  assert.match(firmwareSource, /sle_team_node_send_position/);
-  assert.match(mainSource, /navigator\.geolocation/);
-  assert.match(fs.readFileSync(path.join(repoRoot, "webui/src/api/client.ts"), "utf8"), /\/api\/location/);
+  assert.match(firmwareSource, /pairing-location-form/);
+  assert.match(firmwareSource, /pairing-location-usegps/);
+  assert.match(firmwareSource, /pairing-location-auto/);
+  assert.match(firmwareSource, /navigator\.geolocation/);
+  assert.match(firmwareSource, /watchPosition/);
+  assert.match(firmwareSource, /clearWatch/);
+});
+
+test("v4.1 build keeps WS2812 startup marker and toggles buzzer io14 every 3s", () => {
+  const buildScriptSource = fs.readFileSync(path.join(repoRoot, "scripts/ws63_build_v4_ubuntu.sh"), "utf8");
+  assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_SLE_TEAM_WS2812_ENABLE",\s*"y"\)/);
+  assert.match(buildScriptSource, /unset_kconfig_bool\(s,\s*"CONFIG_SLE_TEAM_BUZZER_ENABLE"\)/);
+  assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_AT_UART",\s*"3"\)/);
+  assert.match(buildScriptSource, /unset_kconfig_bool\(s,\s*"CONFIG_DYNAMIC_UART_ID_BINDDING"\)/);
+  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_WS2812_ENABLE 1/);
+  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_BUZZER_ENABLE 0/);
+  assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_FORCE_OFF_LEVEL GPIO_LEVEL_LOW/);
+  assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_FORCE_ON_LEVEL GPIO_LEVEL_HIGH/);
+  assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS 3000U/);
+  assert.match(firmwareSource, /uapi_pin_set_pull\(pin,\s*PIN_PULL_TYPE_DOWN\)/);
+  assert.match(firmwareSource, /void OHOS_SystemInit\(void\)/);
+  assert.match(firmwareSource, /team_buzzer_force_pin_off\(\(uint8_t\)CONFIG_SLE_TEAM_BUZZER_PIN\)/);
+  assert.match(firmwareSource, /g_team_rt\.buzzer_active_high = 1U/);
+  assert.match(firmwareSource, /team_buzzer_toggle_tick\(\)/);
+  assert.match(firmwareSource, /\[diag\] buzzer io14 toggled level=%u interval_ms=%u/);
+  assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(1U/);
+  assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(2U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_R 0U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_G 24U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_B 64U/);
+  assert.match(firmwareSource, /team_ws2812_set_rgb\(SLE_TEAM_WS2812_BOOT_R,\s*SLE_TEAM_WS2812_BOOT_G,\s*SLE_TEAM_WS2812_BOOT_B\)/);
 });
 
 test("webui keeps wifi send form gated and location button non-submit", () => {
   assert.match(mainSource, /if \(state\.connection\.mode === "wifi"\)/);
-  assert.match(mainSource, /state\.connection\.mode === "wifi" \? renderPhoneLocationPanel\(\) : ""/);
-  assert.match(mainSource, /type="button"[^>]*data-action="send-phone-location"/);
+  assert.match(mainSource, /WiFi 模式暂不提供 \/api\/send/);
+  assert.doesNotMatch(mainSource, /renderPhoneLocationPanel/);
+  assert.doesNotMatch(mainSource, /data-action="send-phone-location"/);
 });
 
 test("webui exposes serial-mode guidance for unsupported factory reset", () => {
@@ -134,11 +171,6 @@ test("firmware i32 query parser avoids 32-bit signed overflow at bounds", () => 
   assert.match(i32Parser, /abs_value > 2147483648UL/);
   assert.match(i32Parser, /abs_value > 2147483647UL/);
   assert.match(i32Parser, /signed_value = negative != 0U \? -\(int64_t\)abs_value : \(int64_t\)abs_value;/);
-});
-
-test("firmware /api/location removes redundant broadcast no-op", () => {
-  const locationHandler = firmwareSource.match(/GET \/api\/location[\s\S]+?sle_team_node_send_position/)?.[0] ?? "";
-  assert.doesNotMatch(locationHandler, /if \(dst == SLE_TEAM_BROADCAST_ID\)/);
 });
 
 test("hello ack path keeps relay_enabled sync when config is cached before ack", () => {
@@ -214,7 +246,7 @@ test("relay tier bucket count is a named constant", () => {
   assert.match(nodeSource, /% SLE_TEAM_MAX_RELAY_TIERS\)/);
 });
 
-test("webui provides an https lan dev script for phone geolocation", () => {
+test("webui keeps dev:https alias mapped to dev command", () => {
   assert.equal(typeof webPackage.scripts["dev:https"], "string");
   assert.match(webPackage.scripts["dev:https"], /--host 0\.0\.0\.0/);
   assert.equal(webPackage.scripts["dev:https"], webPackage.scripts.dev);
@@ -232,8 +264,7 @@ test("webui readme local dev URL matches the https dev server", () => {
   assert.doesNotMatch(webReadmeSource, /http:\/\/localhost:5173\//);
 });
 
-test("webui readme documents lan https access and cert acceptance", () => {
-  assert.match(webReadmeSource, /npm run dev:https/);
-  assert.match(webReadmeSource, /https:\/\/<[^>]+>:5173/);
-  assert.match(webReadmeSource, /自签名证书|证书警告/);
+test("webui readme includes board location bridge route", () => {
+  assert.match(webReadmeSource, /GET \/api\/location\?/);
+  assert.doesNotMatch(webReadmeSource, /手机局域网定位建议使用 HTTPS/);
 });

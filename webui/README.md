@@ -59,21 +59,6 @@ npm run dev
 https://localhost:5173/
 ```
 
-手机局域网定位建议使用 HTTPS（解决 geolocation 在 HTTP 页面被拒绝）：
-
-```sh
-npm run dev:https
-```
-
-电脑端查看本机 IP（例如 `192.168.43.23`），手机连同一个局域网后打开：
-
-```text
-https://<你的电脑IP>:5173/
-https://<你的电脑IP>:5173/?api=http://192.168.43.1
-```
-
-首次访问会出现自签名证书警告，手动信任一次后即可继续使用；后续同一证书通常不需要重复确认。
-
 默认不会显示假数据。进入“连接/设置”页或总览顶部可以切换：
 
 - WiFi：填写任意一块带 HTTP API 的 WS63 地址，如 `http://192.168.43.1`
@@ -99,6 +84,11 @@ WiFi 入口不限定 leader。两种方式都可以落地：
 
 - leader 开 WiFi：WebUI 能看到 leader 汇总后的全队信息。
 - member 开 WiFi：WebUI 连接这个 member，能看这个 member 自身状态；如果固件把收到的配置、ACK、最近 leader 信息也缓存出来，也可以显示它看到的网络视角。
+
+手机定位入口说明（`v4.2.2`）：
+
+- `send location / use phone gps / start auto` 在板端 `http://192.168.43.1/pairing` 页面，不在这个 Vite 域名 WebUI 页面里。
+- 域名 WebUI 的 WiFi 模式当前主要用于状态查看与控制接口调用，不提供 `POST /api/send` 和 phone GPS 采集控件。
 
 ## 当前 WS63 HTTP API
 
@@ -259,7 +249,7 @@ GET /api/status
 GET /api/nodes
 GET /api/events
 GET /api/pending
-GET /api/location?lat=39908456&lon=116397128&dst=255&speed=0&heading=90&battery=88&fix=2&sat=0
+GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...
 GET /api/role?role=leader
 GET /api/role?role=member&leader=C7E9&team=1&channel=17
 GET /api/pairing?action=start|stop|approve&id=2&relay=1

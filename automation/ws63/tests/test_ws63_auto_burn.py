@@ -31,7 +31,10 @@ class Ws63AutoBurnTest(unittest.TestCase):
         sleeps = []
         config = ws63_auto_burn.ResetConfig(
             command="reboot",
+            fallback_command="",
             command_delay_s=0.25,
+            command_retries=1,
+            retry_gap_s=0.0,
             sequence=ws63_auto_burn.parse_control_sequence("rts=0,dtr=0:0.1;rts=0,dtr=1:0.2"),
         )
 
@@ -51,6 +54,36 @@ class Ws63AutoBurnTest(unittest.TestCase):
         )
         self.assertEqual(sleeps, [0.25, 0.1, 0.2])
 
+    def test_perform_auto_reset_software_only_retries_commands(self):
+        ser = FakeSerial()
+        sleeps = []
+        config = ws63_auto_burn.ResetConfig(
+            command="reboot",
+            fallback_command="reset",
+            command_delay_s=0.1,
+            command_retries=2,
+            retry_gap_s=0.05,
+            sequence=(),
+        )
+
+        ws63_auto_burn.perform_auto_reset(ser, config, sleep_fn=sleeps.append, log_fn=lambda message: None)
+
+        self.assertEqual(
+            ser.ops,
+            [
+                ("write", b"reboot\r\n"),
+                ("flush",),
+                ("write", b"reset\r\n"),
+                ("flush",),
+                ("write", b"reboot\r\n"),
+                ("flush",),
+                ("write", b"reset\r\n"),
+                ("flush",),
+                ("reset_input_buffer",),
+            ],
+        )
+        self.assertEqual(sleeps, [0.1, 0.1, 0.05, 0.1, 0.1])
+
     def test_parse_control_sequence_rejects_unknown_signal(self):
         with self.assertRaises(ValueError):
             ws63_auto_burn.parse_control_sequence("boot=1:0.1")
@@ -62,6 +95,11 @@ class Ws63AutoBurnTest(unittest.TestCase):
 
         self.assertTrue(args.show)
         self.assertIsNone(args.port)
+
+    def test_parser_supports_software_reset_only_mode(self):
+        parser = ws63_auto_burn.build_arg_parser()
+        args = parser.parse_args(["-p", "/dev/null", "--software-reset-only", "firmware.fwpkg"])
+        self.assertTrue(args.software_reset_only)
 
     def test_main_returns_nonzero_when_flash_fails(self):
         class FailingBurner:

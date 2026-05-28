@@ -1,7 +1,6 @@
 import {
   Battery,
   CircleDot,
-  Compass,
   Cpu,
   GitBranch,
   Plug,
@@ -11,6 +10,7 @@ import {
   Settings2,
   TerminalSquare,
   Wifi,
+  Wrench,
   createElement,
   type IconNode,
 } from "lucide";
@@ -128,7 +128,7 @@ function renderShell(): void {
         <nav class="nav" aria-label="Primary">
           ${navButton("overview", "总览", CircleDot)}
           ${navButton("packets", "数据包", TerminalSquare)}
-          ${navButton("settings", "连接/设置", Compass)}
+          ${navButton("settings", "连接/设置", Wrench)}
         </nav>
         <section class="side-status">
           <div class="label">Transport</div>
@@ -192,7 +192,6 @@ function renderOverview(): string {
       ${metric("消息", String(state.events.length), TerminalSquare)}
       ${metric("入网", isConfiguredStatus(state.status) && state.status.joined ? "Yes" : "No", CircleDot)}
     </section>
-    ${state.connection.mode === "wifi" ? renderPhoneLocationPanel() : ""}
     ${renderRouteMetrics()}
     <section class="two-column">
       <div class="panel">
@@ -384,7 +383,7 @@ function renderSendForm(): string {
   if (state.connection.mode === "wifi") {
     return `
       <div class="send-form">
-        <div class="note">WiFi 模式暂不提供 /api/send；请用上方“手机位置”面板，或者切到串口模式发送测试包。</div>
+        <div class="note">WiFi 模式暂不提供 /api/send；请切到串口模式发送测试包。</div>
       </div>
     `;
   }
@@ -410,20 +409,6 @@ function renderSendForm(): string {
       </div>
       <button class="primary-button" type="submit">${icon(Send, 17)}发送</button>
     </form>
-  `;
-}
-
-function renderPhoneLocationPanel(): string {
-  return `
-    <section class="panel">
-      <div class="panel-head">
-        <h2>手机位置</h2>
-      </div>
-      <div class="connection-actions">
-        <button class="primary-button" type="button" data-action="send-phone-location">${icon(Compass, 17)}手机定位并发送</button>
-      </div>
-      <div class="note">手机定位需要浏览器允许位置权限；在 HTTP 页面上部分浏览器会拒绝定位。局域网调试请优先使用 HTTPS 页面，例如 https://你的电脑IP:5173/ 。</div>
-    </section>
   `;
 }
 
@@ -490,7 +475,7 @@ function renderSettings(): string {
         </div>
         <div>
           <strong>域名上位机</strong>
-          <span>部署在 sleweb.mecho.top，串口连接可直接使用；WiFi API 直连私网设备时需要浏览器允许 HTTPS 页面访问本地 HTTP 地址。</span>
+          <span>部署在 sleweb.mecho.top，串口连接可直接使用；WiFi API 直连私网设备时受浏览器跨域与私网访问策略影响。</span>
           <code>${hostedConsoleUrl}/?api=${defaultDeviceApiUrl}</code>
         </div>
       </div>
@@ -503,7 +488,6 @@ function renderSettings(): string {
 GET  /api/nodes
 GET  /api/events
 GET  /api/pending
-GET  /api/location?lat=39908456&lon=116397128&dst=255&speed=0&heading=90&battery=88&fix=2&sat=0
 GET  /api/role?role=leader
 GET  /api/role?role=member&leader=C7E9&team=1&channel=17
 GET  /api/pairing?action=start|stop|approve&id=2&relay=1
@@ -716,49 +700,6 @@ function bindEvents(): void {
         state.error = error instanceof Error ? error.message : "send failed";
         renderShell();
       });
-  });
-  document.querySelector<HTMLButtonElement>("[data-action='send-phone-location']")?.addEventListener("click", () => {
-    if (!("geolocation" in navigator)) {
-      state.error = "当前浏览器不支持 geolocation";
-      renderShell();
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitudeE6 = Math.round(position.coords.latitude * 1_000_000);
-        const longitudeE6 = Math.round(position.coords.longitude * 1_000_000);
-        const headingDeg =
-          typeof position.coords.heading === "number" && Number.isFinite(position.coords.heading)
-            ? Math.round(position.coords.heading)
-            : 0;
-        const speedCms =
-          typeof position.coords.speed === "number" && Number.isFinite(position.coords.speed)
-            ? Math.max(0, Math.round(position.coords.speed * 100))
-            : 0;
-        void api
-          .sendLocation({
-            latitudeE6,
-            longitudeE6,
-            headingDeg,
-            speedCms,
-            fixStatus: 2,
-            satCount: 0,
-          })
-          .then((eventResult) => {
-            state.events.unshift(eventResult);
-            return refresh();
-          })
-          .catch((error) => {
-            state.error = error instanceof Error ? error.message : "send location failed";
-            renderShell();
-          });
-      },
-      (error) => {
-        state.error = `定位失败：${error.message}`;
-        renderShell();
-      },
-      { enableHighAccuracy: true, timeout: 7000, maximumAge: 2000 },
-    );
   });
   document.querySelector<HTMLButtonElement>("[data-action='role-leader']")?.addEventListener("click", () => {
     void runAction(() => api.configureRole({ role: "leader" }), "set leader failed");

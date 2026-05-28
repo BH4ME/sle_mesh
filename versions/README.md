@@ -4,6 +4,10 @@
 
 当前版本：
 
+- [v4.3](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.3/VERSION.md)
+- [v4.2.3](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.2.3/VERSION.md)
+- [v4.2.2](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.2.2/VERSION.md)
+- [v4.2.1](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.2.1/VERSION.md)
 - [v4.0.0-alpha1](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.0.0-alpha1/VERSION.md)
 - [v3.0.0-alpha8](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha8/VERSION.md)
 - [v3.0.0-alpha7](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha7/VERSION.md)

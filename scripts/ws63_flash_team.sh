@@ -7,7 +7,11 @@ BURN_TOOL="${BURN_TOOL:-$AUTO_BURN_TOOL}"
 FW_ROOT="${FW_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
 AUTO_RESET="${AUTO_RESET:-1}"
 RESET_COMMAND="${RESET_COMMAND:-reboot}"
+RESET_COMMAND_FALLBACK="${RESET_COMMAND_FALLBACK:-reset}"
 RESET_COMMAND_DELAY="${RESET_COMMAND_DELAY:-0.3}"
+RESET_COMMAND_RETRIES="${RESET_COMMAND_RETRIES:-2}"
+RESET_COMMAND_RETRY_GAP="${RESET_COMMAND_RETRY_GAP:-0.2}"
+AUTO_RESET_MODE="${AUTO_RESET_MODE:-software-only}"
 RESET_CONTROL_SEQUENCE="${RESET_CONTROL_SEQUENCE:-rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05}"
 NO_CONFIRM="${WS63_FLASH_NO_CONFIRM:-0}"
 
@@ -26,18 +30,23 @@ Environment:
   BURN_TOOL=/path/to/burn
   FW_ROOT=/path/to/output_from_vm
   AUTO_RESET=1|0
+  AUTO_RESET_MODE=software-only|hybrid
   WS63_FLASH_NO_CONFIRM=1|0
   RESET_COMMAND=reboot
+  RESET_COMMAND_FALLBACK=reset
   RESET_COMMAND_DELAY=0.3
+  RESET_COMMAND_RETRIES=2
+  RESET_COMMAND_RETRY_GAP=0.2
   RESET_CONTROL_SEQUENCE='rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05'
 
 The script prints role, port, and firmware path, then asks for an exact
 confirmation before it runs the burn tool.
 Use --yes or WS63_FLASH_NO_CONFIRM=1 for non-interactive runs.
 
-By default this script uses automation/ws63/tools/ws63_auto_burn.py, which first sends the
-board's serial CLI reboot command and toggles DTR/RTS before the WS63 burn
-handshake. Set AUTO_RESET=0 to keep the old manual-reset flow.
+By default this script uses automation/ws63/tools/ws63_auto_burn.py in software-only
+mode, which sends serial CLI reset commands and does not depend on RTS/DTR wiring.
+Set AUTO_RESET_MODE=hybrid to also toggle DTR/RTS before burn handshake.
+Set AUTO_RESET=0 to keep the old manual-reset flow.
 USAGE
 }
 
@@ -77,17 +86,17 @@ fi
 case "$role" in
   leader)
     default_port="/dev/tty.usbserial-10"
-    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
+    firmware="$FW_ROOT/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg"
     fallback_firmware="$FW_ROOT/team_network_leader_serial_led/ws63-liteos-app_leader_all.fwpkg"
     ;;
   member)
     default_port="/dev/tty.usbserial-110"
-    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
+    firmware="$FW_ROOT/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg"
     fallback_firmware="$FW_ROOT/team_network_member_serial_led/ws63-liteos-app_member_all.fwpkg"
     ;;
   unified)
     default_port="/dev/tty.usbserial-10"
-    firmware="$FW_ROOT/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg"
+    firmware="$FW_ROOT/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg"
     fallback_firmware="$firmware"
     ;;
   -h|--help|"")
@@ -109,6 +118,7 @@ echo "role:     $role"
 echo "port:     $port"
 echo "firmware: $firmware"
 echo "auto rst: $AUTO_RESET"
+echo "auto mode:$AUTO_RESET_MODE"
 echo
 
 if [[ ! -x "$BURN_TOOL" ]]; then
@@ -153,10 +163,24 @@ if [[ "$BURN_TOOL" == "$AUTO_BURN_TOOL" ]]; then
     burn_args+=(--no-auto-reset)
     echo "Starting burn with auto reset disabled. Press RESET/RST if the tool waits for reset."
   else
+    case "$AUTO_RESET_MODE" in
+      software|software-only)
+        burn_args+=(--software-reset-only)
+        ;;
+      hybrid)
+        burn_args+=(--control-sequence "$RESET_CONTROL_SEQUENCE")
+        ;;
+      *)
+        echo "Unknown AUTO_RESET_MODE: $AUTO_RESET_MODE (expected software-only|hybrid)" >&2
+        exit 2
+        ;;
+    esac
     burn_args+=(
       --reset-command "$RESET_COMMAND"
+      --reset-command-fallback "$RESET_COMMAND_FALLBACK"
       --reset-command-delay "$RESET_COMMAND_DELAY"
-      --control-sequence "$RESET_CONTROL_SEQUENCE"
+      --reset-command-retries "$RESET_COMMAND_RETRIES"
+      --reset-command-retry-gap "$RESET_COMMAND_RETRY_GAP"
     )
     echo "Starting burn with auto reset enabled."
     echo "If this board still waits for reset, press RESET/RST manually; boards with a BOOT key may need BOOT + RESET."
