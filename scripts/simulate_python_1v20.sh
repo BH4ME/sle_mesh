@@ -92,7 +92,7 @@ mkdir -p "$LOG_DIR"
 
 CMD=(
   python3 "$ROOT_DIR/tools/sle_team_python_sim.py"
-  --members 20
+  --members 30
   --direct-cap 8
   --relay-fail-tick "$FAIL_TICK"
   --relay-recover-tick "$RECOVER_TICK"
@@ -110,7 +110,7 @@ if [ "$SHOW_TIMELINE" -ne 0 ]; then
   CMD+=(--show-timeline)
 fi
 
-echo "[py-sim] running python 1vs20 simulation"
+echo "[py-sim] running python 1vs30 simulation"
 echo "[py-sim] stress=$STRESS fail_tick=$FAIL_TICK recover_tick=$RECOVER_TICK ticks=$TICKS loss=$PACKET_LOSS_RATE jitter=${JITTER_MIN_MS}-${JITTER_MAX_MS} batch_fail_count=$BATCH_FAIL_RELAY_COUNT batch_fail_ticks=${BATCH_FAIL_RELAY_TICKS:-none}"
 
 "${CMD[@]}" | tee "$LOG_FILE"

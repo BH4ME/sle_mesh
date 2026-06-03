@@ -29,12 +29,12 @@
 #define SLE_ADV_INTERVAL_MIN_DEFAULT              0xC8
 /* 连接调度间隔25ms，单位125us */
 #define SLE_ADV_INTERVAL_MAX_DEFAULT              0xC8
-/* 超时时间5000ms，单位10ms */
-#define SLE_CONN_SUPERVISION_TIMEOUT_DEFAULT      0x1F4
-/* 超时时间4990ms，单位10ms */
-#define SLE_CONN_MAX_LATENCY                      0x1F3
-/* 广播发送功率 */
-#define SLE_ADV_TX_POWER  10
+/* 超时时间2500ms，单位10ms */
+#define SLE_CONN_SUPERVISION_TIMEOUT_DEFAULT      0xFA
+/* 延迟周期（slot），收紧为 32 以降低断链检测与恢复抖动 */
+#define SLE_CONN_MAX_LATENCY                      0x20
+/* Broadcast TX power in dBm. Keep scan response declaration aligned. */
+#define SLE_ADV_TX_POWER_DBM  18
 /* 广播ID */
 #define SLE_ADV_HANDLE_DEFAULT                    1
 /* 最大广播数据长度 */
@@ -43,6 +43,7 @@
 static uint8_t sle_local_name[NAME_MAX_LENGTH] = "sle_uart_server";
 static uint8_t g_sle_uart_local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 static uint8_t g_sle_uart_route_id = 0U;
+static sle_announce_seek_callbacks_t g_sle_uart_announce_seek_cbks = {0};
 #define SLE_SERVER_INIT_DELAY_MS    1000
 #define sample_at_log_print(fmt, args...) osal_printk(fmt, ##args)
 #define SLE_UART_SERVER_LOG "[sle uart server]"
@@ -144,7 +145,7 @@ static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
     struct sle_adv_common_value tx_power_level = {
         .length = scan_rsp_data_len - 1,
         .type = SLE_ADV_DATA_TYPE_TX_POWER_LEVEL,
-        .value = SLE_ADV_TX_POWER,
+        .value = SLE_ADV_TX_POWER_DBM,
     };
     ret = memcpy_s(scan_rsp_data, SLE_ADV_DATA_LEN_MAX, &tx_power_level, scan_rsp_data_len);
     if (ret != EOK) {
@@ -176,7 +177,7 @@ static int sle_set_default_announce_param(void)
     param.conn_interval_max = SLE_CONN_INTV_MAX_DEFAULT;
     param.conn_max_latency = SLE_CONN_MAX_LATENCY;
     param.conn_supervision_timeout = SLE_CONN_SUPERVISION_TIMEOUT_DEFAULT;
-    param.announce_tx_power = 18;
+    param.announce_tx_power = SLE_ADV_TX_POWER_DBM;
     param.own_addr.type = 0;
     ret = memcpy_s(param.own_addr.addr, SLE_ADDR_LEN, g_sle_uart_local_addr, SLE_ADDR_LEN);
     if (ret != EOK) {
@@ -250,6 +251,43 @@ static void sle_announce_terminal_cbk(uint32_t announce_id)
     sample_at_log_print("%s sle announce terminal callback id:%02x\r\n", SLE_UART_SERVER_LOG, announce_id);
 }
 
+errcode_t sle_uart_announce_seek_merge_cbks(const sle_announce_seek_callbacks_t *cbks)
+{
+    sle_announce_seek_callbacks_t merged_cbks;
+    errcode_t ret;
+
+    if (cbks == NULL) {
+        return ERRCODE_SLE_FAIL;
+    }
+    merged_cbks = g_sle_uart_announce_seek_cbks;
+    if (cbks->sle_enable_cb != NULL) {
+        merged_cbks.sle_enable_cb = cbks->sle_enable_cb;
+    }
+    if (cbks->announce_enable_cb != NULL) {
+        merged_cbks.announce_enable_cb = cbks->announce_enable_cb;
+    }
+    if (cbks->announce_disable_cb != NULL) {
+        merged_cbks.announce_disable_cb = cbks->announce_disable_cb;
+    }
+    if (cbks->announce_terminal_cb != NULL) {
+        merged_cbks.announce_terminal_cb = cbks->announce_terminal_cb;
+    }
+    if (cbks->seek_enable_cb != NULL) {
+        merged_cbks.seek_enable_cb = cbks->seek_enable_cb;
+    }
+    if (cbks->seek_disable_cb != NULL) {
+        merged_cbks.seek_disable_cb = cbks->seek_disable_cb;
+    }
+    if (cbks->seek_result_cb != NULL) {
+        merged_cbks.seek_result_cb = cbks->seek_result_cb;
+    }
+    ret = sle_announce_seek_register_callbacks(&merged_cbks);
+    if (ret == ERRCODE_SLE_SUCCESS) {
+        g_sle_uart_announce_seek_cbks = merged_cbks;
+    }
+    return ret;
+}
+
 errcode_t sle_uart_announce_register_cbks(void)
 {
     errcode_t ret = 0;
@@ -257,7 +295,7 @@ errcode_t sle_uart_announce_register_cbks(void)
     seek_cbks.announce_enable_cb = sle_announce_enable_cbk;
     seek_cbks.announce_disable_cb = sle_announce_disable_cbk;
     seek_cbks.announce_terminal_cb = sle_announce_terminal_cbk;
-    ret = sle_announce_seek_register_callbacks(&seek_cbks);
+    ret = sle_uart_announce_seek_merge_cbks(&seek_cbks);
     if (ret != ERRCODE_SLE_SUCCESS) {
         sample_at_log_print("%s sle_uart_announce_register_cbks,register_callbacks fail :%x\r\n",
             SLE_UART_SERVER_LOG, ret);

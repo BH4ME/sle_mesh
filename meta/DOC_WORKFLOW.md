@@ -6,6 +6,7 @@
 
 1. 根目录文档（操作类）
 - `README.md`：编译、烧录、验证、审查脚本入口。
+- `meta/PROJECT_OPERATION_SOP.md`：工程强制作业 SOP；每次改代码、远程编译、自动烧录和版本管理前必须先读。
 - `meta/DOC_WORKFLOW.md`：本文档（流程规范）。
 - `meta/review_feedback.md`：每次最新审查结果（覆盖写入）。
 
@@ -46,6 +47,7 @@
 1. 更新对应版本 `VERSION.md`（说清“做了什么”）。
 2. 更新对应版本 `MANIFEST.md`（说清“改了哪些文件、怎么验证”）。
 3. 更新 `versions/README.md` 的当前版本列表顺序（新版本放最前）。
+4. 如果远程编译、自动烧录、版本管理或硬件排查流程变化，同步更新 `meta/PROJECT_OPERATION_SOP.md`。
 
 ## 5. 清理策略
 

@@ -154,9 +154,9 @@ static void demo_seed_members(demo_cluster_t *cluster)
     uint8_t id;
 
     (void)memset(cluster, 0, sizeof(*cluster));
-    assert(SLE_TEAM_MAX_MEMBERS >= 20U);
+    assert(SLE_TEAM_MAX_MEMBERS >= 30U);
 
-    for (id = 2U; id <= 21U; id++) {
+    for (id = 2U; id <= 31U; id++) {
         demo_member_t *member = &cluster->members[id - 2U];
 
         member->member_id = id;

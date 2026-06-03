@@ -335,6 +335,12 @@ h2 {
   padding: 16px;
 }
 
+.bulk-config-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
 .role-form {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(90px, 0.35fr) minmax(110px, 0.35fr) auto;
@@ -407,6 +413,12 @@ h2 {
   gap: 12px;
 }
 
+.bulk-config-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .connection-actions {
   display: flex;
   flex-wrap: wrap;
@@ -441,6 +453,17 @@ textarea {
   background: #fbfcfa;
   border: 1px solid #d9dfd7;
   border-radius: 6px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.check-row input {
+  width: auto;
+  min-height: auto;
 }
 
 .form-grid {
@@ -565,6 +588,13 @@ pre {
   padding: 16px 16px 0;
 }
 
+.config-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+
 .board-summary,
 .route-grid {
   display: grid;
@@ -579,6 +609,7 @@ pre {
 }
 
 .allow-summary div,
+.config-summary div,
 .board-summary div,
 .route-grid div {
   display: grid;
@@ -591,6 +622,7 @@ pre {
 }
 
 .allow-summary span,
+.config-summary span,
 .board-summary span,
 .route-grid span {
   color: #637269;
@@ -598,9 +630,30 @@ pre {
 }
 
 .allow-summary strong,
+.config-summary strong,
 .board-summary strong,
 .route-grid strong {
   overflow-wrap: anywhere;
+}
+
+.serial-log {
+  margin: 0 16px 8px;
+  overflow: hidden;
+  border: 1px solid #e4eae2;
+  border-radius: 8px;
+}
+
+.serial-log pre {
+  max-height: 260px;
+  overflow: auto;
+  padding: 14px;
+  color: #dbeee4;
+  background: #13251f;
+}
+
+.small-head {
+  min-height: 42px;
+  background: #f7faf6;
 }
 
 .pending-list {
@@ -687,9 +740,11 @@ code {
 	  .two-column,
 	  .deploy-grid,
 	  .allow-summary,
+	  .config-summary,
 	  .board-summary,
 	  .route-grid,
 	  .role-form,
+	  .bulk-config-fields,
 	  .connection-form.compact {
 	    grid-template-columns: 1fr;
 	  }

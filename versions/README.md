@@ -4,6 +4,30 @@
 
 当前版本：
 
+- [v4.4.37](./v4.4.37/VERSION.md)
+- [v4.4.36](./v4.4.36/VERSION.md)
+- [v4.4.35](./v4.4.35/VERSION.md)
+- [v4.4.34](./v4.4.34/VERSION.md)
+- [v4.4.33](./v4.4.33/VERSION.md)
+- [v4.4.32](./v4.4.32/VERSION.md)
+- [v4.4.31](./v4.4.31/VERSION.md)
+- [v4.4.30](./v4.4.30/VERSION.md)
+- [v4.4.29](./v4.4.29/README.md)
+- [v4.4.16](./v4.4.16/VERSION.md)
+- [v4.4.15](./v4.4.15/VERSION.md)
+- [v4.4.12](./v4.4.12/VERSION.md)
+- [v4.4.11](./v4.4.11/VERSION.md)
+- [v4.4.10](./v4.4.10/VERSION.md)
+- [v4.4.9](./v4.4.9/VERSION.md)
+- [v4.4.8](./v4.4.8/VERSION.md)
+- [v4.4.7](./v4.4.7/VERSION.md)
+- [v4.4.6](./v4.4.6/VERSION.md)
+- [v4.4.5](./v4.4.5/VERSION.md)
+- [v4.4.4](./v4.4.4/VERSION.md)
+- [v4.4.3](./v4.4.3/VERSION.md)
+- [v4.4.2](./v4.4.2/VERSION.md)
+- [v4.4.1](./v4.4.1/VERSION.md)
+- [v4.4](./v4.4/VERSION.md)
 - [v4.3](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.3/VERSION.md)
 - [v4.2.3](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.2.3/VERSION.md)
 - [v4.2.2](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v4.2.2/VERSION.md)
@@ -47,6 +71,8 @@
 
 ## 规则
 
+- 每次代码行为变化必须升版本，默认补丁号加一，例如 `v4.4` -> `v4.4.1`。
+- 每次开工前必须先读 [../meta/PROJECT_OPERATION_SOP.md](../meta/PROJECT_OPERATION_SOP.md)，流程变化时同步更新 SOP。
 - `VERSION.md`：版本说明
 - `MANIFEST.md`：版本内容清单
 - `VERSION.md` 只写这个版本解决了什么。

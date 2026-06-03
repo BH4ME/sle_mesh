@@ -55,7 +55,7 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_NETWORK_TEST \
 
 ./scripts/simulate_v2.sh --suite=core
 
-UBUNTU_HOST=100.91.84.124 UBUNTU_USER=owen UBUNTU_PASS='67215837' \
+UBUNTU_HOST=100.91.84.124 UBUNTU_USER=owen UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 BUILD_JOBS=4 \
 scripts/ws63_build_v4_ubuntu.sh unified
 ```

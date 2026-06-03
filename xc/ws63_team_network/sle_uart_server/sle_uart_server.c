@@ -510,7 +510,7 @@ void sle_uart_server_handle_connect_state_changed(uint16_t conn_id, const sle_ad
         }
         g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : 0U;
         (void)sle_read_remote_device_rssi(conn_id);
-        (void)sle_uart_server_adv_restart();
+        sample_at_log_print("%s keep announce stable after connect\r\n", SLE_UART_SERVER_LOG);
         sample_at_log_print("%s connected count:%u\r\n", SLE_UART_SERVER_LOG, g_sle_conn_count);
     } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
         sle_uart_server_remove_conn(conn_id);
@@ -546,9 +546,12 @@ void sle_uart_server_handle_pair_complete(uint16_t conn_id, const sle_addr_t *ad
     }
     g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : (conn_id + 1U);
     ssap_exchange_info_t parameter = { 0 };
+    errcode_t ret;
     parameter.mtu_size = 520;
     parameter.version = 1;
-    ssaps_set_info(g_server_id, &parameter);
+    ret = ssaps_set_info(g_server_id, &parameter);
+    sample_at_log_print("%s ssaps_set_info ret:%x mtu:%u version:%u\r\n",
+        SLE_UART_SERVER_LOG, ret, parameter.mtu_size, parameter.version);
 }
 
 uint16_t sle_uart_server_connected_count(void)

@@ -219,14 +219,14 @@ int main(void)
     assert(relay.cfg.relay_enabled != 0U);
     assert(relay.upstream_parent_state == SLE_TEAM_PARENT_CONNECTED);
 
-    assert(SLE_TEAM_MAX_MEMBERS >= 20U);
-    for (uint8_t member_id = 2U; member_id <= 21U; member_id++) {
+    assert(SLE_TEAM_MAX_MEMBERS >= 30U);
+    for (uint8_t member_id = 2U; member_id <= 31U; member_id++) {
         assert(sle_team_node_add_allowed_member(&leader, member_id) == SLE_TEAM_OK);
     }
-    assert(leader.cfg.allowed_member_count == 20U);
-    assert(sle_team_node_is_member_allowed(&leader, 21U) != 0U);
-    assert(sle_team_node_pairing_approve_with_relay(&leader, 21U, 0U) == SLE_TEAM_OK);
-    assert(sle_team_node_find_member(&leader, 21U) != NULL);
+    assert(leader.cfg.allowed_member_count == 30U);
+    assert(sle_team_node_is_member_allowed(&leader, 31U) != 0U);
+    assert(sle_team_node_pairing_approve_with_relay(&leader, 31U, 0U) == SLE_TEAM_OK);
+    assert(sle_team_node_find_member(&leader, 31U) != NULL);
     (void)sle_team_node_allow_all_members(&leader);
 
     {

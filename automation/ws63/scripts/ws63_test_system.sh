@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 LOG_ROOT="$ROOT_DIR/logs/auto_test"
 TS="$(date +%Y%m%d_%H%M%S)"
 RUN_DIR="$LOG_ROOT/$TS"

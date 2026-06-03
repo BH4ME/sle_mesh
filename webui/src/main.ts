@@ -16,6 +16,7 @@ import {
 } from "lucide";
 import {
   createTeamApi,
+  getSerialDebugState,
   loadConnectionConfig,
   requestSerialPort,
   saveConnectionConfig,
@@ -24,6 +25,9 @@ import {
 import { decodePacketHex, formatCoordinate } from "./protocol/codec";
 import type {
   AllowMembersCommand,
+  DeviceConfigCommand,
+  DeviceConfigResult,
+  DeviceConfigStatus,
   PendingMember,
   SendCommand,
   TeamEvent,
@@ -45,6 +49,7 @@ interface AppState {
   nodes: TeamNode[];
   pending: PendingMember[];
   events: TeamEvent[];
+  deviceConfig?: DeviceConfigStatus;
   selectedTab: "overview" | "packets" | "settings";
   busy: boolean;
   error?: string;
@@ -182,6 +187,23 @@ function statusSubtitle(status: TeamStatus): string {
   return `self=${status.selfId} leader=${status.leaderId} seq=${status.nextSeq}${mac}${relay}`;
 }
 
+function configSummary(config?: DeviceConfigStatus): string {
+  if (!config) return "not read";
+  if (!config.nvValid) return `empty, self=${config.selfSuffix}`;
+  if (config.nvRole === "leader") return `leader team=${config.nvTeam} channel=${config.nvChannel} self=${config.selfSuffix}`;
+  return `member team=${config.nvTeam} channel=${config.nvChannel} leader=${config.nvLeaderSuffix}`;
+}
+
+function configNumberValue(primary: number | undefined, secondary: number | undefined, fallback: number): number {
+  return primary ?? secondary ?? fallback;
+}
+
+function assertConfigResultOk(result: DeviceConfigResult): void {
+  if (!result.ok) {
+    throw new Error(`config ${result.action} failed ret=${result.ret}`);
+  }
+}
+
 function renderOverview(): string {
   return `
     ${renderConnectionPanel("compact")}
@@ -273,9 +295,11 @@ function renderControlPanel(): string {
           <div><span>MAC</span><strong>${escapeHtml(status.macSuffix || "--")}</strong></div>
           <div><span>SSID</span><strong>${escapeHtml(status.ssid || "--")}</strong></div>
         </div>
-        <div class="connection-actions control-actions">
-          <button class="primary-button" type="button" data-action="role-leader">${icon(Settings2, 17)}设为 Leader</button>
-        </div>
+        <form class="role-form" data-form="role-leader">
+          <label>Team<input name="teamId" type="number" min="1" max="254" value="1" /></label>
+          <label>Channel<input name="channel" type="number" min="0" max="255" value="17" /></label>
+          <button class="primary-button" type="submit">${icon(Settings2, 17)}设为 Leader</button>
+        </form>
         <form class="role-form" data-form="role-member">
           <label>Leader MAC 后四位<input name="leaderSuffix" maxlength="4" placeholder="例如 C7E9" /></label>
           <label>Team<input name="teamId" type="number" min="1" max="254" value="1" /></label>
@@ -462,6 +486,7 @@ function renderPackets(): string {
 function renderSettings(): string {
   return `
     ${renderConnectionPanel("full")}
+    ${renderBulkConfigPanel()}
     ${renderAllowPanel()}
     <section class="panel settings-panel">
       <div class="panel-head">
@@ -488,6 +513,12 @@ function renderSettings(): string {
 GET  /api/nodes
 GET  /api/events
 GET  /api/pending
+GET  /api/config/status
+GET  /api/config/leader?team=1&channel=17&now=1
+GET  /api/config/member?leader=C7E9&team=1&channel=17&now=1
+GET  /api/config/apply
+GET  /api/config/clear
+GET  /api/config/reboot
 GET  /api/role?role=leader
 GET  /api/role?role=member&leader=C7E9&team=1&channel=17
 GET  /api/pairing?action=start|stop|approve&id=2&relay=1
@@ -539,6 +570,59 @@ function renderAllowPanel(): string {
   `;
 }
 
+function renderBulkConfigPanel(): string {
+  const config = state.deviceConfig;
+  const serial = getSerialDebugState();
+  return `
+    <section class="panel settings-panel bulk-config-panel">
+      <div class="panel-head">
+        <h2>One-click node config</h2>
+        <span class="mode-badge">${escapeHtml(configSummary(config))}</span>
+      </div>
+      <div class="config-summary">
+        <div><span>NV Role</span><strong>${config?.nvValid ? config.nvRole : "empty"}</strong></div>
+        <div><span>NV Team</span><strong>${config?.nvValid ? config.nvTeam : "--"}</strong></div>
+        <div><span>NV Channel</span><strong>${config?.nvValid ? config.nvChannel : "--"}</strong></div>
+        <div><span>Leader Suffix</span><strong>${config?.nvValid ? config.nvLeaderSuffix : "--"}</strong></div>
+        <div><span>Runtime</span><strong>${config?.runtimeConfigured ? config.runtimeRole : "unconfigured"}</strong></div>
+        <div><span>Self Suffix</span><strong>${config?.selfSuffix ?? "--"}</strong></div>
+      </div>
+      <form class="bulk-config-form" data-form="bulk-config">
+        <div class="segmented" role="tablist" aria-label="Bulk node role">
+          <label class="segment"><input type="radio" name="role" value="leader" checked /><span>Leader</span></label>
+          <label class="segment"><input type="radio" name="role" value="member" /><span>Member</span></label>
+        </div>
+        <div class="bulk-config-fields">
+          <label>Team ID<input name="teamId" type="number" min="1" max="254" value="${configNumberValue(config?.nvTeam, config?.runtimeTeam, 1)}" /></label>
+          <label>Channel<input name="channel" type="number" min="0" max="255" value="${configNumberValue(config?.nvChannel, config?.runtimeChannel, 17)}" /></label>
+          <label>Leader suffix<input name="leaderSuffix" maxlength="4" placeholder="C7E9" value="${config?.nvRole === "member" ? config.nvLeaderSuffix : ""}" /></label>
+        </div>
+        <label class="check-row">
+          <input name="applyNow" type="checkbox" checked />
+          <span>Apply immediately after saving. If unchecked, save to flash and use Apply/Reboot later.</span>
+        </label>
+        <div class="connection-actions">
+          <button class="primary-button" type="submit">${icon(Settings2, 17)}Write config</button>
+          <button class="text-button" type="button" data-action="config-read">Read back</button>
+          <button class="text-button" type="button" data-action="config-apply">Apply saved</button>
+          <button class="text-button" type="button" data-action="config-clear">Clear saved</button>
+          <button class="text-button" type="button" data-action="config-reboot">Reboot board</button>
+        </div>
+        <div class="note">
+          Serial mode uses <code>cfg status</code>, <code>cfg leader/member</code>, <code>cfg apply</code>, <code>cfg clear</code> and shows returned logs below.
+        </div>
+      </form>
+      <div class="serial-log">
+        <div class="panel-head small-head">
+          <h2>Serial log</h2>
+          <span class="mode-badge">${serial.connected ? "connected" : "not connected"}</span>
+        </div>
+        <pre>${escapeHtml(serial.lines.slice(-36).join("\n") || "No serial lines yet. Click Select serial, then Read back.")}</pre>
+      </div>
+    </section>
+  `;
+}
+
 function renderConnectionPanel(layout: "compact" | "full"): string {
   const title = layout === "compact" ? "当前连接" : "连接配置";
   return `
@@ -583,6 +667,10 @@ function readNumber(form: FormData, key: string): number | undefined {
   return Number(value);
 }
 
+function readChecked(form: FormData, key: string): boolean {
+  return form.get(key) !== null;
+}
+
 function readMemberIds(raw: string): number[] {
   return raw
     .split(/[\s,，]+/)
@@ -623,6 +711,21 @@ async function applyAllow(command: AllowMembersCommand): Promise<void> {
   }
 }
 
+async function readDeviceConfig(): Promise<void> {
+  state.deviceConfig = await api.getDeviceConfig();
+}
+
+async function runConfigAction(action: () => Promise<void>, failure = "config operation failed"): Promise<void> {
+  try {
+    await action();
+    state.error = undefined;
+    await refresh();
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : failure;
+    renderShell();
+  }
+}
+
 async function refresh(): Promise<void> {
   if (state.busy) {
     return;
@@ -643,6 +746,11 @@ async function refresh(): Promise<void> {
     state.status = await api.getStatus();
     state.nodes = await api.getNodes();
     state.events = await api.getEvents();
+    try {
+      await readDeviceConfig();
+    } catch {
+      state.deviceConfig = undefined;
+    }
     if (isConfiguredStatus(state.status) && state.status.role === "leader") {
       try {
         state.pending = await api.getPending();
@@ -701,8 +809,20 @@ function bindEvents(): void {
         renderShell();
       });
   });
-  document.querySelector<HTMLButtonElement>("[data-action='role-leader']")?.addEventListener("click", () => {
-    void runAction(() => api.configureRole({ role: "leader" }), "set leader failed");
+  document.querySelector<HTMLFormElement>("[data-form='role-leader']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    void runAction(
+      () =>
+        api.configureRole({
+          role: "leader",
+          teamId: readNumber(form, "teamId") ?? 1,
+          channel: readNumber(form, "channel") ?? 17,
+        }),
+      "set leader failed",
+    );
   });
   document.querySelector<HTMLFormElement>("[data-form='role-member']")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -803,6 +923,51 @@ function bindEvents(): void {
     const input = document.querySelector<HTMLInputElement>("input[name='memberIds']");
     const memberIds = readMemberIds(input?.value ?? "");
     void applyAllow({ mode: "del", memberIds: memberIds.slice(0, 1) });
+  });
+  document.querySelector<HTMLFormElement>("[data-form='bulk-config']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    const role = String(form.get("role")) === "member" ? "member" : "leader";
+    const base = {
+      teamId: readNumber(form, "teamId") ?? 1,
+      channel: readNumber(form, "channel") ?? 17,
+      applyNow: readChecked(form, "applyNow"),
+    };
+    const command: DeviceConfigCommand =
+      role === "leader" ? { role, ...base } : { role, leaderSuffix: readLeaderSuffix(form), ...base };
+    void runConfigAction(async () => {
+      const result = await api.configureDevice(command);
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "write config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-read']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      await readDeviceConfig();
+    }, "read config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-apply']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.applyDeviceConfig();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "apply config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-clear']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.clearDeviceConfig();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "clear config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-reboot']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.rebootDevice();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "reboot failed");
   });
   document.querySelector<HTMLButtonElement>("[data-action='serial-connect']")?.addEventListener("click", () => {
     void connectSerialPlaceholder();

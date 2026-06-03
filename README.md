@@ -1,33 +1,46 @@
 # sle_mesh
 
-`sle_mesh` 是 WS63 星闪组网工程。根目录只放“怎么编译、怎么烧录、怎么验证、怎么审查”。
+`sle_mesh` 是 WS63 星闪组网工程。根目录保留编译、烧录、验证、版本记录和审查入口；板端业务代码在 `xc/ws63_team_network/`，域名/上位机 WebUI 在 `webui/`。
 
 ## 文档入口
 
-- [docs/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/README.md)：总索引
-- [docs/v0/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/README.md)：V0（1vs2 / 1vs8）
-- [docs/v1/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/README.md)：V1（手动 relay）
-- [docs/v2/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/README.md)：V2（自动组网）
-- [docs/v3/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v3/README.md)：V3（手机定位桥接）
-- [docs/v4/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/README.md)：V4（WS63 模块 + ST7789）
-- [versions/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/README.md)：版本记录
-- [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md)：文档编写与维护流程
+- [docs/README.md](docs/README.md)：总索引
+- [docs/v0/README.md](docs/v0/README.md)：V0（1vs2 / 1vs8）
+- [docs/v1/README.md](docs/v1/README.md)：V1（手动 relay）
+- [docs/v2/README.md](docs/v2/README.md)：V2（自动组网）
+- [docs/v3/README.md](docs/v3/README.md)：V3（手机定位桥接）
+- [docs/v4/README.md](docs/v4/README.md)：V4（WS63 模块 + ST7789）
+- [versions/README.md](versions/README.md)：版本记录
+- [versions/v4.4.37/VERSION.md](versions/v4.4.37/VERSION.md)：当前 v4.4.37 记录
+- [meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md)：每次改代码、远程编译、自动烧录和版本管理前必须读取的作业 SOP
+- [meta/DOC_WORKFLOW.md](meta/DOC_WORKFLOW.md)：文档编写与维护流程
+
+## 当前版本
+
+- 当前固件版本：`v4.4.37`
+- 统一固件：所有 WS63 节点烧同一份 `.fwpkg`，leader/member 通过 WebUI 或串口运行时配置。
+- 板端 SoftAP/HTTP WebUI 默认自动启动；域名/上位机 WebUI 仍依赖板端 HTTP API 做一键配置和状态读取。
+- ST7789 已确认参数：`240x135`，offset `40,53`，MADCTL `0x60`。
+- BLK/backlight 不再由 GPIO11 控制；背光按硬件默认开启。
+- GPS 当前只保留 pinmap 和日志，不做完整 NMEA/GPS 数据解析。
+- WS2812 的 Kconfig 默认是 `n`，构建脚本会按 v4 板子启用 IO0。
+- 蜂鸣器默认关闭，只做安全拉低/命令控制。
+- SLE 广播实际发射功率和广播声明字段统一为 `18 dBm`。
 
 ## 目录
 
-- [include/](/Users/bh4me_macair/Documents/Codex/sle_intercom/include)：协议公共头文件。
-- [src/](/Users/bh4me_macair/Documents/Codex/sle_intercom/src)：协议、组网状态机、串口 CLI、Web API 序列化。
-- [examples/](/Users/bh4me_macair/Documents/Codex/sle_intercom/examples)：本地协议测试和接入示例。
-- [xc/ws63_team_network/](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network)：WS63 上板样例。
-- [webui/](/Users/bh4me_macair/Documents/Codex/sle_intercom/webui)：域名上位机 WebUI。
-- [docs/](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs)：按 v0~v4 分组的协议与组网文档。
-- [versions/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions)：版本记录。
-- [scripts/](/Users/bh4me_macair/Documents/Codex/sle_intercom/scripts)：编译和烧录脚本。
-- [automation/ws63/](/Users/bh4me_macair/Documents/Codex/sle_intercom/automation/ws63)：自动化烧录、角色绑定与回归测试（独立目录）。
+- [include/](include)：协议公共头文件。
+- [src/](src)：协议、组网状态机、串口 CLI、Web API 序列化。
+- [examples/](examples)：本地协议测试和接入示例。
+- [xc/ws63_team_network/](xc/ws63_team_network)：WS63 上板样例和板端 WebUI。
+- [webui/](webui)：域名/上位机 WebUI，支持 WiFi HTTP 和 WebSerial。
+- [versions/](versions)：版本记录、烧录记录和硬件问题记录。
+- [scripts/](scripts)：编译、烧录、串口配置脚本。
+- [automation/ws63/](automation/ws63)：自动化烧录、角色绑定与回归工具。
 
 ## WS63 使用
 
-板端 WiFi（`v4.3`）：
+板端 WiFi：
 
 ```text
 SSID: SLE-TEAM-V4-XXXX
@@ -35,17 +48,12 @@ Password: 123456789
 URL: http://192.168.43.1/
 ```
 
-版本命名说明：
-
-- 当前固件版本是 `v4.3`。
-- `v4.3` 继续按原理图固定 `显示/ST7789 + 蜂鸣器 + WS 灯 + GPS` 四项映射，并同步收敛 WiFi 入网与烧录流程。
-
 常用页面：
 
 - `/`：状态。
 - `/nodes`：已入队节点。
 - `/events`：最近收发事件。
-- `/pairing`：角色选择、leader 配队、member 选择 leader，以及手机定位手动/自动上报。
+- `/pairing`：角色选择、leader 配队、member 选择 leader、手机定位上报。
 
 常用 API：
 
@@ -54,24 +62,39 @@ URL: http://192.168.43.1/
 - `GET /api/events`
 - `GET /api/pending`
 - `GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...`
+- `GET /api/config/status`
+- `GET /api/config/leader?team=1&channel=17&now=1`
+- `GET /api/config/member?leader=C7E9&team=1&channel=17&now=1`
+- `GET /api/config/apply`
+- `GET /api/config/clear`
+- `GET /api/config/reboot`
 - `GET /api/pairing?action=start|stop|approve&id=...&relay=0|1`
 - `GET /api/member/select?team=...&leader=...&channel=...`
 - `GET /api/member/leave`
 - `GET /api/factory-reset`
 
-`v4.3` 手机定位快速手册：
+## 批量串口配置
 
-1. 先把队伍配好（至少 `1 leader + 1 member`），并确认 leader 的 `/nodes` 里 member 是 `online`。
-2. 手机连 leader 的 WiFi，打开 `http://192.168.43.1/pairing`。
-3. 在 `Phone Location` 区域先点 `use phone gps`，首次会弹权限，建议选“使用 App 期间允许”。
-4. 单次发送就点 `send location`；持续上报就点 `start auto`（默认约 2.5s 节流），停止点 `stop auto`。
-5. 持续上报时页面要保持前台，锁屏/切后台可能被系统暂停。
+v4.4 起支持通过串口一键配置，适合 30 个节点批量部署，不需要逐个连接每块板子的 WiFi。
 
-`/api/location` 返回结果判读：
+```text
+cfg status
+cfg leader now <team> <channel>
+cfg member now <leader_suffix_hex> <team> <channel>
+cfg apply
+cfg clear
+cfg reboot
+```
 
-- `ret=0 reason=OK`：本次 POS_REPORT 已发出。
-- `reason=NOT_READY_OR_NO_ROUTE`：当前还没入网完成，或目标节点当前无路由/不在线。
-- `reason=WRITE_FAIL`：SLE 写链路失败，先看 `/events` 和串口日志里的 `sle-tx-fail`。
+Windows PowerShell 脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM7 -Mode leader -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode member -LeaderSuffix 9A2F -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode status
+```
+
+域名/上位机 WebUI 的 `Settings -> One-click node config` 也支持 WebSerial：选择串口后可以读出 `[cfg-json]`、写入 leader/member 配置、apply/clear/reboot，并显示串口日志。
 
 ## 编译和烧录
 
@@ -80,7 +103,7 @@ URL: http://192.168.43.1/
 ```sh
 UBUNTU_HOST=192.168.6.5 \
 UBUNTU_USER=owen \
-UBUNTU_PASS='67215837' \
+UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
 BUILD_JOBS=4 \
 scripts/ws63_build_v4_ubuntu.sh unified
@@ -89,22 +112,35 @@ scripts/ws63_build_v4_ubuntu.sh unified
 输出统一固件：
 
 ```text
-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg
+E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
-本机烧 leader：
+COM16 自动烧录命令：
 
-```sh
-printf 'flash leader\n' | scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
+```powershell
+python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py `
+  -p COM16 `
+  -b 115200 `
+  --software-reset-only `
+  --reset-command reboot `
+  --reset-command-fallback reset `
+  --reset-command-delay 0.3 `
+  --reset-command-retries 2 `
+  --reset-command-retry-gap 0.2 `
+  E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
-烧录脚本中的 `leader/member` 只用于选择串口和二次确认，实际烧录的是同一个统一固件。脚本默认会通过 `automation/ws63/tools/ws63_auto_burn.py`（保留兼容入口 `tools/ws63_auto_burn.py`）先发串口 `reboot` 并尝试 DTR/RTS 自动复位；第一次从老固件升级或烧录器没有复位控制线时，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 这类没有 BOOT 键的开发板按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。临时关闭自动复位：
-
-```sh
-printf 'flash leader\n' | AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
-```
+固定烧录流程见 [meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md)，成功烧录记录见 [versions/v4.4/AUTO_FLASH_NOTES.md](versions/v4.4/AUTO_FLASH_NOTES.md)。
 
 ## 本地验证
+
+```sh
+npm --prefix webui test
+npm --prefix webui run build
+git diff --check
+```
+
+协议本地测试：
 
 ```sh
 cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_NETWORK_TEST \
@@ -115,31 +151,6 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
   examples/team_node_common.c src/sle_team_packet.c \
   -o /tmp/sle_team_packet_test && /tmp/sle_team_packet_test
 ```
-
-一键仿真（自动构建并运行两套测试，输出日志）：
-
-```sh
-./scripts/simulate_v2.sh
-```
-
-日志输出：
-- `logs/sim/network_test.log`
-- `logs/sim/packet_test.log`
-- `logs/sim/relay_rebalance_test.log`（relay 断链补选与重连身份场景）
-
-## 一键审查（DeepSeek）
-
-```sh
-scripts/run_review_with_deepseek.sh --scope "Bugfix / PR 审查" --goal-doc docs/v2/networking-goal.md
-```
-
-说明：
-- 脚本会强制 DeepSeek 先读取 `docs/v2/review_framework.md`，并按 Stage 执行。
-- 审查结果会覆盖写入`meta/review_feedback.md`。
-- 可选 `--model deepseek-chat` 或其他 DeepSeek 模型。
-- 先预览 prompt 可用 `--dry-run`。
-- `scripts/run_review_with_gpt.sh` 仍可用，但已作为兼容入口转发到 DeepSeek 脚本。
-- 审查与文档维护完整流程见 [meta/DOC_WORKFLOW.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/meta/DOC_WORKFLOW.md) 第 7、8 节。
 
 ## License
 

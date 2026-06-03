@@ -10,7 +10,7 @@
 #define SUITE_RELAY_REVOKE_STALE_FACTOR 2U
 #define SUITE_RELAY_CANDIDATE_MIN_RSSI (-92)
 #define SUITE_DEFAULT_TIMEOUT_S 10U
-#define SUITE_MAX_LOGICAL_MEMBERS 20U
+#define SUITE_MAX_LOGICAL_MEMBERS 30U
 
 typedef struct {
     uint8_t member_id;
@@ -396,7 +396,7 @@ static void suite_seed_cluster(suite_cluster_t *cluster)
     cluster->heartbeat_timeout_s = SUITE_DEFAULT_TIMEOUT_S;
     assert(SLE_TEAM_MAX_MEMBERS >= SUITE_MAX_LOGICAL_MEMBERS);
 
-    for (id = 2U; id <= 21U; id++) {
+    for (id = 2U; id <= 31U; id++) {
         suite_member_t *member = &cluster->members[id - 2U];
 
         member->member_id = id;

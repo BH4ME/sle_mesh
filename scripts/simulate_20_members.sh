@@ -29,16 +29,16 @@ fi
 
 mkdir -p "$LOG_DIR"
 
-assert_20_cap_present() {
+assert_30_cap_present() {
   local source_file="$ROOT_DIR/examples/team_network_demo.c"
   local checks=0
 
-  grep -q "assert(SLE_TEAM_MAX_MEMBERS >= 20U);" "$source_file" && checks=$((checks + 1)) || true
-  grep -q "for (uint8_t member_id = 2U; member_id <= 21U; member_id++)" "$source_file" && checks=$((checks + 1)) || true
-  grep -q "assert(leader.cfg.allowed_member_count == 20U);" "$source_file" && checks=$((checks + 1)) || true
+  grep -q "assert(SLE_TEAM_MAX_MEMBERS >= 30U);" "$source_file" && checks=$((checks + 1)) || true
+  grep -q "for (uint8_t member_id = 2U; member_id <= 31U; member_id++)" "$source_file" && checks=$((checks + 1)) || true
+  grep -q "assert(leader.cfg.allowed_member_count == 30U);" "$source_file" && checks=$((checks + 1)) || true
 
   if [ "$checks" -ne 3 ]; then
-    echo "[sim20] ERROR: 20-member assertions not fully present in team_network_demo.c (found $checks/3)" >&2
+    echo "[sim20] ERROR: 30-member assertions not fully present in team_network_demo.c (found $checks/3)" >&2
     exit 1
   fi
 }
@@ -53,9 +53,9 @@ count_or_zero() {
   grep -c "$pattern" "$file" || true
 }
 
-assert_20_cap_present
+assert_30_cap_present
 
-echo "[sim20] running dedicated 20-member simulation"
+echo "[sim20] running dedicated 30-member simulation"
 echo "[sim20] stress iterations: $STRESS"
 
 "$SIM_SCRIPT" --stress="$STRESS" > "$CONSOLE_LOG" 2>&1

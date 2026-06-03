@@ -117,6 +117,21 @@ static void test_deliver_last(test_runtime_t *from, sle_team_node_t *to)
     from->last_tx_len = 0U;
 }
 
+static uint8_t test_count_member_records(const sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t count = 0U;
+
+    if (node == NULL) {
+        return 0U;
+    }
+    for (uint8_t i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->members[i].member_id == member_id) {
+            count++;
+        }
+    }
+    return count;
+}
+
 static void test_broadcast_relay_failure_keeps_local_processing(void)
 {
     test_runtime_t leader_rt = {.name = "leader", .now_s = 20U};
@@ -198,12 +213,94 @@ static void test_member_heartbeat_does_not_pollute_members_table(void)
     assert(sle_team_node_find_member(&member, 1U) == NULL);
 }
 
+static void test_offline_member_rejoin_reuses_logical_slot(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 60U};
+    test_runtime_t member2_rt = {.name = "member2", .now_s = 60U};
+    test_runtime_t member3_rt = {.name = "member3", .now_s = 60U};
+    sle_team_node_t leader;
+    sle_team_node_t member2;
+    sle_team_node_t member3;
+
+    test_init_leader(&leader, &leader_rt);
+    test_init_member(&member2, &member2_rt, 2U);
+    test_init_member(&member3, &member3_rt, 3U);
+
+    assert(sle_team_node_send_hello(&member2, 1U) == SLE_TEAM_OK);
+    assert(sle_team_node_on_packet(&leader, member2_rt.last_tx, member2_rt.last_tx_len) == SLE_TEAM_OK);
+    assert(sle_team_node_send_hello(&member3, 1U) == SLE_TEAM_OK);
+    assert(sle_team_node_on_packet(&leader, member3_rt.last_tx, member3_rt.last_tx_len) == SLE_TEAM_OK);
+    assert(test_count_member_records(&leader, 2U) == 1U);
+    assert(test_count_member_records(&leader, 3U) == 1U);
+
+    leader.members[0].online = 0U;
+    leader.members[1].online = 0U;
+    leader_rt.now_s = 61U;
+    member3_rt.now_s = 61U;
+
+    assert(sle_team_node_send_hello(&member3, 1U) == SLE_TEAM_OK);
+    assert(sle_team_node_on_packet(&leader, member3_rt.last_tx, member3_rt.last_tx_len) == SLE_TEAM_OK);
+    assert(test_count_member_records(&leader, 2U) == 1U);
+    assert(test_count_member_records(&leader, 3U) == 1U);
+    assert(sle_team_node_find_member(&leader, 2U) == NULL);
+    assert(sle_team_node_find_member(&leader, 3U) != NULL);
+}
+
+static void test_allowed_list_seeds_offline_logical_members(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 70U};
+    test_runtime_t member5_rt = {.name = "member5", .now_s = 70U};
+    sle_team_node_t leader;
+    sle_team_node_t member5;
+    uint8_t allowed[SLE_TEAM_MAX_MEMBERS];
+
+    test_init_leader(&leader, &leader_rt);
+    test_init_member(&member5, &member5_rt, 5U);
+    for (uint8_t i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        allowed[i] = (uint8_t)(i + 2U);
+    }
+
+    assert(sle_team_node_set_allowed_members(&leader, allowed, SLE_TEAM_MAX_MEMBERS) == SLE_TEAM_OK);
+    assert(leader.cfg.allowed_member_count == SLE_TEAM_MAX_MEMBERS);
+    for (uint8_t i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &leader.members[i];
+
+        assert(member->member_id == allowed[i]);
+        assert(member->online == 0U);
+    }
+
+    assert(sle_team_node_send_hello(&member5, 1U) == SLE_TEAM_OK);
+    assert(sle_team_node_on_packet(&leader, member5_rt.last_tx, member5_rt.last_tx_len) == SLE_TEAM_OK);
+    assert(test_count_member_records(&leader, 5U) == 1U);
+    assert(sle_team_node_find_member(&leader, 5U) != NULL);
+}
+
+static void test_add_allowed_member_failure_keeps_allow_all(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 80U};
+    sle_team_node_t leader;
+
+    test_init_leader(&leader, &leader_rt);
+    assert(sle_team_node_allow_all_members(&leader) == SLE_TEAM_OK);
+    for (uint8_t i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        leader.members[i].member_id = (uint8_t)(i + 2U);
+        leader.members[i].online = 1U;
+    }
+
+    assert(sle_team_node_add_allowed_member(&leader, 40U) == SLE_TEAM_ERR_BUF);
+    assert(leader.cfg.member_filter_enabled == 0U);
+    assert(leader.cfg.allowed_member_count == 0U);
+}
+
 int main(void)
 {
     test_broadcast_relay_failure_keeps_local_processing();
     test_hello_config_failure_does_not_commit_join();
     test_pairing_stop_config_failure_is_retryable();
     test_member_heartbeat_does_not_pollute_members_table();
+    test_offline_member_rejoin_reuses_logical_slot();
+    test_allowed_list_seeds_offline_logical_members();
+    test_add_allowed_member_failure_keeps_allow_all();
     printf("[team-node-regression] pass\n");
     return 0;
 }

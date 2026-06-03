@@ -12,17 +12,34 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional
 
 import serial
-from xf_burn_tools.fwpkg import Fwpkg
-from xf_burn_tools.pymodem import ymodem_xfer
-from xf_burn_tools.ws63flash import (
-    CMD_DOWNLOAD,
-    CMD_HANDSHAKE,
-    CMD_RST,
-    RESET_TIMEOUT,
-    UART_READ_TIMEOUT,
-    WS63E_FLASHINFO,
-    Ws63BurnTools,
-)
+try:
+    from xf_burn_tools.fwpkg import Fwpkg
+    from xf_burn_tools.pymodem import ymodem_xfer
+    from xf_burn_tools.ws63flash import (
+        CMD_DOWNLOAD,
+        CMD_HANDSHAKE,
+        CMD_RST,
+        RESET_TIMEOUT,
+        UART_READ_TIMEOUT,
+        WS63E_FLASHINFO,
+        Ws63BurnTools,
+    )
+    HAVE_XF_BURN_TOOLS = True
+except ModuleNotFoundError:
+    HAVE_XF_BURN_TOOLS = False
+    Fwpkg = None  # type: ignore[assignment]
+    ymodem_xfer = None  # type: ignore[assignment]
+    CMD_DOWNLOAD = "download"  # type: ignore[assignment]
+    CMD_HANDSHAKE = "handshake"  # type: ignore[assignment]
+    CMD_RST = "reset"  # type: ignore[assignment]
+    RESET_TIMEOUT = 10.0  # type: ignore[assignment]
+    UART_READ_TIMEOUT = 1  # type: ignore[assignment]
+    WS63E_FLASHINFO = {}  # type: ignore[assignment]
+
+    class Ws63BurnTools:  # type: ignore[no-redef]
+        def __init__(self, com, baudrate):
+            self.com = com
+            self.baudrate = baudrate
 
 
 SleepFn = Callable[[float], None]
@@ -136,9 +153,36 @@ def perform_auto_reset(
 
 
 class AutoResetWs63BurnTools(Ws63BurnTools):
-    def __init__(self, com: str, baudrate: int, reset_config: Optional[ResetConfig]) -> None:
+    def __init__(
+        self,
+        com: str,
+        baudrate: int,
+        reset_config: Optional[ResetConfig],
+        *,
+        wait_timeout_s: float,
+        handshake_interval_s: float,
+        manual_retry_timeout_s: float,
+    ) -> None:
         super().__init__(com, baudrate)
         self.reset_config = reset_config
+        self.wait_timeout_s = wait_timeout_s
+        self.handshake_interval_s = handshake_interval_s
+        self.manual_retry_timeout_s = manual_retry_timeout_s
+
+    def _try_wait_for_handshake(self, timeout_s: float) -> bool:
+        t0 = time.time()
+        ack = b"\xEF\xBE\xAD\xDE\x0C\x00\xE1\x1E"
+        while True:
+            if time.time() - t0 > timeout_s:
+                return False
+            WS63E_FLASHINFO[CMD_HANDSHAKE]["data"][0:4] = self.baudrate.to_bytes(4, "little")
+            self.ws63SendCmddef(WS63E_FLASHINFO[CMD_HANDSHAKE])
+            data = self.ser.read_all()
+            if ack in data:
+                self.ser.baudrate = self.baudrate
+                return True
+            if self.handshake_interval_s > 0.0:
+                time.sleep(self.handshake_interval_s)
 
     def flash(self, name) -> bool:  # noqa: C901 - mirrors xf_burn_tools to keep its protocol behavior.
         self.ser = serial.Serial(self.com, 115200, timeout=1)
@@ -159,19 +203,12 @@ class AutoResetWs63BurnTools(Ws63BurnTools):
         self.fwpkg.show()
 
         logging.info("Waiting for device reset...")
-        t0 = time.time()
-        while True:
-            if time.time() - t0 > RESET_TIMEOUT:
+        if not self._try_wait_for_handshake(self.wait_timeout_s):
+            logging.warning("Auto handshake timeout. Please press reset / BOOT+RESET now...")
+            if not self._try_wait_for_handshake(self.manual_retry_timeout_s):
                 logging.warning("Timeout while waiting for device reset")
                 return False
-            WS63E_FLASHINFO[CMD_HANDSHAKE]["data"][0:4] = self.baudrate.to_bytes(4, "little")
-            self.ws63SendCmddef(WS63E_FLASHINFO[CMD_HANDSHAKE])
-            data = self.ser.read_all()
-            ack = b"\xEF\xBE\xAD\xDE\x0C\x00\xE1\x1E"
-            if ack in data:
-                self.ser.baudrate = self.baudrate
-                logging.info("Establishing ymodem session...")
-                break
+        logging.info("Establishing ymodem session...")
 
         time.sleep(0.5)
         logging.info(f"Transferring {loaderboot['name']}...")
@@ -253,6 +290,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_CONTROL_SEQUENCE,
         help="DTR/RTS sequence, for example 'rts=0,dtr=1:0.1;rts=0,dtr=0:0.1'",
     )
+    parser.add_argument(
+        "--wait-timeout",
+        type=float,
+        default=float(RESET_TIMEOUT),
+        help="initial handshake wait timeout in seconds",
+    )
+    parser.add_argument(
+        "--manual-retry-timeout",
+        type=float,
+        default=20.0,
+        help="extra wait window after auto reset timeout for manual reset",
+    )
+    parser.add_argument(
+        "--handshake-interval",
+        type=float,
+        default=0.05,
+        help="delay between repeated handshake probes in seconds",
+    )
     return parser
 
 
@@ -261,6 +316,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s")
+
+    if not HAVE_XF_BURN_TOOLS:
+        logging.error("xf_burn_tools is not installed. Please install vendor burn tools to use flashing.")
+        return 2
 
     if args.show:
         Fwpkg(args.firmware_file).show()
@@ -273,6 +332,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("--reset-command-delay must be >= 0")
     if args.reset_command_retry_gap < 0.0:
         parser.error("--reset-command-retry-gap must be >= 0")
+    if args.wait_timeout <= 0.0:
+        parser.error("--wait-timeout must be > 0")
+    if args.manual_retry_timeout < 0.0:
+        parser.error("--manual-retry-timeout must be >= 0")
+    if args.handshake_interval < 0.0:
+        parser.error("--handshake-interval must be >= 0")
 
     reset_config = None
     if not args.no_auto_reset:
@@ -292,7 +357,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             sequence=sequence,
         )
 
-    tools = AutoResetWs63BurnTools(args.port, args.baudrate, reset_config)
+    tools = AutoResetWs63BurnTools(
+        args.port,
+        args.baudrate,
+        reset_config,
+        wait_timeout_s=args.wait_timeout,
+        handshake_interval_s=args.handshake_interval,
+        manual_retry_timeout_s=args.manual_retry_timeout,
+    )
     return 0 if tools.flash(args.firmware_file) else 1
 
 

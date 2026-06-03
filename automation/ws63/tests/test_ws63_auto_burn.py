@@ -103,7 +103,7 @@ class Ws63AutoBurnTest(unittest.TestCase):
 
     def test_main_returns_nonzero_when_flash_fails(self):
         class FailingBurner:
-            def __init__(self, *_args):
+            def __init__(self, *_args, **_kwargs):
                 pass
 
             def flash(self, _firmware):

@@ -21,8 +21,10 @@ typedef struct {
 } ws63_st7789_config_t;
 
 int ws63_st7789_init(const ws63_st7789_config_t *cfg);
-int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_count, uint8_t lost_count);
+int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_count,
+    uint8_t offline_count, uint8_t alert_count, const char *fw_version);
 int ws63_st7789_show_alert(uint8_t member_id, int32_t latitude_e6, int32_t longitude_e6, uint32_t last_seen_s);
+void ws63_st7789_tick(void);
 
 #ifdef __cplusplus
 }

@@ -31,16 +31,44 @@ static int8_t sle_team_rssi_dbm(const sle_team_node_t *node)
     return node->ops.rssi_dbm(node->ops.user_ctx);
 }
 
+static const sle_team_member_record_t *sle_team_find_member_record_const(const sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t i;
+
+    if (node == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return NULL;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->members[i].member_id == member_id) {
+            return &node->members[i];
+        }
+    }
+    return NULL;
+}
+
+static sle_team_member_record_t *sle_team_find_member_record(sle_team_node_t *node, uint8_t member_id)
+{
+    return (sle_team_member_record_t *)sle_team_find_member_record_const(node, member_id);
+}
+
 static sle_team_member_record_t *sle_team_get_member_slot(sle_team_node_t *node, uint8_t member_id, uint8_t create)
 {
     uint8_t i;
+    sle_team_member_record_t *member;
     sle_team_member_record_t *free_slot = NULL;
 
-    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
-        if (node->members[i].online != 0U && node->members[i].member_id == member_id) {
-            return &node->members[i];
+    if (node == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return NULL;
+    }
+    member = sle_team_find_member_record(node, member_id);
+    if (member != NULL) {
+        if (create != 0U) {
+            member->online = 1U;
         }
-        if (free_slot == NULL && node->members[i].online == 0U) {
+        return member;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (free_slot == NULL && node->members[i].member_id == 0U) {
             free_slot = &node->members[i];
         }
     }
@@ -93,6 +121,89 @@ static void sle_team_clear_members(sle_team_node_t *node)
     if (node != NULL) {
         (void)memset(node->members, 0, sizeof(node->members));
     }
+}
+
+static void sle_team_clear_offline_member_records(sle_team_node_t *node)
+{
+    uint8_t i;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        sle_team_member_record_t *member = &node->members[i];
+
+        if (member->member_id != 0U && member->online == 0U) {
+            (void)memset(member, 0, sizeof(*member));
+        }
+    }
+}
+
+static uint8_t sle_team_id_in_list(const uint8_t *member_ids, uint8_t count, uint8_t member_id)
+{
+    uint8_t i;
+
+    if (member_ids == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return 0U;
+    }
+    for (i = 0U; i < count; i++) {
+        if (member_ids[i] == member_id) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+static sle_team_member_record_t *sle_team_alloc_offline_member_record(sle_team_node_t *node, uint8_t member_id)
+{
+    uint8_t i;
+    sle_team_member_record_t *free_slot = NULL;
+
+    if (node == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return NULL;
+    }
+    if (sle_team_find_member_record(node, member_id) != NULL) {
+        return sle_team_find_member_record(node, member_id);
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->members[i].member_id == 0U) {
+            free_slot = &node->members[i];
+            break;
+        }
+    }
+    if (free_slot == NULL) {
+        return NULL;
+    }
+    (void)memset(free_slot, 0, sizeof(*free_slot));
+    free_slot->member_id = member_id;
+    free_slot->role = SLE_TEAM_ROLE_MEMBER;
+    free_slot->last_rssi_dbm = SLE_TEAM_RSSI_UNKNOWN;
+    return free_slot;
+}
+
+static int sle_team_sync_allowed_member_records(sle_team_node_t *node, const uint8_t *member_ids, uint8_t count)
+{
+    uint8_t i;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER) {
+        return SLE_TEAM_OK;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        sle_team_member_record_t *member = &node->members[i];
+
+        if (member->member_id == 0U || member->member_id == SLE_TEAM_BROADCAST_ID) {
+            continue;
+        }
+        if (sle_team_id_in_list(member_ids, count, member->member_id) == 0U) {
+            (void)memset(member, 0, sizeof(*member));
+        }
+    }
+    for (i = 0U; i < count; i++) {
+        if (sle_team_alloc_offline_member_record(node, member_ids[i]) == NULL) {
+            return SLE_TEAM_ERR_BUF;
+        }
+    }
+    return SLE_TEAM_OK;
 }
 
 static void sle_team_note_leader_seen(sle_team_node_t *node)
@@ -331,7 +442,7 @@ static uint8_t sle_team_has_online_member(const sle_team_node_t *node)
 
 static uint8_t sle_team_node_has_member_record(const sle_team_node_t *node, uint8_t member_id)
 {
-    return sle_team_node_find_member(node, member_id) != NULL ? 1U : 0U;
+    return sle_team_find_member_record_const(node, member_id) != NULL ? 1U : 0U;
 }
 
 static uint8_t sle_team_node_relay_tier_for_member(uint8_t member_id, uint8_t leader_id)
@@ -380,6 +491,15 @@ static void sle_team_node_disable_member_relay(sle_team_node_t *node, uint8_t cl
     }
 }
 
+static uint8_t sle_team_should_stage_pairing_hello(const sle_team_node_t *node, uint8_t member_id)
+{
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER || node->cfg.pairing_enabled == 0U ||
+        node->cfg.member_filter_enabled == 0U || node->cfg.allowed_member_count != 0U) {
+        return 0U;
+    }
+    return sle_team_find_member_record_const(node, member_id) == NULL ? 1U : 0U;
+}
+
 uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t member_id)
 {
     uint8_t i;
@@ -388,6 +508,14 @@ uint8_t sle_team_node_is_member_allowed(const sle_team_node_t *node, uint8_t mem
         return 0U;
     }
     if (node->cfg.role != SLE_TEAM_ROLE_LEADER || node->cfg.member_filter_enabled == 0U) {
+        return 1U;
+    }
+    /*
+     * Keep empty allowlist non-blocking. Pairing/startup flows can temporarily
+     * set filter=only with count=0; treating this as deny-all would deadlock
+     * member rejoin after power cycle.
+     */
+    if (node->cfg.allowed_member_count == 0U) {
         return 1U;
     }
     for (i = 0U; i < node->cfg.allowed_member_count && i < SLE_TEAM_MAX_MEMBERS; i++) {
@@ -406,6 +534,7 @@ int sle_team_node_allow_all_members(sle_team_node_t *node)
     node->cfg.member_filter_enabled = 0U;
     node->cfg.allowed_member_count = 0U;
     (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
+    sle_team_clear_offline_member_records(node);
     return SLE_TEAM_OK;
 }
 
@@ -432,6 +561,9 @@ int sle_team_node_set_allowed_members(sle_team_node_t *node, const uint8_t *memb
             unique_ids[unique_count++] = member_ids[i];
         }
     }
+    if (sle_team_sync_allowed_member_records(node, unique_ids, unique_count) != SLE_TEAM_OK) {
+        return SLE_TEAM_ERR_BUF;
+    }
     node->cfg.member_filter_enabled = 1U;
     node->cfg.allowed_member_count = unique_count;
     (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
@@ -442,14 +574,17 @@ int sle_team_node_set_allowed_members(sle_team_node_t *node, const uint8_t *memb
 int sle_team_node_add_allowed_member(sle_team_node_t *node, uint8_t member_id)
 {
     uint8_t i;
+    uint8_t was_filter_enabled;
 
     if (node == NULL || member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
         return SLE_TEAM_ERR_ARG;
     }
+    was_filter_enabled = node->cfg.member_filter_enabled;
     if (node->cfg.member_filter_enabled == 0U) {
+        if (sle_team_alloc_offline_member_record(node, member_id) == NULL) {
+            return SLE_TEAM_ERR_BUF;
+        }
         node->cfg.member_filter_enabled = 1U;
-        node->cfg.allowed_member_count = 0U;
-        (void)memset(node->cfg.allowed_member_ids, 0, sizeof(node->cfg.allowed_member_ids));
     }
     for (i = 0U; i < node->cfg.allowed_member_count; i++) {
         if (node->cfg.allowed_member_ids[i] == member_id) {
@@ -457,6 +592,12 @@ int sle_team_node_add_allowed_member(sle_team_node_t *node, uint8_t member_id)
         }
     }
     if (node->cfg.allowed_member_count >= SLE_TEAM_MAX_MEMBERS) {
+        return SLE_TEAM_ERR_BUF;
+    }
+    if (sle_team_alloc_offline_member_record(node, member_id) == NULL) {
+        if (was_filter_enabled == 0U) {
+            node->cfg.member_filter_enabled = 0U;
+        }
         return SLE_TEAM_ERR_BUF;
     }
     node->cfg.allowed_member_ids[node->cfg.allowed_member_count++] = member_id;
@@ -480,9 +621,8 @@ int sle_team_node_remove_allowed_member(sle_team_node_t *node, uint8_t member_id
         }
         node->cfg.allowed_member_count--;
         node->cfg.allowed_member_ids[node->cfg.allowed_member_count] = 0U;
-        /* Revoke cached online membership state after explicit allowlist removal. */
         for (j = 0U; j < SLE_TEAM_MAX_MEMBERS; j++) {
-            if (node->members[j].online != 0U && node->members[j].member_id == member_id) {
+            if (node->members[j].member_id == member_id) {
                 (void)memset(&node->members[j], 0, sizeof(node->members[j]));
                 break;
             }
@@ -678,6 +818,19 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     }
 
     (void)memcpy(&hello, app->body, sizeof(hello));
+    if (sle_team_should_stage_pairing_hello(node, app->src_id) != 0U) {
+        pending = sle_team_get_pending_slot(node, app->src_id, 1U);
+        if (pending != NULL) {
+            pending->role = hello.role;
+            pending->battery_percent = hello.battery_percent;
+            pending->mac_ready = hello.mac_ready;
+            (void)memcpy(pending->mac, hello.mac, sizeof(pending->mac));
+            pending->last_seen_s = sle_team_now(node);
+            sle_team_log(node, "member pending approval");
+            return SLE_TEAM_OK;
+        }
+        return SLE_TEAM_ERR_BUF;
+    }
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER && sle_team_node_is_member_allowed(node, app->src_id) == 0U) {
         if (sle_team_node_has_member_record(node, app->src_id) != 0U) {
             sle_team_log(node, "known member hello before allowlist sync");
@@ -1220,16 +1373,14 @@ int sle_team_node_send_route_update(sle_team_node_t *node, uint8_t dst_id, uint8
 
 const sle_team_member_record_t *sle_team_node_find_member(const sle_team_node_t *node, uint8_t member_id)
 {
-    uint8_t i;
+    const sle_team_member_record_t *member;
 
     if (node == NULL) {
         return NULL;
     }
-
-    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
-        if (node->members[i].online != 0U && node->members[i].member_id == member_id) {
-            return &node->members[i];
-        }
+    member = sle_team_find_member_record_const(node, member_id);
+    if (member != NULL && member->online != 0U) {
+        return member;
     }
     return NULL;
 }

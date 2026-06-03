@@ -250,6 +250,12 @@ GET /api/nodes
 GET /api/events
 GET /api/pending
 GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...
+GET /api/config/status
+GET /api/config/leader?team=1&channel=17&now=1
+GET /api/config/member?leader=C7E9&team=1&channel=17&now=1
+GET /api/config/apply
+GET /api/config/clear
+GET /api/config/reboot
 GET /api/role?role=leader
 GET /api/role?role=member&leader=C7E9&team=1&channel=17
 GET /api/pairing?action=start|stop|approve&id=2&relay=1

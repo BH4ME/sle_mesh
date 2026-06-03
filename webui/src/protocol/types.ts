@@ -169,8 +169,48 @@ export interface AllowMembersCommand {
   memberIds?: number[];
 }
 
+export type ConfigRole = NodeRole | "none";
+
+export interface DeviceConfigStatus {
+  ok: boolean;
+  fw?: string;
+  selfSuffix: string;
+  routeId: number;
+  nvValid: boolean;
+  nvRole: ConfigRole;
+  nvRoleValue: number;
+  nvTeam: number;
+  nvChannel: number;
+  nvLeaderSuffix: string;
+  runtimeConfigured: boolean;
+  runtimeRole: ConfigRole;
+  runtimeRoleValue: number;
+  runtimeTeam: number;
+  runtimeChannel: number;
+  runtimeLeader: number;
+  runtimeSelf: number;
+  roleRequestPending: boolean;
+  roleRequestRole: ConfigRole;
+  roleRequestTeam: number;
+  roleRequestChannel: number;
+  roleRequestLeader: number;
+  roleRequestLeaderSuffix: string;
+  roleRequestLastRet: number;
+}
+
+export type DeviceConfigCommand =
+  | { role: "leader"; teamId: number; channel: number; applyNow: boolean }
+  | { role: "member"; leaderSuffix: string; teamId: number; channel: number; applyNow: boolean };
+
+export interface DeviceConfigResult {
+  ok: boolean;
+  action: string;
+  ret: number;
+  config: DeviceConfigStatus;
+}
+
 export type RoleCommand =
-  | { role: "leader" }
+  | { role: "leader"; teamId: number; channel: number }
   | { role: "member"; leaderSuffix: string; teamId: number; channel: number };
 
 export type PairingCommand =
