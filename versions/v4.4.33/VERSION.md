@@ -48,7 +48,7 @@ Performed on 2026-06-02 from this Windows PC:
 - Build fallback: Python Paramiko, because local `sshpass` was not installed
 - SDK: `/home/owen/workspace/bearpi-pico_h3863`
 - Local package:
-  `E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`
+  `<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`
 - Package size: `1427240`
 - Package timestamp: `2026-06-02 17:34:10`
 - `COM13`: flashed successfully with manual reset

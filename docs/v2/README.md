@@ -4,9 +4,9 @@
 
 ## 核心文档
 
-- [networking-goal.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/networking-goal.md)：V2 目标、约束、验收标准
-- [review_framework.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/review_framework.md)：审查执行框架
-- [protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v2/protocol.md)：V2 协议总览
+- [networking-goal.md](<repo-root>/docs/v2/networking-goal.md)：V2 目标、约束、验收标准
+- [review_framework.md](<repo-root>/docs/v2/review_framework.md)：审查执行框架
+- [protocol.md](<repo-root>/docs/v2/protocol.md)：V2 协议总览
 
 ## 说明
 

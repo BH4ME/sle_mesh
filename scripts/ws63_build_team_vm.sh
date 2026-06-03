@@ -17,10 +17,10 @@ They do not produce role-specific firmware; role is selected at runtime.
 Environment:
   VM_HOST=127.0.0.1
   VM_PORT=2222
-  VM_USER=codex
-  VM_PASS=codex
-  VM_SDK=/home/codex/workspace/bearpi-pico_h3863_fresh
-  OUT_ROOT=/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm
+  VM_USER=builder
+  VM_PASS=builder
+  VM_SDK=/home/builder/workspace/bearpi-pico_h3863_fresh
+  OUT_ROOT=/path/to/output_from_vm
 USAGE
 }
 
@@ -44,12 +44,12 @@ esac
 
 VM_HOST="${VM_HOST:-127.0.0.1}"
 VM_PORT="${VM_PORT:-2222}"
-VM_USER="${VM_USER:-codex}"
-VM_PASS="${VM_PASS:-codex}"
-VM_SDK="${VM_SDK:-/home/codex/workspace/bearpi-pico_h3863_fresh}"
-OUT_ROOT="${OUT_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
-BUILD_JOBS="${BUILD_JOBS:-4}"
+VM_USER="${VM_USER:-builder}"
+VM_PASS="${VM_PASS:-builder}"
+VM_SDK="${VM_SDK:-/home/builder/workspace/bearpi-pico_h3863_fresh}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
+BUILD_JOBS="${BUILD_JOBS:-4}"
 CONFIG_PATH="$VM_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
 REMOTE_PROTO="$VM_SDK/third_party/sle_mesh"
 REMOTE_APP="$VM_SDK/application/samples/products/sle_team_network"

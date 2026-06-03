@@ -18,7 +18,7 @@
 
 - Ubuntu 编译机 `owen@192.168.6.130` 出包通过。
 - 新统一固件包已生成：
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
 
 已知限制：
 

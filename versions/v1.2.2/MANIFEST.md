@@ -15,26 +15,26 @@
 
 ## 源码快照
 
-- [include/sle_team_packet.h](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/include/sle_team_packet.h)
-- [include/sle_team_node.h](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/include/sle_team_node.h)
-- [include/sle_team_cli.h](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/include/sle_team_cli.h)
-- [src/sle_team_packet.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/src/sle_team_packet.c)
-- [src/sle_team_node.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/src/sle_team_node.c)
-- [src/sle_team_cli.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/src/sle_team_cli.c)
+- [include/sle_team_packet.h](<repo-root>/versions/v1.2.2/include/sle_team_packet.h)
+- [include/sle_team_node.h](<repo-root>/versions/v1.2.2/include/sle_team_node.h)
+- [include/sle_team_cli.h](<repo-root>/versions/v1.2.2/include/sle_team_cli.h)
+- [src/sle_team_packet.c](<repo-root>/versions/v1.2.2/src/sle_team_packet.c)
+- [src/sle_team_node.c](<repo-root>/versions/v1.2.2/src/sle_team_node.c)
+- [src/sle_team_cli.c](<repo-root>/versions/v1.2.2/src/sle_team_cli.c)
 
 ## 示例快照
 
-- [examples/team_node_common.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/examples/team_node_common.c)
-- [examples/team_network_demo.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/examples/team_network_demo.c)
-- [examples/app_terminal_node.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/examples/app_terminal_node.c)
+- [examples/team_node_common.c](<repo-root>/versions/v1.2.2/examples/team_node_common.c)
+- [examples/team_network_demo.c](<repo-root>/versions/v1.2.2/examples/team_network_demo.c)
+- [examples/app_terminal_node.c](<repo-root>/versions/v1.2.2/examples/app_terminal_node.c)
 
 ## 文档快照
 
-- [docs/protocol/README.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/docs/protocol/README.md)
-- [docs/protocol/packet-structure.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/docs/protocol/packet-structure.md)
-- [docs/protocol/messages.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/docs/protocol/messages.md)
-- [docs/protocol/terminal-cli.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/docs/protocol/terminal-cli.md)
-- [docs/protocol/versioning.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/docs/protocol/versioning.md)
+- [docs/protocol/README.md](<repo-root>/versions/v1.2.2/docs/protocol/README.md)
+- [docs/protocol/packet-structure.md](<repo-root>/versions/v1.2.2/docs/protocol/packet-structure.md)
+- [docs/protocol/messages.md](<repo-root>/versions/v1.2.2/docs/protocol/messages.md)
+- [docs/protocol/terminal-cli.md](<repo-root>/versions/v1.2.2/docs/protocol/terminal-cli.md)
+- [docs/protocol/versioning.md](<repo-root>/versions/v1.2.2/docs/protocol/versioning.md)
 
 ## 校验命令
 

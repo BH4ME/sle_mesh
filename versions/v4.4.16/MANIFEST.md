@@ -36,4 +36,4 @@
   - Command: `python3 build.py ws63-liteos-app -j4`
   - Output:
     - Remote: `/home/owen/workspace/bearpi-pico_h3863/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg`
-    - Local: `E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`
+    - Local: `<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`

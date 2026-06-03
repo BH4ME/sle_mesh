@@ -33,4 +33,4 @@
 
 - 协议/状态机本地回归通过。
 - 远端 Ubuntu 交叉编译通过，产物成功回传：
-  - `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg`
+  - `<sdk-root>/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg`

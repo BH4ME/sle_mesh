@@ -2,9 +2,9 @@
 
 串口 CLI 代码：
 
-- [sle_team_cli.h](/Users/bh4me_macair/Documents/Codex/sle_intercom/include/sle_team_cli.h)
-- [sle_team_cli.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/src/sle_team_cli.c)
-- [app_terminal_node.c](/Users/bh4me_macair/Documents/Codex/sle_intercom/examples/app_terminal_node.c)
+- [sle_team_cli.h](<repo-root>/include/sle_team_cli.h)
+- [sle_team_cli.c](<repo-root>/src/sle_team_cli.c)
+- [app_terminal_node.c](<repo-root>/examples/app_terminal_node.c)
 
 ## 角色选择
 

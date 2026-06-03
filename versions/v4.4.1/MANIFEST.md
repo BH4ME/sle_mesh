@@ -45,7 +45,7 @@ Result: pass
 Package:
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 Size: 1507176 bytes
 Last write: 2026-05-31 01:25:02 +08:00
 SHA256: 13F461F124552BC8DC51FCF06EE48E4E5C44F0D94B2BF54B0FE25B6673F817D6

@@ -36,14 +36,14 @@
 
 ## 工作记录
 
-- [task_plan.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/task_plan.md)
-- [findings.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/findings.md)
-- [progress.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v4/progress.md)
+- [task_plan.md](<repo-root>/docs/v4/task_plan.md)
+- [findings.md](<repo-root>/docs/v4/findings.md)
+- [progress.md](<repo-root>/docs/v4/progress.md)
 
 ## 代码位置
 
 - V4 上板工程统一维护在：
-  - [xc/ws63_team_network](/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network)
+  - [xc/ws63_team_network](<repo-root>/xc/ws63_team_network)
 
 ## 版本管理
 

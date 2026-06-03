@@ -7,7 +7,7 @@ Date: 2026-05-31
 - Build host: `192.168.6.5`
 - SSH user: `owen`
 - Remote SDK: `/home/owen/workspace/bearpi-pico_h3863`
-- Local firmware output: `E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`
+- Local firmware output: `<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg`
 - Flash port: `COM16`
 - USB serial adapter observed as: `USB-SERIAL CH340 (COM16)`
 
@@ -16,7 +16,7 @@ Date: 2026-05-31
 Use the remote Ubuntu machine, not the local VM:
 
 ```powershell
-bash -lc "cd /mnt/e/codex_documents/sle && UBUNTU_HOST=192.168.6.5 UBUNTU_USER=owen UBUNTU_PASS='<set locally, do not commit secrets>' UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 BUILD_JOBS=4 ./scripts/ws63_build_v4_ubuntu.sh unified"
+bash -lc "cd <repo-root> && UBUNTU_HOST=192.168.6.5 UBUNTU_USER=owen UBUNTU_PASS='<set locally, do not commit secrets>' UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 BUILD_JOBS=4 ./scripts/ws63_build_v4_ubuntu.sh unified"
 ```
 
 If `sshpass` is missing locally, use the Python/Paramiko path that was confirmed during v4.4:
@@ -53,7 +53,7 @@ Expected:
 ## Flash Command
 
 ```powershell
-python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py `
+python <repo-root>\automation\ws63\tools\ws63_auto_burn.py `
   -p COM16 `
   -b 115200 `
   --software-reset-only `
@@ -62,7 +62,7 @@ python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py `
   --reset-command-delay 0.3 `
   --reset-command-retries 2 `
   --reset-command-retry-gap 0.2 `
-  E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+  <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 ## Successful Flash Evidence

@@ -19,7 +19,7 @@
 
 - Ubuntu 编译机 `owen@192.168.6.130` 出包通过。
 - 两块 WS63 已烧录同一个统一固件包：
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
 - 实测 member 首次 `NOT_READY` 后出现 `member force rescan reason=not_ready`，随后完成 SLE scan/connect/pair/service discovery。
 - 实测 SLE RSSI 回调有真实值，例如 `-31 dBm`、`-28 dBm`、`-15 dBm`。
 - leader 收到 member `HELLO`，批准后 member 收到 `CONFIG + ACK` 并进入 joined。

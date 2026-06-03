@@ -8,7 +8,7 @@
 2. 执行 `git status --short --branch`，确认当前分支、脏文件和未跟踪产物。
 3. 确认最新版本号：优先看 `README.md` 的“当前版本”和 `versions/README.md` 顶部。
 4. 不要回退别人或上一次调试留下的改动；如果改动冲突，先停下来确认。
-5. 新工作默认在 `codex/` 前缀分支上完成，除非用户明确要求别的分支。
+5. 新工作默认在 `line/` 前缀分支上完成，除非用户明确要求别的分支。
 
 ## 2. 版本管理硬规则
 
@@ -58,7 +58,7 @@ scripts/ws63_build_v4_ubuntu.sh unified
 输出固件固定记录为：
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 如果本机缺少 `sshpass` 或 `rsync`，允许用 Python `paramiko` 做同等步骤，但版本记录里必须写清楚使用了 fallback。
@@ -68,7 +68,7 @@ E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-
 COM16 成功路径：
 
 ```powershell
-python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py `
+python <repo-root>\automation\ws63\tools\ws63_auto_burn.py `
   -p COM16 `
   -b 115200 `
   --software-reset-only `
@@ -77,7 +77,7 @@ python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py `
   --reset-command-delay 0.3 `
   --reset-command-retries 2 `
   --reset-command-retry-gap 0.2 `
-  E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+  <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 注意事项：

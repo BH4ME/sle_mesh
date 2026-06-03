@@ -170,7 +170,7 @@ scripts/ws63_build_v4_ubuntu.sh unified
 输出统一固件包：
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 COM16 自动烧录流程见 [../../meta/PROJECT_OPERATION_SOP.md](../../meta/PROJECT_OPERATION_SOP.md)，成功记录见 [../../versions/v4.4/AUTO_FLASH_NOTES.md](../../versions/v4.4/AUTO_FLASH_NOTES.md)。

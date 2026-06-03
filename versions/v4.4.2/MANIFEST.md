@@ -50,7 +50,7 @@ Memory: SRAM 196208/548608 bytes (35.76%), PROGRAM 1346620/2357504 bytes (57.12%
 Package:
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 Size: 1507176 bytes
 Last write: 2026-05-31 01:44:00 +08:00
 SHA256: AA31C7A24568EA27EBBB50F037AF2A9D4618661F2BE710512A832406EBEDCDF8
@@ -70,7 +70,7 @@ Flash:
 
 ```text
 Port: COM16
-Command: python E:\codex_documents\sle\automation\ws63\tools\ws63_auto_burn.py -p COM16 -b 115200 --software-reset-only --reset-command reboot --reset-command-fallback reset --reset-command-delay 0.3 --reset-command-retries 2 --reset-command-retry-gap 0.2 E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+Command: python <repo-root>\automation\ws63\tools\ws63_auto_burn.py -p COM16 -b 115200 --software-reset-only --reset-command reboot --reset-command-fallback reset --reset-command-delay 0.3 --reset-command-retries 2 --reset-command-retry-gap 0.2 <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 Time: 2026-05-31 12:58:55 to 13:01:19 +08:00
 Result: pass, all YMODEM transfers reached 100%, tool printed "Done. Reseting device..." and exited 0
 ```

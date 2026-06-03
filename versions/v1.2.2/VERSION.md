@@ -7,7 +7,7 @@
 说明：
 
 - 本目录用于标记当前协议与代码实现版本。
-- 当前版本快照清单见 [MANIFEST.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2/MANIFEST.md)。
+- 当前版本快照清单见 [MANIFEST.md](<repo-root>/versions/v1.2.2/MANIFEST.md)。
 
 备注：
 

@@ -3,7 +3,7 @@
 **Reviewer:** DeepSeek Flash (deepseek-v4-flash)
 **Date:** 2026-05-10
 **Version:** v2.0.0-alpha11
-**Branch:** codex/v2-networking-auto-parent
+**Branch:** line/v2-auto-networking
 **Scope:** 增量/小修改 — alpha11 之上的 3 项加固修复（HELLO ACK 拒绝、CONFIG 角色/来源守卫、心跳零间隔守卫）
 
 ---

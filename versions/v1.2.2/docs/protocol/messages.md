@@ -4,7 +4,7 @@
 
 当前定义在：
 
-- [sle_team_packet.h](/Users/bh4me_macair/Documents/Codex/sle_intercom/include/sle_team_packet.h)
+- [sle_team_packet.h](<repo-root>/include/sle_team_packet.h)
 
 ## 消息类型
 

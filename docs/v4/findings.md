@@ -64,9 +64,9 @@
 
 ## Resources
 - `/Users/bh4me_macair/Desktop/SCH_Schematic1_2026-05-19.pdf`
-- `/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network/README.md`
-- `/Users/bh4me_macair/Documents/Codex/sle_intercom/xc/ws63_team_network/src/ws63_team_network_app.c`
-- `/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha8/VERSION.md`
-- `/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v3.0.0-alpha8/MANIFEST.md`
-- `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/application/samples/peripheral/spi/spi_master_demo.c`
-- `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/application/samples/peripheral/spi/ssd1306.c`
+- `<repo-root>/xc/ws63_team_network/README.md`
+- `<repo-root>/xc/ws63_team_network/src/ws63_team_network_app.c`
+- `<repo-root>/versions/v3.0.0-alpha8/VERSION.md`
+- `<repo-root>/versions/v3.0.0-alpha8/MANIFEST.md`
+- `<sdk-root>/application/samples/peripheral/spi/spi_master_demo.c`
+- `<sdk-root>/application/samples/peripheral/spi/ssd1306.c`

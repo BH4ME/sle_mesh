@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AUTO_BURN_TOOL="$ROOT_DIR/automation/ws63/tools/ws63_auto_burn.py"
 BURN_TOOL="${BURN_TOOL:-$AUTO_BURN_TOOL}"
-FW_ROOT="${FW_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
+FW_ROOT="${FW_ROOT:-$ROOT_DIR/output_from_vm}"
 AUTO_RESET="${AUTO_RESET:-1}"
 RESET_COMMAND="${RESET_COMMAND:-reboot}"
 RESET_COMMAND_FALLBACK="${RESET_COMMAND_FALLBACK:-reset}"

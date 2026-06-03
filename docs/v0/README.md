@@ -10,8 +10,8 @@
 
 ## 当前可参考文档
 
-- [baseline.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/baseline.md)
-- [protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v0/protocol.md)
+- [baseline.md](<repo-root>/docs/v0/baseline.md)
+- [protocol.md](<repo-root>/docs/v0/protocol.md)
 
 ## 说明
 

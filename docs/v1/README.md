@@ -11,5 +11,5 @@
 
 ## 文档
 
-- [networking.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/networking.md)
-- [protocol.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/v1/protocol.md)
+- [networking.md](<repo-root>/docs/v1/networking.md)
+- [protocol.md](<repo-root>/docs/v1/protocol.md)

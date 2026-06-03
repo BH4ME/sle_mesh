@@ -62,4 +62,4 @@ scripts/ws63_build_v4_ubuntu.sh unified
 
 产物：
 
-- `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg`
+- `<sdk-root>/output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_unified_all.fwpkg`

@@ -61,14 +61,14 @@ Mac 直接编译容易遇到：
 本次 VM 通过 QEMU user network 暴露 SSH：
 
 ```sh
-ssh -p 2222 codex@127.0.0.1
+ssh -p 2222 builder@127.0.0.1
 ```
 
 VM 用户：
 
 ```text
-user: codex
-password: codex
+user: builder
+password: builder
 ```
 
 ## VM 安装依赖
@@ -125,7 +125,7 @@ which(...)
 第一次把 Mac 上的 SDK 整目录同步到 VM 后，原有 `output/` 里残留了 Mac 路径，例如：
 
 ```text
-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output/...
+<sdk-root>/output/...
 ```
 
 VM 构建时会报类似 CMakeCache 路径不一致的问题。
@@ -134,8 +134,8 @@ VM 构建时会报类似 CMakeCache 路径不一致的问题。
 
 ```sh
 rsync -a --exclude=/output \
-  /home/codex/workspace/bearpi-pico_h3863/ \
-  /home/codex/workspace/bearpi-pico_h3863_fresh/
+  /home/builder/workspace/bearpi-pico_h3863/ \
+  /home/builder/workspace/bearpi-pico_h3863_fresh/
 ```
 
 注意只排除根目录 `output`，不要排除所有叫 `output` 的目录。
@@ -160,7 +160,7 @@ drivers/chips/ws63/rom_config/acore/output/rom_callback_wrap.cmake
 
 ```sh
 export PATH="$HOME/.local/bin:$PATH"
-cd /home/codex/workspace/bearpi-pico_h3863_fresh
+cd /home/builder/workspace/bearpi-pico_h3863_fresh
 python3 build.py ws63-liteos-app -j4
 ```
 
@@ -178,13 +178,13 @@ packet success!
 完整烧录包：
 
 ```text
-/home/codex/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
+/home/builder/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
 ```
 
 只更新应用的包：
 
 ```text
-/home/codex/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_load_only.fwpkg
+/home/builder/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_load_only.fwpkg
 ```
 
 第一次上板建议使用完整包 `ws63-liteos-app_all.fwpkg`，避免 bootloader、分区、NV 状态不一致。
@@ -192,11 +192,11 @@ packet success!
 ## 拷回 Mac
 
 ```sh
-mkdir -p /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm
+mkdir -p <sdk-root>/output_from_vm
 
 scp -P 2222 \
-  codex@127.0.0.1:/home/codex/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg \
-  /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/
+  builder@127.0.0.1:/home/builder/workspace/bearpi-pico_h3863_fresh/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg \
+  <sdk-root>/output_from_vm/
 ```
 
 ## Mac 串口识别
@@ -245,7 +245,7 @@ python3 -m pip install --user xf-burn-tools rich
 
 ```sh
 /Users/bh4me_macair/Library/Python/3.9/bin/burn -s \
-  /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/ws63-liteos-app_all.fwpkg
+  <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg
 ```
 
 ## 烧录命令
@@ -254,7 +254,7 @@ python3 -m pip install --user xf-burn-tools rich
 
 ```sh
 printf 'flash leader\n' | \
-  /Users/bh4me_macair/Documents/Codex/sle_intercom/scripts/ws63_flash_team.sh \
+  <repo-root>/scripts/ws63_flash_team.sh \
   leader /dev/tty.usbserial-10
 ```
 
@@ -273,7 +273,7 @@ printf 'flash leader\n' | \
 /Users/bh4me_macair/Library/Python/3.9/bin/burn \
   -p /dev/tty.usbserial-10 \
   -b 115200 \
-  /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/ws63-liteos-app_all.fwpkg
+  <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg
 ```
 
 烧录过程中如果工具停在：
@@ -496,7 +496,7 @@ rsync -a --exclude=/output source/ fresh/
 编译：
 
 ```sh
-cd /home/codex/workspace/bearpi-pico_h3863_fresh
+cd /home/builder/workspace/bearpi-pico_h3863_fresh
 export PATH="$HOME/.local/bin:$PATH"
 python3 build.py ws63-liteos-app -j4
 ```
@@ -507,7 +507,7 @@ python3 build.py ws63-liteos-app -j4
 /Users/bh4me_macair/Library/Python/3.9/bin/burn \
   -p /dev/tty.usbserial-10 \
   -b 115200 \
-  /Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/ws63-liteos-app_all.fwpkg
+  <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg
 ```
 
 串口查看：

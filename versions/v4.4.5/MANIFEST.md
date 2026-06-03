@@ -44,7 +44,7 @@ Memory summary: SRAM 196208 / 548608 bytes (35.76%), PROGRAM 1347580 / 2357504 b
 Package:
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 Size: 1508136 bytes
 SHA256: E31395BBE43A4ED203B27A317F089ECD1CD70279DDF8600F2F7B148E27057AFB
 String check: v4.4.5 / SLE V4.4.5 / v4.4.5 board map present; v4.4.4 absent
