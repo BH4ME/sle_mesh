@@ -6,7 +6,7 @@
 
 - `automation/ws63/tools/`
   - `ws63_auto_burn.py`：自动复位烧录工具（串口 `reboot` + DTR/RTS）。
-  - `ws63_link_cycle_test.py`：串口连接回归（connect -> leave -> reconnect）。
+  - `ws63_link_cycle_test.py`：串口 member 生命周期回归（重启自动恢复 + 手动 leave/rejoin）。
   - `ws63_flash_bind_team.py`：批量烧录并绑定角色（1 个 leader -> N 个 members）。
 - `automation/ws63/scripts/`
   - `ws63_test_system.sh`：自动化总入口（单测 / 仿真 / 烧录 / role-bind / link-cycle）。

@@ -94,6 +94,14 @@ static const suite_member_t *suite_find_member_const(const suite_cluster_t *clus
     return NULL;
 }
 
+static void suite_set_member_rssi(suite_cluster_t *cluster, uint8_t member_id, int8_t rssi_dbm)
+{
+    suite_member_t *member = suite_find_member(cluster, member_id);
+
+    assert(member != NULL);
+    member->last_rssi_dbm = rssi_dbm;
+}
+
 static void suite_route_clear_by_next_hop(suite_cluster_t *cluster, uint8_t next_hop_id)
 {
     uint8_t i;
@@ -408,10 +416,10 @@ static void suite_seed_cluster(suite_cluster_t *cluster)
     }
 
     /* Keep fallback candidates deterministic for relay promotion order. */
-    suite_find_member(cluster, 5U)->last_rssi_dbm = -55;
-    suite_find_member(cluster, 6U)->last_rssi_dbm = -60;
-    suite_find_member(cluster, 7U)->last_rssi_dbm = -65;
-    suite_find_member(cluster, 8U)->last_rssi_dbm = -75;
+    suite_set_member_rssi(cluster, 5U, -55);
+    suite_set_member_rssi(cluster, 6U, -60);
+    suite_set_member_rssi(cluster, 7U, -65);
+    suite_set_member_rssi(cluster, 8U, -75);
 }
 
 static void suite_refresh_online_seen(suite_cluster_t *cluster, uint32_t now_s)

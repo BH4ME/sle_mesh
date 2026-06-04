@@ -70,7 +70,11 @@
 #define ST7789_COLOR_RED 0xF800U
 #define ST7789_COLOR_GREEN 0x07E0U
 #define ST7789_COLOR_YELLOW 0xFFE0U
-#define ST7789_MAX_TEXT_LEN 32U
+#define ST7789_COLOR_CYAN 0x07FFU
+#define ST7789_COLOR_ORANGE 0xFD20U
+#define ST7789_COLOR_NAVY 0x000BU
+#define ST7789_COLOR_PANEL 0x0865U
+#define ST7789_MAX_TEXT_LEN 48U
 #define ST7789_FONT6X8_FIRST 32U
 #define ST7789_FONT6X8_COUNT ((uint8_t)(sizeof(g_st7789_font6x8) / sizeof(g_st7789_font6x8[0])))
 #define ST7789_FONT6X8_WIDTH 6U
@@ -84,7 +88,7 @@ static uint32_t g_st7789_last_tick_ms;
 static uint8_t g_st7789_status_cache_valid;
 static uint8_t g_st7789_last_online_count;
 static uint8_t g_st7789_last_offline_count;
-static uint8_t g_st7789_last_alert_count;
+static uint8_t g_st7789_last_event_count;
 static char g_st7789_last_role[16];
 static char g_st7789_last_self[16];
 static char g_st7789_last_fw[24];
@@ -98,12 +102,124 @@ static lv_disp_t *g_st7789_lv_display;
 static lv_disp_draw_buf_t g_st7789_lv_draw_buf;
 static lv_disp_drv_t g_st7789_lv_disp_drv;
 #endif
+static lv_obj_t *g_st7789_lv_panel_status;
+static lv_obj_t *g_st7789_lv_panel_event;
+static lv_obj_t *g_st7789_lv_event_rail;
+static lv_obj_t *g_st7789_lv_accent_rail;
 static lv_obj_t *g_st7789_lv_label_title;
 static lv_obj_t *g_st7789_lv_label_status;
-static lv_obj_t *g_st7789_lv_label_alert;
+static lv_obj_t *g_st7789_lv_label_event;
 static lv_color_t *g_st7789_lv_buf1;
 static uint32_t g_st7789_lv_buf_px_count;
 static uint8_t g_st7789_lv_ready;
+#endif
+
+static const char *st7789_event_name(uint8_t event)
+{
+    switch (event) {
+        case WS63_ST7789_EVENT_JOIN:
+            return "JOIN";
+        case WS63_ST7789_EVENT_LEFT:
+            return "LEFT";
+        case WS63_ST7789_EVENT_TIMEOUT:
+            return "TIMEOUT";
+        case WS63_ST7789_EVENT_LOST:
+            return "LOST";
+        case WS63_ST7789_EVENT_REJOIN:
+            return "REJOIN";
+        default:
+            return "EVENT";
+    }
+}
+
+static uint16_t st7789_event_color565(uint8_t event)
+{
+    switch (event) {
+        case WS63_ST7789_EVENT_JOIN:
+        case WS63_ST7789_EVENT_REJOIN:
+            return ST7789_COLOR_GREEN;
+        case WS63_ST7789_EVENT_LEFT:
+            return ST7789_COLOR_ORANGE;
+        case WS63_ST7789_EVENT_TIMEOUT:
+        case WS63_ST7789_EVENT_LOST:
+            return ST7789_COLOR_RED;
+        default:
+            return ST7789_COLOR_CYAN;
+    }
+}
+
+static const char *st7789_event_hint(uint8_t event)
+{
+    switch (event) {
+        case WS63_ST7789_EVENT_JOIN:
+            return "NODE ONLINE";
+        case WS63_ST7789_EVENT_LEFT:
+            return "MANUAL LEAVE";
+        case WS63_ST7789_EVENT_TIMEOUT:
+            return "HEARTBEAT T/O";
+        case WS63_ST7789_EVENT_LOST:
+            return "LINK LOST";
+        case WS63_ST7789_EVENT_REJOIN:
+            return "BACK ONLINE";
+        default:
+            return "LINK EVENT";
+    }
+}
+
+#if SLE_TEAM_USE_LVGL_BACKEND
+static uint32_t st7789_event_color_hex(uint8_t event)
+{
+    switch (event) {
+        case WS63_ST7789_EVENT_JOIN:
+        case WS63_ST7789_EVENT_REJOIN:
+            return 0x22C55E;
+        case WS63_ST7789_EVENT_LEFT:
+            return 0xF97316;
+        case WS63_ST7789_EVENT_TIMEOUT:
+        case WS63_ST7789_EVENT_LOST:
+            return 0xF43F5E;
+        default:
+            return 0x38BDF8;
+    }
+}
+
+static void st7789_lvgl_style_panel(lv_obj_t *obj, uint32_t bg, uint32_t border)
+{
+    if (obj == NULL) {
+        return;
+    }
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(obj, 8, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(bg), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(obj, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(obj, lv_color_hex(border), LV_PART_MAIN);
+    lv_obj_set_style_border_opa(obj, LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(obj, 4, LV_PART_MAIN);
+}
+
+static void st7789_lvgl_style_rail(lv_obj_t *obj, uint32_t color)
+{
+    if (obj == NULL) {
+        return;
+    }
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(obj, 4, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN);
+}
+
+static void st7789_lvgl_config_label(lv_obj_t *label, uint16_t width, uint32_t color)
+{
+    if (label == NULL) {
+        return;
+    }
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(label, width);
+    lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
+    lv_obj_set_style_text_line_space(label, 2, LV_PART_MAIN);
+}
 #endif
 
 /*
@@ -728,25 +844,53 @@ static void st7789_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
 static void st7789_lvgl_create_ui(void)
 {
     lv_obj_t *root = lv_scr_act();
+    uint16_t panel_w = g_st7789_cfg.width > 18U ? (uint16_t)(g_st7789_cfg.width - 18U) : g_st7789_cfg.width;
 
-    lv_obj_set_style_bg_color(root, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(root, lv_color_hex(0x020617), LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_color(root, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_VER, LV_PART_MAIN);
     lv_obj_set_style_text_color(root, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    lv_obj_set_style_pad_all(root, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(root, 0, LV_PART_MAIN);
 
-    g_st7789_lv_label_title = lv_label_create(root);
-    lv_obj_set_style_text_color(g_st7789_lv_label_title, lv_color_hex(0x34D399), LV_PART_MAIN);
+    g_st7789_lv_accent_rail = lv_obj_create(root);
+    st7789_lvgl_style_rail(g_st7789_lv_accent_rail, 0x22C55E);
+    lv_obj_set_size(g_st7789_lv_accent_rail, 4, (lv_coord_t)(g_st7789_cfg.height > 8U ? g_st7789_cfg.height - 8U : 1U));
+    lv_obj_align(g_st7789_lv_accent_rail, LV_ALIGN_TOP_LEFT, 3, 4);
+
+    g_st7789_lv_panel_status = lv_obj_create(root);
+    st7789_lvgl_style_panel(g_st7789_lv_panel_status, 0x07111F, 0x1D4ED8);
+    lv_obj_set_size(g_st7789_lv_panel_status, panel_w, 47);
+    lv_obj_align(g_st7789_lv_panel_status, LV_ALIGN_TOP_LEFT, 11, 4);
+
+    g_st7789_lv_label_title = lv_label_create(g_st7789_lv_panel_status);
+    st7789_lvgl_config_label(g_st7789_lv_label_title, (uint16_t)(panel_w > 12U ? panel_w - 12U : panel_w), 0x67E8F9);
+    lv_obj_set_style_text_letter_space(g_st7789_lv_label_title, 1, LV_PART_MAIN);
     lv_obj_align(g_st7789_lv_label_title, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_label_set_text(g_st7789_lv_label_title, "SLE boot");
+    lv_label_set_text(g_st7789_lv_label_title, "SLE//BOOT  LINK-MESH");
 
-    g_st7789_lv_label_status = lv_label_create(root);
-    lv_obj_set_style_text_color(g_st7789_lv_label_status, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    lv_obj_align(g_st7789_lv_label_status, LV_ALIGN_TOP_LEFT, 0, 20);
-    lv_label_set_text(g_st7789_lv_label_status, "ID - ON 0 LOST 0");
+    g_st7789_lv_label_status = lv_label_create(g_st7789_lv_panel_status);
+    st7789_lvgl_config_label(g_st7789_lv_label_status, (uint16_t)(panel_w > 12U ? panel_w - 12U : panel_w), 0xF8FAFC);
+    lv_obj_align(g_st7789_lv_label_status, LV_ALIGN_TOP_LEFT, 0, 22);
+    lv_label_set_text(g_st7789_lv_label_status, "SELF -- | ON 0 OFF 0 EVT 0");
 
-    g_st7789_lv_label_alert = lv_label_create(root);
-    lv_obj_set_style_text_color(g_st7789_lv_label_alert, lv_color_hex(0xFACC15), LV_PART_MAIN);
-    lv_obj_align(g_st7789_lv_label_alert, LV_ALIGN_TOP_LEFT, 0, 52);
-    lv_label_set_text(g_st7789_lv_label_alert, "ALERT -");
+    g_st7789_lv_panel_event = lv_obj_create(root);
+    st7789_lvgl_style_panel(g_st7789_lv_panel_event, 0x030712, 0x38BDF8);
+    lv_obj_set_size(g_st7789_lv_panel_event, panel_w, (lv_coord_t)(g_st7789_cfg.height > 62U ? g_st7789_cfg.height - 62U : 50U));
+    lv_obj_align(g_st7789_lv_panel_event, LV_ALIGN_TOP_LEFT, 11, 56);
+
+    g_st7789_lv_event_rail = lv_obj_create(g_st7789_lv_panel_event);
+    st7789_lvgl_style_rail(g_st7789_lv_event_rail, 0x38BDF8);
+    lv_obj_set_size(g_st7789_lv_event_rail, 5, (lv_coord_t)(g_st7789_cfg.height > 82U ? g_st7789_cfg.height - 82U : 40U));
+    lv_obj_align(g_st7789_lv_event_rail, LV_ALIGN_TOP_LEFT, 0, 5);
+
+    g_st7789_lv_label_event = lv_label_create(g_st7789_lv_panel_event);
+    st7789_lvgl_config_label(g_st7789_lv_label_event, (uint16_t)(panel_w > 24U ? panel_w - 24U : panel_w), 0x38BDF8);
+    lv_label_set_long_mode(g_st7789_lv_label_event, LV_LABEL_LONG_WRAP);
+    lv_obj_set_size(g_st7789_lv_label_event, (uint16_t)(panel_w > 24U ? panel_w - 24U : panel_w),
+        (lv_coord_t)(g_st7789_cfg.height > 82U ? g_st7789_cfg.height - 82U : 40U));
+    lv_obj_align(g_st7789_lv_label_event, LV_ALIGN_TOP_LEFT, 12, 4);
+    lv_label_set_text(g_st7789_lv_label_event, "EVENT --\nLINK EVENT\nWAITING MEMBER");
 }
 
 static void st7789_lvgl_flush_now(void)
@@ -866,7 +1010,7 @@ int ws63_st7789_init(const ws63_st7789_config_t *cfg)
 }
 
 int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_count,
-    uint8_t offline_count, uint8_t alert_count, const char *fw_version)
+    uint8_t offline_count, uint8_t event_count, const char *fw_version)
 {
     char line[ST7789_MAX_TEXT_LEN];
     const char *role_text = role != NULL ? role : "-";
@@ -879,7 +1023,7 @@ int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_c
     if (g_st7789_status_cache_valid != 0U &&
         g_st7789_last_online_count == online_count &&
         g_st7789_last_offline_count == offline_count &&
-        g_st7789_last_alert_count == alert_count &&
+        g_st7789_last_event_count == event_count &&
         strcmp(g_st7789_last_role, role_text) == 0 &&
         strcmp(g_st7789_last_self, self_text) == 0 &&
         strcmp(g_st7789_last_fw, fw_text) == 0) {
@@ -887,34 +1031,50 @@ int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_c
     }
 #if SLE_TEAM_USE_LVGL_BACKEND
     if (g_st7789_lv_ready != 0U) {
+        uint32_t status_color = offline_count == 0U ? 0x22C55E : 0xF97316;
+
+        if (g_st7789_lv_accent_rail != NULL) {
+            lv_obj_set_style_bg_color(g_st7789_lv_accent_rail, lv_color_hex(status_color), LV_PART_MAIN);
+        }
+        if (g_st7789_lv_panel_status != NULL) {
+            lv_obj_set_style_border_color(g_st7789_lv_panel_status, lv_color_hex(status_color), LV_PART_MAIN);
+        }
         if (g_st7789_lv_label_title != NULL) {
-            (void)snprintf(line, sizeof(line), "SLE %s %s", fw_text, role_text);
+            (void)snprintf(line, sizeof(line), "SLE//%s  %s", fw_text, role_text);
             lv_label_set_text(g_st7789_lv_label_title, line);
         }
         if (g_st7789_lv_label_status != NULL) {
-            (void)snprintf(line, sizeof(line), "ID %s ON %u OFF %u A%u",
-                self_text, online_count, offline_count, alert_count);
+            (void)snprintf(line, sizeof(line), "%s | ON %u OFF %u EVT %u",
+                self_text, online_count, offline_count, event_count);
             lv_label_set_text(g_st7789_lv_label_status, line);
         }
     } else {
-        st7789_fill_rect(0U, 0U, g_st7789_cfg.width, 48U, ST7789_COLOR_BLACK);
-        (void)snprintf(line, sizeof(line), "SLE %s %s", fw_text, role_text);
-        st7789_draw_text(4U, 8U, line, ST7789_COLOR_GREEN, ST7789_COLOR_BLACK);
-        (void)snprintf(line, sizeof(line), "ID %s ON %u OFF %u A%u",
-            self_text, online_count, offline_count, alert_count);
-        st7789_draw_text(4U, 24U, line, ST7789_COLOR_WHITE, ST7789_COLOR_BLACK);
+        uint16_t status_color = offline_count == 0U ? ST7789_COLOR_GREEN : ST7789_COLOR_ORANGE;
+
+        st7789_fill_rect(0U, 0U, g_st7789_cfg.width, 50U, ST7789_COLOR_NAVY);
+        st7789_fill_rect(0U, 0U, 4U, 50U, status_color);
+        (void)snprintf(line, sizeof(line), "SLE//%s %s", role_text, fw_text);
+        st7789_draw_text(8U, 8U, line, ST7789_COLOR_CYAN, ST7789_COLOR_NAVY);
+        (void)snprintf(line, sizeof(line), "%s ON%u OFF%u E%u",
+            self_text, online_count, offline_count, event_count);
+        st7789_draw_text(8U, 27U, line, ST7789_COLOR_WHITE, ST7789_COLOR_NAVY);
     }
 #else
-    st7789_fill_rect(0U, 0U, g_st7789_cfg.width, 48U, ST7789_COLOR_BLACK);
-    (void)snprintf(line, sizeof(line), "SLE %s %s", fw_text, role_text);
-    st7789_draw_text(4U, 8U, line, ST7789_COLOR_GREEN, ST7789_COLOR_BLACK);
-    (void)snprintf(line, sizeof(line), "ID %s ON %u OFF %u A%u",
-        self_text, online_count, offline_count, alert_count);
-    st7789_draw_text(4U, 24U, line, ST7789_COLOR_WHITE, ST7789_COLOR_BLACK);
+    {
+        uint16_t status_color = offline_count == 0U ? ST7789_COLOR_GREEN : ST7789_COLOR_ORANGE;
+
+        st7789_fill_rect(0U, 0U, g_st7789_cfg.width, 50U, ST7789_COLOR_NAVY);
+        st7789_fill_rect(0U, 0U, 4U, 50U, status_color);
+    }
+    (void)snprintf(line, sizeof(line), "SLE//%s %s", role_text, fw_text);
+    st7789_draw_text(8U, 8U, line, ST7789_COLOR_CYAN, ST7789_COLOR_NAVY);
+    (void)snprintf(line, sizeof(line), "%s ON%u OFF%u E%u",
+        self_text, online_count, offline_count, event_count);
+    st7789_draw_text(8U, 27U, line, ST7789_COLOR_WHITE, ST7789_COLOR_NAVY);
 #endif
     g_st7789_last_online_count = online_count;
     g_st7789_last_offline_count = offline_count;
-    g_st7789_last_alert_count = alert_count;
+    g_st7789_last_event_count = event_count;
     (void)snprintf(g_st7789_last_role, sizeof(g_st7789_last_role), "%s", role_text);
     (void)snprintf(g_st7789_last_self, sizeof(g_st7789_last_self), "%s", self_text);
     (void)snprintf(g_st7789_last_fw, sizeof(g_st7789_last_fw), "%s", fw_text);
@@ -922,34 +1082,59 @@ int ws63_st7789_show_status(const char *role, const char *self, uint8_t online_c
     return 0;
 }
 
-int ws63_st7789_show_alert(uint8_t member_id, int32_t latitude_e6, int32_t longitude_e6, uint32_t last_seen_s)
+int ws63_st7789_show_event(uint8_t event, const char *member_label, int32_t latitude_e6, int32_t longitude_e6,
+    uint32_t last_seen_s)
 {
     char line[ST7789_MAX_TEXT_LEN];
+    const char *event_text = st7789_event_name(event);
+    const char *label_text = (member_label != NULL && member_label[0] != '\0') ? member_label : "--";
+    uint16_t event_color = st7789_event_color565(event);
 
     if (g_st7789_ready == 0U) {
         return -1;
     }
 #if SLE_TEAM_USE_LVGL_BACKEND
-    if (g_st7789_lv_ready != 0U && g_st7789_lv_label_alert != NULL) {
-        char alert_line[ST7789_MAX_TEXT_LEN];
+    if (g_st7789_lv_ready != 0U && g_st7789_lv_label_event != NULL) {
+        char event_line[ST7789_MAX_TEXT_LEN];
+        char meta_line[ST7789_MAX_TEXT_LEN];
+        uint32_t event_color_hex = st7789_event_color_hex(event);
         int32_t lat_int = latitude_e6 / 1000000L;
         int32_t lat_frac = latitude_e6 >= 0 ? (latitude_e6 % 1000000L) : -(latitude_e6 % 1000000L);
         int32_t lon_int = longitude_e6 / 1000000L;
         int32_t lon_frac = longitude_e6 >= 0 ? (longitude_e6 % 1000000L) : -(longitude_e6 % 1000000L);
-        (void)snprintf(alert_line, sizeof(alert_line), "LOST M%u @%lu", member_id, (unsigned long)last_seen_s);
-        (void)snprintf(line, sizeof(line), "LAT %ld.%06ld LON %ld.%06ld",
-            (long)lat_int, (long)lat_frac, (long)lon_int, (long)lon_frac);
-        lv_label_set_text_fmt(g_st7789_lv_label_alert, "%s\n%s", alert_line, line);
+
+        (void)snprintf(event_line, sizeof(event_line), "%s  %s", event_text, label_text);
+        if (latitude_e6 != 0 || longitude_e6 != 0) {
+            (void)snprintf(meta_line, sizeof(meta_line), "T%lu  GPS %ld.%06ld/%ld.%06ld",
+                (unsigned long)last_seen_s, (long)lat_int, (long)lat_frac, (long)lon_int, (long)lon_frac);
+        } else {
+            (void)snprintf(meta_line, sizeof(meta_line), "T%lu  %s", (unsigned long)last_seen_s,
+                st7789_event_hint(event));
+        }
+        if (g_st7789_lv_event_rail != NULL) {
+            lv_obj_set_style_bg_color(g_st7789_lv_event_rail, lv_color_hex(event_color_hex), LV_PART_MAIN);
+        }
+        if (g_st7789_lv_panel_event != NULL) {
+            lv_obj_set_style_border_color(g_st7789_lv_panel_event, lv_color_hex(event_color_hex), LV_PART_MAIN);
+        }
+        lv_obj_set_style_text_color(g_st7789_lv_label_event, lv_color_hex(event_color_hex), LV_PART_MAIN);
+        lv_label_set_text_fmt(g_st7789_lv_label_event, "%s\n%s\n%s", event_line, st7789_event_hint(event), meta_line);
         return 0;
     }
 #endif
-    st7789_fill_rect(0U, 56U, g_st7789_cfg.width, 64U, ST7789_COLOR_BLACK);
-    (void)snprintf(line, sizeof(line), "LOST M%u @%lu", member_id, (unsigned long)last_seen_s);
-    st7789_draw_text(4U, 60U, line, ST7789_COLOR_RED, ST7789_COLOR_BLACK);
-    (void)snprintf(line, sizeof(line), "LAT %ld", (long)latitude_e6);
-    st7789_draw_text(4U, 76U, line, ST7789_COLOR_YELLOW, ST7789_COLOR_BLACK);
-    (void)snprintf(line, sizeof(line), "LON %ld", (long)longitude_e6);
-    st7789_draw_text(4U, 92U, line, ST7789_COLOR_YELLOW, ST7789_COLOR_BLACK);
+    st7789_fill_rect(0U, 52U, g_st7789_cfg.width, 78U, ST7789_COLOR_PANEL);
+    st7789_fill_rect(0U, 52U, 4U, 78U, event_color);
+    st7789_draw_text(8U, 57U, ">> LINK EVENT", ST7789_COLOR_CYAN, ST7789_COLOR_PANEL);
+    (void)snprintf(line, sizeof(line), "%s %s", event_text, label_text);
+    st7789_draw_text(8U, 74U, line, event_color, ST7789_COLOR_PANEL);
+    (void)snprintf(line, sizeof(line), "%s", st7789_event_hint(event));
+    st7789_draw_text(8U, 91U, line, ST7789_COLOR_WHITE, ST7789_COLOR_PANEL);
+    (void)snprintf(line, sizeof(line), "T%lu", (unsigned long)last_seen_s);
+    st7789_draw_text(8U, 108U, line, ST7789_COLOR_WHITE, ST7789_COLOR_PANEL);
+    if (latitude_e6 != 0 || longitude_e6 != 0) {
+        (void)snprintf(line, sizeof(line), "GPS %ld/%ld", (long)latitude_e6, (long)longitude_e6);
+        st7789_draw_text(68U, 108U, line, ST7789_COLOR_YELLOW, ST7789_COLOR_PANEL);
+    }
     return 0;
 }
 

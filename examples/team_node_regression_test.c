@@ -117,6 +117,16 @@ static void test_deliver_last(test_runtime_t *from, sle_team_node_t *to)
     from->last_tx_len = 0U;
 }
 
+static void test_join_member(sle_team_node_t *leader, test_runtime_t *leader_rt,
+    sle_team_node_t *member, test_runtime_t *member_rt)
+{
+    assert(sle_team_node_send_hello(member, member->cfg.leader_id) == SLE_TEAM_OK);
+    test_deliver_last(member_rt, leader);
+    test_deliver_last(leader_rt, member);
+    assert(sle_team_node_find_member(leader, member->cfg.self_id) != NULL);
+    assert(member->joined != 0U);
+}
+
 static uint8_t test_count_member_records(const sle_team_node_t *node, uint8_t member_id)
 {
     uint8_t count = 0U;
@@ -130,6 +140,19 @@ static uint8_t test_count_member_records(const sle_team_node_t *node, uint8_t me
         }
     }
     return count;
+}
+
+static const sle_team_member_record_t *test_find_member_record(const sle_team_node_t *node, uint8_t member_id)
+{
+    if (node == NULL) {
+        return NULL;
+    }
+    for (uint8_t i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->members[i].member_id == member_id) {
+            return &node->members[i];
+        }
+    }
+    return NULL;
 }
 
 static void test_broadcast_relay_failure_keeps_local_processing(void)
@@ -292,6 +315,112 @@ static void test_add_allowed_member_failure_keeps_allow_all(void)
     assert(leader.cfg.allowed_member_count == 0U);
 }
 
+static void test_rebooted_member_rejoins_after_timeout(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 90U};
+    test_runtime_t member_rt = {.name = "member", .now_s = 90U};
+    test_runtime_t rebooted_rt = {.name = "rebooted", .now_s = 104U};
+    sle_team_node_t leader;
+    sle_team_node_t member;
+    sle_team_node_t rebooted;
+    const sle_team_member_record_t *record;
+
+    test_init_leader(&leader, &leader_rt);
+    test_init_member(&member, &member_rt, 2U);
+    test_join_member(&leader, &leader_rt, &member, &member_rt);
+
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online != 0U);
+
+    test_init_member(&rebooted, &rebooted_rt, 2U);
+    leader_rt.now_s = 104U;
+    sle_team_node_tick(&leader);
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online == 0U);
+    leader_rt.last_tx_len = 0U;
+
+    assert(sle_team_node_send_hello(&rebooted, rebooted.cfg.leader_id) == SLE_TEAM_OK);
+    test_deliver_last(&rebooted_rt, &leader);
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online != 0U);
+    test_deliver_last(&leader_rt, &rebooted);
+    assert(rebooted.joined != 0U);
+}
+
+static void test_member_leave_notifies_leader_and_manual_rejoin(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 120U};
+    test_runtime_t member_rt = {.name = "member", .now_s = 120U};
+    sle_team_node_t leader;
+    sle_team_node_t member;
+    const sle_team_member_record_t *record;
+
+    test_init_leader(&leader, &leader_rt);
+    test_init_member(&member, &member_rt, 2U);
+    test_join_member(&leader, &leader_rt, &member, &member_rt);
+
+    assert(sle_team_node_member_leave(&member) == SLE_TEAM_OK);
+    test_deliver_last(&member_rt, &leader);
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online == 0U);
+    assert(member.joined == 0U);
+    assert(member.state == SLE_TEAM_NET_IDLE);
+    assert(member.cfg.leader_id == 0U);
+
+    member_rt.now_s = 130U;
+    member_rt.last_tx_len = 0U;
+    sle_team_node_tick(&member);
+    assert(member_rt.last_tx_len == 0U);
+
+    assert(sle_team_node_member_select_leader(&member, 1U, 1U, 0x11U) == SLE_TEAM_OK);
+    test_deliver_last(&member_rt, &leader);
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online != 0U);
+    test_deliver_last(&leader_rt, &member);
+    assert(member.joined != 0U);
+}
+
+static void test_member_link_lost_preserves_leader_and_rejoins(void)
+{
+    test_runtime_t leader_rt = {.name = "leader", .now_s = 150U};
+    test_runtime_t member_rt = {.name = "member", .now_s = 150U};
+    sle_team_node_t leader;
+    sle_team_node_t member;
+    const sle_team_member_record_t *record;
+
+    test_init_leader(&leader, &leader_rt);
+    test_init_member(&member, &member_rt, 2U);
+    test_join_member(&leader, &leader_rt, &member, &member_rt);
+    member.cfg.relay_allowed = 1U;
+    member.cfg.relay_enabled = 1U;
+    member.cfg.relay_tier = 1U;
+    member.cfg.max_downstream = 4U;
+    member.upstream_parent_id = member.cfg.leader_id;
+    member.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
+    member.last_parent_seen_s = 150U;
+
+    assert(sle_team_node_member_link_lost(&member) == SLE_TEAM_OK);
+    assert(member.joined == 0U);
+    assert(member.state == SLE_TEAM_NET_DISCOVERING);
+    assert(member.cfg.leader_id == 1U);
+    assert(member.cfg.relay_allowed == 1U);
+    assert(member.cfg.relay_enabled == 0U);
+    assert(member.cfg.relay_tier == 1U);
+    assert(member.cfg.max_downstream == 4U);
+    assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+    assert(member.upstream_parent_reselect_pending != 0U);
+
+    member_rt.last_tx_len = 0U;
+    member_rt.now_s = 153U;
+    sle_team_node_tick(&member);
+    assert(member_rt.last_tx_len != 0U);
+    test_deliver_last(&member_rt, &leader);
+    record = test_find_member_record(&leader, 2U);
+    assert(record != NULL && record->online != 0U);
+    test_deliver_last(&leader_rt, &member);
+    assert(member.joined != 0U);
+}
+
 int main(void)
 {
     test_broadcast_relay_failure_keeps_local_processing();
@@ -301,6 +430,9 @@ int main(void)
     test_offline_member_rejoin_reuses_logical_slot();
     test_allowed_list_seeds_offline_logical_members();
     test_add_allowed_member_failure_keeps_allow_all();
+    test_rebooted_member_rejoins_after_timeout();
+    test_member_leave_notifies_leader_and_manual_rejoin();
+    test_member_link_lost_preserves_leader_and_rejoins();
     printf("[team-node-regression] pass\n");
     return 0;
 }

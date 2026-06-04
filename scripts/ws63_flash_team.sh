@@ -13,6 +13,7 @@ RESET_COMMAND_RETRIES="${RESET_COMMAND_RETRIES:-2}"
 RESET_COMMAND_RETRY_GAP="${RESET_COMMAND_RETRY_GAP:-0.2}"
 AUTO_RESET_MODE="${AUTO_RESET_MODE:-software-only}"
 RESET_CONTROL_SEQUENCE="${RESET_CONTROL_SEQUENCE:-rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05}"
+EXPECTED_FW_VERSION="${EXPECTED_FW_VERSION:-v4.4.57}"
 NO_CONFIRM="${WS63_FLASH_NO_CONFIRM:-0}"
 
 usage() {
@@ -38,6 +39,7 @@ Environment:
   RESET_COMMAND_RETRIES=2
   RESET_COMMAND_RETRY_GAP=0.2
   RESET_CONTROL_SEQUENCE='rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05'
+  EXPECTED_FW_VERSION=v4.4.57
 
 The script prints role, port, and firmware path, then asks for an exact
 confirmation before it runs the burn tool.
@@ -117,6 +119,7 @@ echo "repo:     $ROOT_DIR"
 echo "role:     $role"
 echo "port:     $port"
 echo "firmware: $firmware"
+echo "expected: $EXPECTED_FW_VERSION"
 echo "auto rst: $AUTO_RESET"
 echo "auto mode:$AUTO_RESET_MODE"
 echo
@@ -141,6 +144,15 @@ if [[ ! -f "$firmware" ]]; then
   else
     echo "Firmware package does not exist: $firmware" >&2
     echo "Fallback package does not exist: $fallback_firmware" >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "$EXPECTED_FW_VERSION" ]]; then
+  if ! grep -a -q "$EXPECTED_FW_VERSION" "$firmware"; then
+    echo "Firmware package does not contain expected version: $EXPECTED_FW_VERSION" >&2
+    echo "Refusing to flash stale package: $firmware" >&2
+    echo "Set EXPECTED_FW_VERSION= to override only when intentionally flashing an older image." >&2
     exit 1
   fi
 fi

@@ -283,8 +283,8 @@
 #define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 3U
 #define SLE_TEAM_WIFI_SECURITY_COMPAT_MIX ((wifi_security_enum)WIFI_SEC_TYPE_WPA2_WPA_PSK_MIX)
 #define SLE_TEAM_WIFI_PROTOCOL_COMPAT_AX WIFI_MODE_11B_G_N_AX
-#define SLE_TEAM_FW_VERSION "v4.4.37"
-#define SLE_TEAM_HW_CONSTRAINTS "v4.4.37 board map"
+#define SLE_TEAM_FW_VERSION "v4.4.57"
+#define SLE_TEAM_HW_CONSTRAINTS "v4.4.57 board map"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 120U
 
 #if defined(__GNUC__)
@@ -332,6 +332,39 @@ typedef struct {
     uint32_t last_seen_s;
 } team_route_entry_t;
 
+typedef enum {
+    TEAM_DISPLAY_EVENT_NONE = 0,
+    TEAM_DISPLAY_EVENT_JOIN,
+    TEAM_DISPLAY_EVENT_LEFT,
+    TEAM_DISPLAY_EVENT_TIMEOUT,
+    TEAM_DISPLAY_EVENT_LOST,
+    TEAM_DISPLAY_EVENT_REJOIN,
+} team_display_event_t;
+
+typedef enum {
+    TEAM_DISPLAY_MEMBER_UNKNOWN = 0,
+    TEAM_DISPLAY_MEMBER_ONLINE,
+    TEAM_DISPLAY_MEMBER_OFFLINE,
+} team_display_member_state_t;
+
+static const char *team_display_event_name(team_display_event_t event)
+{
+    switch (event) {
+        case TEAM_DISPLAY_EVENT_JOIN:
+            return "JOIN";
+        case TEAM_DISPLAY_EVENT_LEFT:
+            return "LEFT";
+        case TEAM_DISPLAY_EVENT_TIMEOUT:
+            return "TIMEOUT";
+        case TEAM_DISPLAY_EVENT_LOST:
+            return "LOST";
+        case TEAM_DISPLAY_EVENT_REJOIN:
+            return "REJOIN";
+        default:
+            return "EVENT";
+    }
+}
+
 typedef struct {
     uint8_t uart_rx_buf[SLE_TEAM_UART_RX_BUF_SIZE];
     char line_buf[SLE_TEAM_CLI_LINE_SIZE];
@@ -361,13 +394,18 @@ typedef struct {
     uint32_t buzzer_toggle_last_ms;
     uint8_t display_ready;
     volatile uint8_t display_status_dirty;
-    volatile uint8_t display_alert_dirty;
-    uint8_t display_lost_count;
+    volatile uint8_t display_event_dirty;
+    uint8_t display_event_count;
     uint32_t display_status_last_flush_ms;
-    uint8_t display_alert_member_id;
-    int32_t display_alert_latitude_e6;
-    int32_t display_alert_longitude_e6;
-    uint32_t display_alert_last_seen_s;
+    uint8_t display_event_member_id;
+    uint8_t display_event_type;
+    char display_event_label[8];
+    int32_t display_event_latitude_e6;
+    int32_t display_event_longitude_e6;
+    uint32_t display_event_last_seen_s;
+    uint8_t display_member_ids[SLE_TEAM_MAX_MEMBERS];
+    uint8_t display_member_states[SLE_TEAM_MAX_MEMBERS];
+    uint8_t display_member_last_events[SLE_TEAM_MAX_MEMBERS];
     uint32_t last_seek_led_ms;
     uint8_t route_id;
     uint8_t role_configured;
@@ -474,6 +512,8 @@ static void team_leader_rebalance_relays(uint8_t force_now);
 static void team_leader_route_metrics_update(void);
 static void team_leader_route_convergence_hint(uint32_t now_s, uint8_t trigger_state_change,
     uint8_t stale_count, uint8_t unreachable_count);
+static void team_identity_format_route_label(uint8_t node_id, uint8_t role, const uint8_t mac[6], uint8_t mac_ready,
+    char *out, size_t out_size);
 static uint32_t team_now_s(void *user_ctx);
 static void *team_network_task(const char *arg);
 
@@ -535,7 +575,8 @@ static int team_nv_config_save(sle_team_node_role_t role, uint8_t team_id, uint1
     }
     osal_printk("[team-nv] save role=%u team=%u leader_suffix=%04X channel=%u ret=0x%x flush=0x%x\r\n",
         cfg.role, cfg.team_id, cfg.leader_suffix, cfg.channel_hash, ret, flush_ret);
-    return (ret == ERRCODE_SUCC && flush_ret == ERRCODE_SUCC) ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
+    /* Some WS63 NV backends return a flush warning after a successful write. */
+    return ret == ERRCODE_SUCC ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
 }
 
 static int team_nv_config_load(sle_team_web_config_nv_t *cfg)
@@ -569,7 +610,7 @@ static int team_nv_config_clear(void)
         flush_ret = uapi_nv_flush();
     }
     osal_printk("[team-nv] clear web config ret=0x%x flush=0x%x\r\n", ret, flush_ret);
-    return (ret == ERRCODE_SUCC && flush_ret == ERRCODE_SUCC) ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
+    return ret == ERRCODE_SUCC ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
 }
 
 static uint16_t team_nv_allowed_checksum(const sle_team_allowed_members_nv_t *cfg)
@@ -652,7 +693,7 @@ static int team_nv_allowed_save_from_node(void)
     }
     osal_printk("[team-nv] save allow filter=%u count=%u ret=0x%x flush=0x%x\r\n",
         cfg.member_filter_enabled, cfg.allowed_member_count, ret, flush_ret);
-    return (ret == ERRCODE_SUCC && flush_ret == ERRCODE_SUCC) ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
+    return ret == ERRCODE_SUCC ? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;
 }
 
 static int team_nv_allowed_apply_to_node(void)
@@ -737,32 +778,152 @@ static void team_display_refresh_status(void)
 #endif
 }
 
-static void team_display_show_lost(uint8_t member_id, int32_t latitude_e6, int32_t longitude_e6,
-    uint32_t last_seen_s)
+static const sle_team_member_record_t *team_display_find_member_record(uint8_t member_id)
+{
+    uint8_t i;
+
+    if (member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return NULL;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        const sle_team_member_record_t *member = &g_team_node.members[i];
+
+        if (member->member_id == member_id) {
+            return member;
+        }
+    }
+    return NULL;
+}
+
+static void team_display_format_member_label(uint8_t member_id, char *out, size_t out_size)
+{
+    const sle_team_member_record_t *member = team_display_find_member_record(member_id);
+
+    if (member != NULL) {
+        team_identity_format_route_label(member->member_id, member->role, member->mac, member->mac_ready,
+            out, out_size);
+        return;
+    }
+    team_identity_format_route_label(member_id, (uint8_t)SLE_TEAM_ROLE_MEMBER, NULL, 0U, out, out_size);
+}
+
+static uint8_t team_display_member_index_locked(uint8_t member_id, uint8_t create, uint8_t *out_index)
+{
+    uint8_t i;
+    uint8_t free_index = SLE_TEAM_MAX_MEMBERS;
+
+    if (member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID || out_index == NULL) {
+        return 0U;
+    }
+    for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (g_team_rt.display_member_ids[i] == member_id) {
+            *out_index = i;
+            return 1U;
+        }
+        if (g_team_rt.display_member_ids[i] == 0U && free_index == SLE_TEAM_MAX_MEMBERS) {
+            free_index = i;
+        }
+    }
+    if (create == 0U || free_index == SLE_TEAM_MAX_MEMBERS) {
+        return 0U;
+    }
+    g_team_rt.display_member_ids[free_index] = member_id;
+    g_team_rt.display_member_states[free_index] = (uint8_t)TEAM_DISPLAY_MEMBER_UNKNOWN;
+    g_team_rt.display_member_last_events[free_index] = (uint8_t)TEAM_DISPLAY_EVENT_NONE;
+    *out_index = free_index;
+    return 1U;
+}
+
+static team_display_event_t team_display_note_member_joined(uint8_t member_id)
+{
+    uint32_t irq_sts;
+    uint8_t index = 0U;
+    uint8_t prev_state;
+    team_display_event_t event;
+
+    irq_sts = osal_irq_lock();
+    if (team_display_member_index_locked(member_id, 1U, &index) == 0U) {
+        osal_irq_restore(irq_sts);
+        return TEAM_DISPLAY_EVENT_JOIN;
+    }
+    prev_state = g_team_rt.display_member_states[index];
+    if (prev_state == (uint8_t)TEAM_DISPLAY_MEMBER_ONLINE) {
+        osal_irq_restore(irq_sts);
+        return TEAM_DISPLAY_EVENT_NONE;
+    }
+    event = prev_state == (uint8_t)TEAM_DISPLAY_MEMBER_OFFLINE ?
+        TEAM_DISPLAY_EVENT_REJOIN : TEAM_DISPLAY_EVENT_JOIN;
+    g_team_rt.display_member_states[index] = (uint8_t)TEAM_DISPLAY_MEMBER_ONLINE;
+    g_team_rt.display_member_last_events[index] = (uint8_t)event;
+    osal_irq_restore(irq_sts);
+    return event;
+}
+
+static uint8_t team_display_member_last_event(uint8_t member_id, uint8_t *event)
+{
+    uint32_t irq_sts;
+    uint8_t index = 0U;
+    uint8_t found;
+
+    if (event == NULL) {
+        return 0U;
+    }
+    *event = (uint8_t)TEAM_DISPLAY_EVENT_NONE;
+    irq_sts = osal_irq_lock();
+    found = team_display_member_index_locked(member_id, 0U, &index);
+    if (found != 0U) {
+        *event = g_team_rt.display_member_last_events[index];
+    }
+    osal_irq_restore(irq_sts);
+    return found;
+}
+
+static void team_display_note_member_offline(uint8_t member_id, team_display_event_t event)
+{
+    uint32_t irq_sts;
+    uint8_t index = 0U;
+
+    irq_sts = osal_irq_lock();
+    if (team_display_member_index_locked(member_id, 1U, &index) != 0U) {
+        g_team_rt.display_member_states[index] = (uint8_t)TEAM_DISPLAY_MEMBER_OFFLINE;
+        g_team_rt.display_member_last_events[index] = (uint8_t)event;
+    }
+    osal_irq_restore(irq_sts);
+}
+
+static void team_display_show_event(team_display_event_t event, uint8_t member_id, int32_t latitude_e6,
+    int32_t longitude_e6, uint32_t last_seen_s)
 {
 #if CONFIG_SLE_TEAM_ST7789_ENABLE
     uint32_t irq_sts;
-    uint8_t same_alert;
+    uint8_t same_event;
+    char label[8];
 
     if (g_team_rt.display_ready == 0U) {
         return;
     }
+    team_display_format_member_label(member_id, label, sizeof(label));
     irq_sts = osal_irq_lock();
-    same_alert = (g_team_rt.display_alert_member_id == member_id &&
-        g_team_rt.display_alert_last_seen_s == last_seen_s &&
-        g_team_rt.display_alert_latitude_e6 == latitude_e6 &&
-        g_team_rt.display_alert_longitude_e6 == longitude_e6) ? 1U : 0U;
-    if (same_alert == 0U) {
-        g_team_rt.display_lost_count++;
+    same_event = (g_team_rt.display_event_member_id == member_id &&
+        g_team_rt.display_event_type == (uint8_t)event &&
+        g_team_rt.display_event_last_seen_s == last_seen_s &&
+        g_team_rt.display_event_latitude_e6 == latitude_e6 &&
+        g_team_rt.display_event_longitude_e6 == longitude_e6 &&
+        strcmp(g_team_rt.display_event_label, label) == 0) ? 1U : 0U;
+    if (same_event == 0U) {
+        g_team_rt.display_event_count++;
     }
-    g_team_rt.display_alert_member_id = member_id;
-    g_team_rt.display_alert_latitude_e6 = latitude_e6;
-    g_team_rt.display_alert_longitude_e6 = longitude_e6;
-    g_team_rt.display_alert_last_seen_s = last_seen_s;
-    g_team_rt.display_alert_dirty = 1U;
+    g_team_rt.display_event_member_id = member_id;
+    g_team_rt.display_event_type = (uint8_t)event;
+    (void)snprintf(g_team_rt.display_event_label, sizeof(g_team_rt.display_event_label), "%s", label);
+    g_team_rt.display_event_latitude_e6 = latitude_e6;
+    g_team_rt.display_event_longitude_e6 = longitude_e6;
+    g_team_rt.display_event_last_seen_s = last_seen_s;
+    g_team_rt.display_event_dirty = 1U;
     g_team_rt.display_status_dirty = 1U;
     osal_irq_restore(irq_sts);
 #else
+    unused(event);
     unused(member_id);
     unused(latitude_e6);
     unused(longitude_e6);
@@ -796,8 +957,9 @@ static void team_display_note_offline_delta(void)
         }
     }
     if (latest_lost != NULL) {
-        team_display_show_lost(latest_lost->member_id, latest_lost->latitude_e6, latest_lost->longitude_e6,
-            latest_lost->last_seen_s);
+        team_display_note_member_offline(latest_lost->member_id, TEAM_DISPLAY_EVENT_TIMEOUT);
+        team_display_show_event(TEAM_DISPLAY_EVENT_TIMEOUT, latest_lost->member_id, latest_lost->latitude_e6,
+            latest_lost->longitude_e6, latest_lost->last_seen_s);
     }
     g_team_rt.last_online_member_count = online_now;
 }
@@ -806,13 +968,16 @@ static void team_display_flush_pending_once(void)
 {
 #if CONFIG_SLE_TEAM_ST7789_ENABLE
     uint8_t do_status;
-    uint8_t do_alert;
-    uint8_t alert_member_id = 0U;
-    int32_t alert_lat = 0;
-    int32_t alert_lon = 0;
-    uint32_t alert_last_seen = 0U;
+    uint8_t do_event;
+    uint8_t event_type = (uint8_t)TEAM_DISPLAY_EVENT_NONE;
+    uint8_t event_member_id = 0U;
+    char event_label[8] = {0};
+    int32_t event_lat = 0;
+    int32_t event_lon = 0;
+    uint32_t event_last_seen = 0U;
     uint32_t irq_sts;
     uint32_t now_ms;
+    int display_ret;
     const char *role = "idle";
 
     if (g_team_rt.display_ready == 0U) {
@@ -822,18 +987,27 @@ static void team_display_flush_pending_once(void)
     irq_sts = osal_irq_lock();
     do_status = g_team_rt.display_status_dirty;
     g_team_rt.display_status_dirty = 0U;
-    do_alert = g_team_rt.display_alert_dirty;
-    if (do_alert != 0U) {
-        alert_member_id = g_team_rt.display_alert_member_id;
-        alert_lat = g_team_rt.display_alert_latitude_e6;
-        alert_lon = g_team_rt.display_alert_longitude_e6;
-        alert_last_seen = g_team_rt.display_alert_last_seen_s;
-        g_team_rt.display_alert_dirty = 0U;
+    do_event = g_team_rt.display_event_dirty;
+    if (do_event != 0U) {
+        event_type = g_team_rt.display_event_type;
+        event_member_id = g_team_rt.display_event_member_id;
+        (void)snprintf(event_label, sizeof(event_label), "%s", g_team_rt.display_event_label);
+        event_lat = g_team_rt.display_event_latitude_e6;
+        event_lon = g_team_rt.display_event_longitude_e6;
+        event_last_seen = g_team_rt.display_event_last_seen_s;
+        g_team_rt.display_event_dirty = 0U;
     }
     osal_irq_restore(irq_sts);
 
-    if (do_alert != 0U) {
-        (void)ws63_st7789_show_alert(alert_member_id, alert_lat, alert_lon, alert_last_seen);
+    if (do_event != 0U) {
+        display_ret = ws63_st7789_show_event((uint8_t)event_type, event_label, event_lat, event_lon,
+            event_last_seen);
+        osal_printk("[display-event] event=%s label=%s member=%u ret=%d last_seen=%lu\r\n",
+            team_display_event_name((team_display_event_t)event_type),
+            event_label[0] != '\0' ? event_label : "--",
+            event_member_id,
+            display_ret,
+            (unsigned long)event_last_seen);
     }
     if (do_status != 0U) {
         now_ms = uapi_tcxo_get_ms();
@@ -848,7 +1022,7 @@ static void team_display_flush_pending_once(void)
             role = g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? "leader" : "member";
         }
         (void)ws63_st7789_show_status(role, g_team_rt.self_label, team_online_member_count(),
-            team_offline_member_count(), g_team_rt.display_lost_count, SLE_TEAM_FW_VERSION);
+            team_offline_member_count(), g_team_rt.display_event_count, SLE_TEAM_FW_VERSION);
         g_team_rt.display_status_last_flush_ms = now_ms;
     }
 #endif
@@ -1326,7 +1500,7 @@ static int team_display_cli_handle(const char *line)
         return 1;
     }
     if (strcmp(line, "disp demo") == 0) {
-        team_display_show_lost(99U, 31123456, 121987654, team_now_s(NULL));
+        team_display_show_event(TEAM_DISPLAY_EVENT_LOST, 99U, 31123456, 121987654, team_now_s(NULL));
         return 1;
     }
     if (strcmp(line, "disp help") == 0) {
@@ -1383,12 +1557,43 @@ static int team_led_cli_handle(const char *line)
     return 0;
 }
 
+static uint8_t team_serial_cfg_matches_runtime(const sle_team_web_config_nv_t *cfg)
+{
+    uint8_t leader_id;
+
+    if (cfg == NULL || g_team_rt.role_configured == 0U) {
+        return 0U;
+    }
+    if (g_team_node.cfg.team_id != cfg->team_id || g_team_node.cfg.channel_hash != cfg->channel_hash) {
+        return 0U;
+    }
+    if (cfg->role == (uint8_t)SLE_TEAM_ROLE_LEADER) {
+        return g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? 1U : 0U;
+    }
+    if (cfg->role != (uint8_t)SLE_TEAM_ROLE_MEMBER) {
+        return 0U;
+    }
+    leader_id = team_route_id_from_suffix(cfg->leader_suffix);
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || g_team_node.cfg.leader_id != leader_id) {
+        return 0U;
+    }
+    return 1U;
+}
+
 static int team_serial_cfg_apply_loaded(const sle_team_web_config_nv_t *cfg)
 {
     if (cfg == NULL) {
         return SLE_TEAM_ERR_FORMAT;
     }
-    if (g_team_rt.role_configured != 0U || g_team_rt.role_request_pending != 0U) {
+    if (g_team_rt.role_request_pending != 0U) {
+        return SLE_TEAM_ERR_UNSUPPORTED;
+    }
+    if (g_team_rt.role_configured != 0U) {
+        if (team_serial_cfg_matches_runtime(cfg) != 0U) {
+            osal_printk("[cfg] runtime already matches role=%u team=%u channel=%u leader_suffix=%04X\r\n",
+                cfg->role, cfg->team_id, cfg->channel_hash, cfg->leader_suffix);
+            return SLE_TEAM_OK;
+        }
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (cfg->role == (uint8_t)SLE_TEAM_ROLE_LEADER) {
@@ -2185,6 +2390,29 @@ static void team_route_clear_by_next_hop(uint8_t next_hop_id)
     }
 }
 
+static uint8_t team_route_member_by_conn(uint16_t conn_id, team_conn_dir_t dir, uint8_t *member_id)
+{
+    uint8_t i;
+
+    if (member_id == NULL) {
+        return 0U;
+    }
+    for (i = 0U; i < TEAM_ROUTE_ENTRY_MAX; i++) {
+        if (g_team_routes[i].active == 0U || g_team_routes[i].conn_id != conn_id) {
+            continue;
+        }
+        if (dir != TEAM_CONN_DIR_UNKNOWN && g_team_routes[i].dir != dir) {
+            continue;
+        }
+        if (g_team_routes[i].member_id == 0U || g_team_routes[i].member_id == SLE_TEAM_BROADCAST_ID) {
+            continue;
+        }
+        *member_id = g_team_routes[i].member_id;
+        return 1U;
+    }
+    return 0U;
+}
+
 static sle_team_member_record_t *team_leader_find_member_slot(uint8_t member_id)
 {
     uint8_t i;
@@ -2207,21 +2435,44 @@ static uint8_t team_leader_mark_member_offline(uint8_t member_id, const char *re
     sle_team_member_record_t *member;
     uint8_t was_relay;
     uint32_t now_s;
+    uint8_t already_offline = 0U;
+    uint8_t last_display_event = (uint8_t)TEAM_DISPLAY_EVENT_NONE;
+    team_display_event_t event = TEAM_DISPLAY_EVENT_LOST;
 
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER) {
         return 0U;
     }
     member = team_leader_find_member_slot(member_id);
-    if (member == NULL || member->online == 0U) {
+    if (member == NULL) {
+        osal_printk("[team] member offline skip id=%u reason=%s missing_record=1\r\n",
+            member_id, reason != NULL ? reason : "unknown");
         return 0U;
     }
 
-    member->online = 0U;
     now_s = team_now_s(NULL);
+    if (reason != NULL && strcmp(reason, "member_leave") == 0) {
+        event = TEAM_DISPLAY_EVENT_LEFT;
+    }
+    if (member->online == 0U) {
+        already_offline = 1U;
+        (void)team_display_member_last_event(member_id, &last_display_event);
+        if (reason == NULL || strcmp(reason, "conn_disconnected") != 0) {
+            osal_printk("[team] member offline skip id=%u reason=%s already_offline=1 last_event=%u\r\n",
+                member_id, reason != NULL ? reason : "unknown", last_display_event);
+            return 0U;
+        }
+        if (last_display_event == (uint8_t)TEAM_DISPLAY_EVENT_LEFT) {
+            osal_printk("[team] member offline skip id=%u reason=conn_disconnected already_offline=1 last_event=LEFT\r\n",
+                member_id);
+            return 0U;
+        }
+    } else {
+        member->online = 0U;
+    }
     if (member->last_seen_s == 0U && now_s != 0U) {
         member->last_seen_s = now_s;
     }
-    was_relay = member->relay_allowed;
+    was_relay = already_offline == 0U ? member->relay_allowed : 0U;
     member->relay_allowed = 0U;
     member->relay_tier = 0U;
     member->max_downstream = 0U;
@@ -2231,10 +2482,14 @@ static uint8_t team_leader_mark_member_offline(uint8_t member_id, const char *re
         g_team_node.ops.on_relay_offline(g_team_node.ops.user_ctx, member_id);
     }
 
-    team_display_show_lost(member->member_id, member->latitude_e6, member->longitude_e6, member->last_seen_s);
+    team_display_note_member_offline(member->member_id, event);
+    team_display_show_event(event, member->member_id, member->latitude_e6,
+        member->longitude_e6, member->last_seen_s);
+    g_team_rt.last_online_member_count = team_online_member_count();
     team_display_refresh_status();
-    osal_printk("[team] member offline id=%u reason=%s last_seen=%lu\r\n",
-        member->member_id, reason != NULL ? reason : "unknown", (unsigned long)member->last_seen_s);
+    osal_printk("[team] member offline id=%u reason=%s last_seen=%lu already_offline=%u last_event=%u\r\n",
+        member->member_id, reason != NULL ? reason : "unknown", (unsigned long)member->last_seen_s,
+        already_offline, last_display_event);
     return 1U;
 }
 
@@ -2587,6 +2842,7 @@ static void team_conn_track_update(uint16_t conn_id, team_conn_dir_t dir, const 
 {
     team_conn_track_t *track = team_conn_track_alloc(conn_id);
     team_pending_conn_t *pending;
+    uint8_t route_id;
 
     if (track == NULL) {
         return;
@@ -2598,7 +2854,10 @@ static void team_conn_track_update(uint16_t conn_id, team_conn_dir_t dir, const 
             track->route_id = pending->route_id;
             team_pending_conn_clear(addr);
         } else {
-            track->route_id = team_route_id_from_sle_addr(addr->addr);
+            route_id = team_route_id_from_sle_addr(addr->addr);
+            if (track->route_id == 0U || track->route_id == SLE_TEAM_BROADCAST_ID) {
+                track->route_id = route_id;
+            }
         }
     }
 }
@@ -2693,6 +2952,15 @@ static void team_connection_state_changed_cbk(uint16_t conn_id, const sle_addr_t
     team_conn_track_t *track = team_conn_track_find(conn_id);
     uint8_t disconnected_member_id = 0U;
     uint8_t disconnected_member_known = 0U;
+    uint8_t tracked_member_id = 0U;
+    uint8_t routed_member_id = 0U;
+
+    if (conn_state == SLE_ACB_STATE_DISCONNECTED && g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+        if (track != NULL && track->route_id != 0U && track->route_id != SLE_TEAM_BROADCAST_ID) {
+            tracked_member_id = track->route_id;
+        }
+        (void)team_route_member_by_conn(conn_id, dir, &routed_member_id);
+    }
 
     team_conn_track_update(conn_id, dir, addr);
     track = team_conn_track_find(conn_id);
@@ -2707,11 +2975,24 @@ static void team_connection_state_changed_cbk(uint16_t conn_id, const sle_addr_t
                 disconnected_member_id != 0U && disconnected_member_id != SLE_TEAM_BROADCAST_ID) {
                 disconnected_member_known = 1U;
             }
+            if (disconnected_member_known == 0U && tracked_member_id != 0U &&
+                tracked_member_id != SLE_TEAM_BROADCAST_ID) {
+                disconnected_member_id = tracked_member_id;
+                disconnected_member_known = 1U;
+            }
+            if (disconnected_member_known == 0U && routed_member_id != 0U &&
+                routed_member_id != SLE_TEAM_BROADCAST_ID) {
+                disconnected_member_id = routed_member_id;
+                disconnected_member_known = 1U;
+            }
             if (disconnected_member_known == 0U && track != NULL && track->route_id != 0U &&
                 track->route_id != SLE_TEAM_BROADCAST_ID) {
                 disconnected_member_id = track->route_id;
                 disconnected_member_known = 1U;
             }
+            osal_printk("[team] disconnect lookup conn=%u dir=%u known=%u member=%u tracked=%u routed=%u\r\n",
+                conn_id, (uint8_t)dir, disconnected_member_known, disconnected_member_id,
+                tracked_member_id, routed_member_id);
         }
         if (dir == TEAM_CONN_DIR_DOWNSTREAM) {
             sle_uart_client_handle_connect_state_changed(conn_id, addr, conn_state, pair_state, disc_reason);
@@ -2727,8 +3008,10 @@ static void team_connection_state_changed_cbk(uint16_t conn_id, const sle_addr_t
                 }
                 if (disconnect_parent != 0U && g_team_node.joined != 0U) {
                     int switch_ret = sle_team_node_try_parent_switch(&g_team_node);
-                    if (switch_ret != SLE_TEAM_OK && switch_ret != SLE_TEAM_ERR_UNSUPPORTED) {
-                        (void)sle_team_node_member_leave(&g_team_node);
+                    if (switch_ret != SLE_TEAM_OK) {
+                        int recover_ret = sle_team_node_member_link_lost(&g_team_node);
+                        osal_printk("[team] upstream link lost switch_ret=%d recover_ret=%d\r\n",
+                            switch_ret, recover_ret);
                     }
                     team_upstream_parent_reset("disconnect");
                     if (g_team_rt.relay_client_started != 0U) {
@@ -3501,6 +3784,20 @@ static void team_joined(void *user_ctx, uint8_t member_id)
 
     unused(user_ctx);
     osal_printk("[team] joined member=%u\r\n", member_id);
+    if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+        const sle_team_member_record_t *member = team_display_find_member_record(member_id);
+        team_display_event_t event = team_display_note_member_joined(member_id);
+
+        if (event != TEAM_DISPLAY_EVENT_NONE) {
+            if (member != NULL) {
+                team_display_show_event(event, member_id, member->latitude_e6,
+                    member->longitude_e6, member->last_seen_s);
+            } else {
+                team_display_show_event(event, member_id, 0, 0, team_now_s(NULL));
+            }
+        }
+        g_team_rt.last_online_member_count = team_online_member_count();
+    }
     team_display_refresh_status();
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || member_id != g_team_node.cfg.self_id) {
         return;
@@ -3532,15 +3829,34 @@ static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
 {
     unused(user_ctx);
     osal_printk("[team] alert member=%u reason=%u\r\n", member_id, reason);
+    if (reason == SLE_TEAM_ALERT_LEAVE) {
+        (void)team_leader_mark_member_offline(member_id, "member_leave");
+        return;
+    }
     if (reason == SLE_TEAM_ALERT_TIMEOUT) {
-        const sle_team_member_record_t *member = sle_team_node_find_member(&g_team_node, member_id);
+        const sle_team_member_record_t *member = team_display_find_member_record(member_id);
 
+        team_display_note_member_offline(member_id, TEAM_DISPLAY_EVENT_TIMEOUT);
         if (member != NULL) {
-            team_display_show_lost(member_id, member->latitude_e6, member->longitude_e6, member->last_seen_s);
+            team_display_show_event(TEAM_DISPLAY_EVENT_TIMEOUT, member_id, member->latitude_e6,
+                member->longitude_e6, member->last_seen_s);
         } else {
-            team_display_show_lost(member_id, 0, 0, team_now_s(NULL));
+            team_display_show_event(TEAM_DISPLAY_EVENT_TIMEOUT, member_id, 0, 0, team_now_s(NULL));
         }
     }
+}
+
+static void team_member_reset_after_leave(void)
+{
+    (void)team_nv_config_clear();
+    g_team_rt.role_configured = 0U;
+    g_team_rt.role_request_pending = 0U;
+    g_team_rt.role_request_last_ret = SLE_TEAM_OK;
+    (void)memset_s(&g_team_node, sizeof(g_team_node), 0, sizeof(g_team_node));
+    (void)memset_s(&g_team_cli, sizeof(g_team_cli), 0, sizeof(g_team_cli));
+    g_team_rt.leader_label[0] = '\0';
+    team_identity_refresh_labels();
+    team_display_refresh_status();
 }
 
 static void team_on_relay_offline(void *user_ctx, uint8_t member_id)
@@ -4950,14 +5266,7 @@ static void team_http_handle_client(int fd)
         }
         ret = sle_team_node_member_leave(&g_team_node);
         if (ret == SLE_TEAM_OK) {
-            (void)team_nv_config_clear();
-            g_team_rt.role_configured = 0U;
-            g_team_rt.role_request_pending = 0U;
-            g_team_rt.role_request_last_ret = SLE_TEAM_OK;
-            (void)memset_s(&g_team_node, sizeof(g_team_node), 0, sizeof(g_team_node));
-            (void)memset_s(&g_team_cli, sizeof(g_team_cli), 0, sizeof(g_team_cli));
-            g_team_rt.leader_label[0] = '\0';
-            team_identity_refresh_labels();
+            team_member_reset_after_leave();
         }
         osal_printk("[team-wifi] member leave ret=%d\r\n", ret);
         team_http_send_redirect(fd, "/pairing");
@@ -5756,28 +6065,24 @@ static void team_handle_cli_queue_once(void)
             return;
         }
         if (strcmp(msg.line, "role leader") == 0) {
-            int ret = team_configure_role(SLE_TEAM_ROLE_LEADER, g_team_rt.route_id);
-            osal_printk("[cli] role leader ret=%d\r\n", ret);
-            if (ret == SLE_TEAM_OK) {
-                team_ws2812_show_boot_marker();
-                team_buzzer_set(0U);
-            }
+            uint8_t team = team_cfg_default_team();
+            uint8_t channel = team_cfg_default_channel();
+            int ret = team_cfg_save_leader(team, channel, 1U);
+            osal_printk("[cli] role leader ret=%d saved=1 team=%u channel=%u\r\n", ret, team, channel);
             return;
         }
         if (strncmp(msg.line, "role member ", 12) == 0) {
             unsigned int suffix = 0U;
             int ret;
+            uint8_t team = team_cfg_default_team();
+            uint8_t channel = team_cfg_default_channel();
             if (sscanf(msg.line + 12, "%x", &suffix) != 1 || suffix > 0xFFFFU) {
                 osal_printk("[cli] usage: role member <leader_mac_suffix>\r\n");
                 return;
             }
-            ret = team_configure_role(SLE_TEAM_ROLE_MEMBER, team_route_id_from_suffix((uint16_t)suffix));
-            if (ret == SLE_TEAM_OK) {
-                (void)snprintf(g_team_rt.leader_label, sizeof(g_team_rt.leader_label), "L%04X", suffix);
-                team_ws2812_show_boot_marker();
-                team_buzzer_set(0U);
-            }
-            osal_printk("[cli] role member leader_suffix=%04X ret=%d\r\n", suffix, ret);
+            ret = team_cfg_save_member((uint16_t)suffix, team, channel, 1U);
+            osal_printk("[cli] role member leader_suffix=%04X leader=%u ret=%d saved=1 team=%u channel=%u\r\n",
+                suffix, team_route_id_from_suffix((uint16_t)suffix), ret, team, channel);
             return;
         }
         if (team_ws2812_cli_handle(msg.line) != 0) {
@@ -5793,6 +6098,20 @@ static void team_handle_cli_queue_once(void)
             return;
         }
         if (team_serial_cfg_cli_handle(msg.line) != 0) {
+            return;
+        }
+        if (strcmp(msg.line, "leave") == 0) {
+            int ret;
+            if (g_team_rt.role_configured == 0U || g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER) {
+                osal_printk("[cli] leave ignored role_configured=%u role=%u\r\n",
+                    g_team_rt.role_configured, g_team_node.cfg.role);
+                return;
+            }
+            ret = sle_team_node_member_leave(&g_team_node);
+            if (ret == SLE_TEAM_OK) {
+                team_member_reset_after_leave();
+            }
+            osal_printk("[cli] leave ret=%d\r\n", ret);
             return;
         }
         if (g_team_rt.role_configured != 0U) {

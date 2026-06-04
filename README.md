@@ -11,14 +11,14 @@
 - [docs/v3/README.md](docs/v3/README.md)：V3（手机定位桥接）
 - [docs/v4/README.md](docs/v4/README.md)：V4（WS63 模块 + ST7789）
 - [versions/README.md](versions/README.md)：版本记录
-- [versions/v4.4.38/VERSION.md](versions/v4.4.38/VERSION.md)：当前 v4.4.38 仓库记录
+- [versions/v4.4.57/VERSION.md](versions/v4.4.57/VERSION.md)：当前 v4.4.57 仓库记录
 - [meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md)：每次改代码、远程编译、自动烧录和版本管理前必须读取的作业 SOP
 - [meta/DOC_WORKFLOW.md](meta/DOC_WORKFLOW.md)：文档编写与维护流程
 
 ## 当前版本
 
-- 当前仓库记录版本：`v4.4.38`
-- 当前固件版本：`v4.4.37`（本次未修改固件业务逻辑）
+- 当前仓库记录版本：`v4.4.57`
+- 当前固件版本：`v4.4.57`
 - 统一固件：所有 WS63 节点烧同一份 `.fwpkg`，leader/member 通过 WebUI 或串口运行时配置。
 - 板端 SoftAP/HTTP WebUI 默认自动启动；域名/上位机 WebUI 仍依赖板端 HTTP API 做一键配置和状态读取。
 - ST7789 已确认参数：`240x135`，offset `40,53`，MADCTL `0x60`。
@@ -27,6 +27,7 @@
 - WS2812 的 Kconfig 默认是 `n`，构建脚本会按 v4 板子启用 IO0。
 - 蜂鸣器默认关闭，只做安全拉低/命令控制。
 - SLE 广播实际发射功率和广播声明字段统一为 `18 dBm`。
+- ST7789/LVGL 屏幕事件显示已同步为科技感链路面板：`JOIN/LEFT/TIMEOUT/LOST/REJOIN + Mxxxx`，其中 `Mxxxx` 使用成员 MAC 后四位，避免再出现 `M241` 这种内部十进制 ID；v4.4.57 增加 `[display-event]` 串口审计日志，用于证明屏幕事件和 member 标签同步。
 
 ## 目录
 

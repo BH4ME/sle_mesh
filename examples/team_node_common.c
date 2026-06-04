@@ -63,7 +63,7 @@ int parse_demo_position_packet(const uint8_t *buf, size_t buf_len)
     uint16_t app_payload_len;
     uint8_t channel_hash;
     uint8_t cipher_mac[2];
-    const sle_team_pos_body_t *pos;
+    sle_team_pos_body_t pos;
 
     if (sle_team_decode_mesh_packet(&mesh_packet, buf, buf_len) != SLE_TEAM_OK) {
         return -1;
@@ -79,15 +79,15 @@ int parse_demo_position_packet(const uint8_t *buf, size_t buf_len)
         return -4;
     }
 
-    pos = (const sle_team_pos_body_t *)app_packet.body;
+    (void)memcpy(&pos, app_packet.body, sizeof(pos));
     printf("team=%u src=%u dst=%u seq=%u lat=%ld lon=%ld battery=%u\n",
         app_packet.team_id,
         app_packet.src_id,
         app_packet.dst_id,
         app_packet.seq,
-        (long)pos->latitude_e6,
-        (long)pos->longitude_e6,
-        pos->battery_percent);
+        (long)pos.latitude_e6,
+        (long)pos.longitude_e6,
+        pos.battery_percent);
 
     return 0;
 }

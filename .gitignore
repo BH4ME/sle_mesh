@@ -14,3 +14,9 @@ cmake-build-*/
 node_modules/
 dist/
 .vercel/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.tooling/
+output_from_vm/
+local

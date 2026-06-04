@@ -6,15 +6,17 @@ LOG_DIR="$ROOT_DIR/logs/sim"
 BUILD_DIR="${TMPDIR:-/tmp}/sle_team_sim"
 NETWORK_BIN="$BUILD_DIR/sle_team_network_test"
 PACKET_BIN="$BUILD_DIR/sle_team_packet_test"
+REGRESSION_BIN="$BUILD_DIR/sle_team_node_regression_test"
 REBALANCE_BIN="$BUILD_DIR/sle_team_relay_rebalance_test"
 FAILOVER_BIN="$BUILD_DIR/sle_team_failover_suite_test"
 PYTHON_SIM_SCRIPT="$ROOT_DIR/tools/sle_team_python_sim.py"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 NETWORK_LOG="$LOG_DIR/network_test.log"
 PACKET_LOG="$LOG_DIR/packet_test.log"
+REGRESSION_LOG="$LOG_DIR/team_node_regression_test.log"
 REBALANCE_LOG="$LOG_DIR/relay_rebalance_test.log"
 FAILOVER_LOG="$LOG_DIR/failover_suite.log"
-PYTHON_LOG="$LOG_DIR/python_1v20.log"
+PYTHON_LOG=""
 
 ITERATIONS=1
 SUITE="all"
@@ -85,6 +87,10 @@ if ! [[ "$ITERATIONS" =~ ^[0-9]+$ ]] || [ "$ITERATIONS" -lt 1 ]; then
   echo "[sim] ERROR: --stress must be a positive integer, got '$ITERATIONS'" >&2
   exit 1
 fi
+if ! [[ "$PY_MEMBERS" =~ ^[0-9]+$ ]] || [ "$PY_MEMBERS" -lt 1 ]; then
+  echo "[sim] ERROR: --py-members must be a positive integer, got '$PY_MEMBERS'" >&2
+  exit 1
+fi
 
 case "$SUITE" in
   all|core|failover|python)
@@ -94,6 +100,8 @@ case "$SUITE" in
     exit 1
     ;;
 esac
+
+PYTHON_LOG="$LOG_DIR/python_1v${PY_MEMBERS}.log"
 
 mkdir -p "$LOG_DIR" "$BUILD_DIR"
 
@@ -149,6 +157,14 @@ if [ "$SUITE" = "core" ] || [ "$SUITE" = "all" ]; then
     "$ROOT_DIR/src/sle_team_node.c" \
     -DSLE_TEAM_PACKET_TEST \
     -o "$PACKET_BIN"
+
+  echo "[sim] building node regression simulation..."
+  "$CC_BIN" $CFLAGS \
+    "$ROOT_DIR/examples/team_node_regression_test.c" \
+    "$ROOT_DIR/src/sle_team_packet.c" \
+    "$ROOT_DIR/src/sle_team_node.c" \
+    -DSLE_TEAM_NODE_REGRESSION_TEST \
+    -o "$REGRESSION_BIN"
 fi
 
 if [ "$SUITE" = "failover" ] || [ "$SUITE" = "all" ]; then
@@ -169,6 +185,7 @@ LAST_ERR=""
 
 : > "$NETWORK_LOG"
 : > "$PACKET_LOG"
+: > "$REGRESSION_LOG"
 : > "$REBALANCE_LOG"
 : > "$FAILOVER_LOG"
 : > "$PYTHON_LOG"
@@ -208,9 +225,10 @@ run_once() {
   local i="$1"
   local nlog="$LOG_DIR/network_test.iter${i}.log"
   local plog="$LOG_DIR/packet_test.iter${i}.log"
+  local glog="$LOG_DIR/team_node_regression_test.iter${i}.log"
   local rlog="$LOG_DIR/relay_rebalance_test.iter${i}.log"
   local flog="$LOG_DIR/failover_suite.iter${i}.log"
-  local pylog="$LOG_DIR/python_1v20.iter${i}.log"
+  local pylog="$LOG_DIR/python_1v${PY_MEMBERS}.iter${i}.log"
   local iter_err=""
 
   if [ "$SUITE" = "core" ]; then
@@ -218,10 +236,13 @@ run_once() {
       iter_err="$nlog"
     elif ! "$PACKET_BIN" > "$plog" 2>&1; then
       iter_err="$plog"
+    elif ! "$REGRESSION_BIN" > "$glog" 2>&1; then
+      iter_err="$glog"
     else
       PASS_COUNT=$((PASS_COUNT + 1))
       cat "$nlog" >> "$NETWORK_LOG"
       cat "$plog" >> "$PACKET_LOG"
+      cat "$glog" >> "$REGRESSION_LOG"
       return 0
     fi
   elif [ "$SUITE" = "python" ]; then
@@ -251,6 +272,8 @@ run_once() {
       iter_err="$nlog"
     elif ! "$PACKET_BIN" > "$plog" 2>&1; then
       iter_err="$plog"
+    elif ! "$REGRESSION_BIN" > "$glog" 2>&1; then
+      iter_err="$glog"
     elif ! "$REBALANCE_BIN" > "$rlog" 2>&1; then
       iter_err="$rlog"
     elif ! "$FAILOVER_BIN" > "$flog" 2>&1; then
@@ -261,6 +284,7 @@ run_once() {
       PASS_COUNT=$((PASS_COUNT + 1))
       cat "$nlog" >> "$NETWORK_LOG"
       cat "$plog" >> "$PACKET_LOG"
+      cat "$glog" >> "$REGRESSION_LOG"
       cat "$rlog" >> "$REBALANCE_LOG"
       cat "$flog" >> "$FAILOVER_LOG"
       cat "$pylog" >> "$PYTHON_LOG"
@@ -280,6 +304,8 @@ run_once() {
       cat "$nlog" || true
       echo "---- packet ----"
       cat "$plog" || true
+      echo "---- node regression ----"
+      cat "$glog" || true
     fi
     if [ "$SUITE" = "failover" ] || [ "$SUITE" = "all" ]; then
       echo "---- relay rebalance ----"
@@ -312,6 +338,7 @@ echo "[sim] done"
 if [ "$SUITE" = "core" ] || [ "$SUITE" = "all" ]; then
   echo "[sim] network log: $NETWORK_LOG"
   echo "[sim] packet  log: $PACKET_LOG"
+  echo "[sim] node    log: $REGRESSION_LOG"
 fi
 if [ "$SUITE" = "failover" ] || [ "$SUITE" = "all" ]; then
   echo "[sim] relay   log: $REBALANCE_LOG"

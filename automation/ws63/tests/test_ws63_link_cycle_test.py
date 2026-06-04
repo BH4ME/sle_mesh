@@ -69,6 +69,82 @@ class LinkCycleUnitTest(unittest.TestCase):
         )
         self.assertIsNone(lc._extract_suffix("no suffix here"))
 
+    def test_reboot_cycle_does_not_send_manual_rejoin_before_leave(self):
+        leader = lc.Peer(name="leader", port="COML", baudrate=115200, ser=FakeSerial())
+        member = lc.Peer(name="member", port="COMM", baudrate=115200, ser=FakeSerial())
+        calls = []
+        originals = {
+            "_open_peer": lc._open_peer,
+            "_drain": lc._drain,
+            "_detect_suffix": lc._detect_suffix,
+            "_wait_regex": lc._wait_regex,
+            "_wait_member_state": lc._wait_member_state,
+            "_wait_leader_offline_event": lc._wait_leader_offline_event,
+            "_query_member_online": lc._query_member_online,
+            "_wait_role": lc._wait_role,
+        }
+
+        def fake_open_peer(name, _port, _baudrate):
+            return leader if name == "leader" else member
+
+        def fake_drain(_peers, seconds):
+            calls.append(("drain", seconds))
+
+        def fake_detect_suffix(_peer, _peers, _provided_hex, _timeout_s, _note):
+            calls.append(("detect_suffix",))
+            return 0xC7E9
+
+        def fake_wait_regex(target, _peers, pattern, _timeout_s, note):
+            calls.append(("wait_regex", target.name, note, pattern))
+
+        def fake_wait_member_state(_leader, _peers, _member_id, expect_online, _timeout_s, _poll_s):
+            calls.append(("wait_member_state", expect_online))
+
+        def fake_wait_leader_offline_event(_leader, _peers, *, member_id, timeout_s, note, log_start):
+            calls.append(("offline_event", member_id, timeout_s, note, log_start))
+
+        def fake_query_member_online(_leader, _peers, _member_id, _query_window_s=None, **_kwargs):
+            calls.append(("query_member_online",))
+            return 0
+
+        def fake_wait_role(peer, _peers, expected_role, _timeout_s=None, _poll_s=None, **_kwargs):
+            calls.append(("wait_role", peer.name, expected_role))
+
+        try:
+            lc._open_peer = fake_open_peer
+            lc._drain = fake_drain
+            lc._detect_suffix = fake_detect_suffix
+            lc._wait_regex = fake_wait_regex
+            lc._wait_member_state = fake_wait_member_state
+            lc._wait_leader_offline_event = fake_wait_leader_offline_event
+            lc._query_member_online = fake_query_member_online
+            lc._wait_role = fake_wait_role
+
+            args = lc.build_parser().parse_args([
+                "--leader-port", "COML",
+                "--member-port", "COMM",
+                "--leader-id", "1",
+                "--team-id", "1",
+                "--member-id", "2",
+                "--channel", "17",
+                "--initial-drain-s", "0",
+                "--no-auto-rejoin-s", "0.1",
+            ])
+            self.assertEqual(lc.run(args), 0)
+        finally:
+            for name, original in originals.items():
+                setattr(lc, name, original)
+
+        member_tx = [item.removeprefix("[tx] ") for item in member.log if item.startswith("[tx] ")]
+        self.assertEqual(member_tx, ["join 1 1 17", "reboot", "leave", "role member C7E9"])
+        reboot_index = member_tx.index("reboot")
+        leave_index = member_tx.index("leave")
+        self.assertFalse(any(cmd.startswith("join ") or cmd.startswith("role member ") for cmd in member_tx[reboot_index + 1:leave_index]))
+        self.assertIn(
+            ("wait_regex", "member", "member restore from NV after reboot", r"\[team-nv\] (load role=0 .*|restore member leader_suffix=)"),
+            calls,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

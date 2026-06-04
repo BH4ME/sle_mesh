@@ -232,10 +232,13 @@ static void sle_team_set_parent_state(sle_team_node_t *node, uint8_t parent_id, 
     }
 }
 
-static void sle_team_member_rejoin(sle_team_node_t *node)
+static int sle_team_member_recover_link(sle_team_node_t *node, const char *reason)
 {
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
-        return;
+        return SLE_TEAM_ERR_ARG;
+    }
+    if (node->cfg.leader_id == 0U || node->cfg.leader_id == SLE_TEAM_BROADCAST_ID) {
+        return SLE_TEAM_ERR_UNSUPPORTED;
     }
     sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_RESELECTING, 1U);
     node->joined = 0U;
@@ -247,7 +250,13 @@ static void sle_team_member_rejoin(sle_team_node_t *node)
     node->last_parent_seen_s = 0U;
     sle_team_node_disable_member_relay(node, 0U);
     sle_team_clear_members(node);
-    sle_team_log(node, "leader timeout, rejoining");
+    sle_team_log(node, reason != NULL ? reason : "link lost, rejoining");
+    return SLE_TEAM_OK;
+}
+
+static void sle_team_member_rejoin(sle_team_node_t *node)
+{
+    (void)sle_team_member_recover_link(node, "leader timeout, rejoining");
 }
 
 int sle_team_node_try_parent_switch(sle_team_node_t *node)
@@ -423,6 +432,37 @@ static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
             sle_team_log(node, "member heartbeat timeout");
         }
     }
+}
+
+static void sle_team_leader_mark_member_left(sle_team_node_t *node, uint8_t member_id, uint32_t last_report_s)
+{
+    sle_team_member_record_t *member;
+    uint32_t now_s;
+    uint8_t was_relay;
+
+    if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_LEADER ||
+        member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID) {
+        return;
+    }
+    member = sle_team_find_member_record(node, member_id);
+    if (member == NULL || member->online == 0U) {
+        return;
+    }
+    member->online = 0U;
+    was_relay = member->relay_allowed;
+    member->relay_allowed = 0U;
+    member->relay_tier = 0U;
+    member->max_downstream = 0U;
+    now_s = sle_team_now(node);
+    if (last_report_s != 0U) {
+        member->last_seen_s = last_report_s;
+    } else if (member->last_seen_s == 0U && now_s != 0U) {
+        member->last_seen_s = now_s;
+    }
+    if (was_relay != 0U && node->ops.on_relay_offline != NULL) {
+        node->ops.on_relay_offline(node->ops.user_ctx, member_id);
+    }
+    sle_team_log(node, "member left leader");
 }
 
 static uint8_t sle_team_has_online_member(const sle_team_node_t *node)
@@ -786,21 +826,42 @@ int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, u
 
 int sle_team_node_member_leave(sle_team_node_t *node)
 {
+    sle_team_alert_body_t alert;
+    int notify_ret = SLE_TEAM_OK;
+    uint8_t leader_id;
+
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
         return SLE_TEAM_ERR_ARG;
     }
+    leader_id = node->cfg.leader_id;
+    if (node->joined != 0U && leader_id != 0U && leader_id != SLE_TEAM_BROADCAST_ID) {
+        (void)memset(&alert, 0, sizeof(alert));
+        alert.lost_member_id = node->cfg.self_id;
+        alert.reason = SLE_TEAM_ALERT_LEAVE;
+        alert.last_report_s = sle_team_now(node);
+        notify_ret = sle_team_node_send_alert(node, leader_id, &alert);
+    }
     node->joined = 0U;
-    node->state = SLE_TEAM_NET_DISCOVERING;
+    node->state = SLE_TEAM_NET_IDLE;
+    node->cfg.leader_id = 0U;
     node->last_hello_s = 0U;
     node->last_heartbeat_s = 0U;
     node->last_config_s = 0U;
     node->last_leader_seen_s = 0U;
     node->last_parent_seen_s = 0U;
-    sle_team_set_parent_state(node, node->upstream_parent_id, SLE_TEAM_PARENT_DISCOVERING, 0U);
+    sle_team_set_parent_state(node, 0U, SLE_TEAM_PARENT_IDLE, 0U);
     sle_team_node_disable_member_relay(node, 1U);
     sle_team_clear_members(node);
+    if (notify_ret != SLE_TEAM_OK) {
+        sle_team_log(node, "member leave notify failed");
+    }
     sle_team_log(node, "member left team");
     return SLE_TEAM_OK;
+}
+
+int sle_team_node_member_link_lost(sle_team_node_t *node)
+{
+    return sle_team_member_recover_link(node, "link lost, rejoining");
 }
 
 static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packet_t *app)
@@ -1050,6 +1111,10 @@ static int sle_team_handle_alert(sle_team_node_t *node, const sle_team_app_packe
     if (node->ops.on_alert != NULL) {
         node->ops.on_alert(node->ops.user_ctx, alert.lost_member_id, alert.reason);
     }
+    if (node->cfg.role == SLE_TEAM_ROLE_LEADER && alert.reason == SLE_TEAM_ALERT_LEAVE &&
+        alert.lost_member_id == app->src_id) {
+        sle_team_leader_mark_member_left(node, alert.lost_member_id, alert.last_report_s);
+    }
     return SLE_TEAM_OK;
 }
 
@@ -1138,7 +1203,9 @@ void sle_team_node_tick(sle_team_node_t *node)
         (void)sle_team_node_try_parent_switch(node);
     }
 
-    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined == 0U) {
+    if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->joined == 0U &&
+        node->cfg.leader_id != 0U && node->cfg.leader_id != SLE_TEAM_BROADCAST_ID &&
+        node->state != SLE_TEAM_NET_IDLE) {
         if ((now_s - node->last_hello_s) >= 3U) {
             (void)sle_team_node_send_hello(node, node->cfg.leader_id);
             node->last_hello_s = now_s;

@@ -168,6 +168,7 @@ int sle_team_node_pairing_approve_with_relay(sle_team_node_t *node, uint8_t memb
 int sle_team_node_member_select_leader(sle_team_node_t *node, uint8_t team_id, uint8_t leader_id,
     uint8_t channel_hash);
 int sle_team_node_member_leave(sle_team_node_t *node);
+int sle_team_node_member_link_lost(sle_team_node_t *node);
 int sle_team_node_try_parent_switch(sle_team_node_t *node);
 
 #ifdef __cplusplus

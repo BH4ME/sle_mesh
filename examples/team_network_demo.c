@@ -319,10 +319,13 @@ int main(void)
     assert(sle_team_node_is_member_allowed(&leader, 2U) != 0U);
 
     assert(sle_team_node_member_leave(&member) == SLE_TEAM_OK);
+    relay_last_packet(&member_rt, &leader);
+    assert(sle_team_node_find_member(&leader, 2U) == NULL);
     assert(member.joined == 0U);
     assert(member.cfg.relay_enabled == 0U);
-    assert(member.state == SLE_TEAM_NET_DISCOVERING);
-    assert(member.upstream_parent_state == SLE_TEAM_PARENT_DISCOVERING);
+    assert(member.state == SLE_TEAM_NET_IDLE);
+    assert(member.cfg.leader_id == 0U);
+    assert(member.upstream_parent_state == SLE_TEAM_PARENT_IDLE);
     assert(member.upstream_parent_reselect_pending == 0U);
     assert(sle_team_node_member_select_leader(&member, 4U, 1U, 0x22U) == SLE_TEAM_OK);
     assert(member.cfg.team_id == 4U);
@@ -342,6 +345,7 @@ int main(void)
     {
         sle_team_app_packet_t route_app;
         sle_team_route_update_body_t route_update = {0};
+        sle_team_route_update_body_t decoded_route_update;
 
         route_update.parent_id = 3U;
         route_update.next_hop_id = 3U;
@@ -352,9 +356,10 @@ int main(void)
         assert(demo_decode_last_app_packet(&member_rt, &route_app) != 0U);
         assert(route_app.app_msg_type == SLE_TEAM_APP_ROUTE_UPDATE);
         assert(route_app.body_len == sizeof(sle_team_route_update_body_t));
-        assert(((const sle_team_route_update_body_t *)route_app.body)->parent_id == 3U);
-        assert(((const sle_team_route_update_body_t *)route_app.body)->next_hop_id == 3U);
-        assert(((const sle_team_route_update_body_t *)route_app.body)->parent_state == 2U);
+        (void)memcpy(&decoded_route_update, route_app.body, sizeof(decoded_route_update));
+        assert(decoded_route_update.parent_id == 3U);
+        assert(decoded_route_update.next_hop_id == 3U);
+        assert(decoded_route_update.parent_state == 2U);
         member_rt.last_tx_len = 0U;
     }
 
@@ -363,12 +368,12 @@ int main(void)
     assert(sle_team_node_send_route_update(&leader, 2U, 3U, 2U, 3U) == SLE_TEAM_OK);
     {
         sle_team_app_packet_t route_app;
-        const sle_team_route_update_body_t *route_body;
+        sle_team_route_update_body_t route_body;
 
         assert(demo_decode_last_app_packet(&leader_rt, &route_app) != 0U);
         assert(route_app.body_len == sizeof(sle_team_route_update_body_t));
-        route_body = (const sle_team_route_update_body_t *)route_app.body;
-        assert((route_body->reserved & SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT) != 0U);
+        (void)memcpy(&route_body, route_app.body, sizeof(route_body));
+        assert((route_body.reserved & SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT) != 0U);
     }
     relay_last_packet(&leader_rt, &member);
     assert(member.upstream_parent_state == SLE_TEAM_PARENT_CONNECTED);
@@ -466,7 +471,7 @@ int main(void)
 
     {
         sle_team_app_packet_t lost_alert_app;
-        const sle_team_alert_body_t *lost_alert;
+        sle_team_alert_body_t lost_alert;
 
         (void)sle_team_node_allow_all_members(&leader);
         (void)memset(leader.members, 0, sizeof(leader.members));
@@ -483,12 +488,12 @@ int main(void)
         assert(lost_alert_app.app_msg_type == SLE_TEAM_APP_ALERT);
         assert(lost_alert_app.dst_id == SLE_TEAM_BROADCAST_ID);
         assert(lost_alert_app.body_len == sizeof(sle_team_alert_body_t));
-        lost_alert = (const sle_team_alert_body_t *)lost_alert_app.body;
-        assert(lost_alert->lost_member_id == 2U);
-        assert(lost_alert->reason == SLE_TEAM_ALERT_TIMEOUT);
-        assert(lost_alert->last_latitude_e6 == pos.latitude_e6);
-        assert(lost_alert->last_longitude_e6 == pos.longitude_e6);
-        assert(lost_alert->last_report_s == 30U);
+        (void)memcpy(&lost_alert, lost_alert_app.body, sizeof(lost_alert));
+        assert(lost_alert.lost_member_id == 2U);
+        assert(lost_alert.reason == SLE_TEAM_ALERT_TIMEOUT);
+        assert(lost_alert.last_latitude_e6 == pos.latitude_e6);
+        assert(lost_alert.last_longitude_e6 == pos.longitude_e6);
+        assert(lost_alert.last_report_s == 30U);
         relay_last_packet(&leader_rt, &member);
         assert(member_rt.alert_count == 1U);
         assert(member_rt.alert_last_member == 2U);

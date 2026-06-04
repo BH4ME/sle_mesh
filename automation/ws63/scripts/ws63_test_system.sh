@@ -13,6 +13,7 @@ DO_SIM=1
 DO_BURN=0
 DO_SERIAL=0
 DO_LINK_CYCLE=0
+DO_RELAY_CYCLE=0
 DO_ROLE_BIND=0
 SKIP_BUILD=0
 SUITE="all"
@@ -27,6 +28,19 @@ LINK_LEADER_ID=-1
 LINK_MEMBER_ID=2
 LINK_CHANNEL=17
 LINK_LEADER_SUFFIX="${LINK_LEADER_SUFFIX:-}"
+LINK_SKIP_REBOOT_CYCLE=0
+LINK_MEMBER_REBOOT_COMMAND="reboot"
+LINK_REBOOT_OFFLINE_TIMEOUT_S=20
+LINK_MEMBER_BOOT_TIMEOUT_S=45
+LINK_NO_AUTO_REJOIN_S=5
+RELAY_ID=-1
+RELAY_CHILD_ID=-1
+RELAY_REBOOT_COMMAND="reboot"
+RELAY_REQUIRE_CHILD_PARENT=1
+RELAY_SKIP_POS_REPORT=0
+RELAY_OFFLINE_TIMEOUT_S=30
+RELAY_BOOT_TIMEOUT_S=60
+RELAY_FAILOVER_TIMEOUT_S=60
 ROLE_BIND_MEMBER_JOIN=0
 ROLE_BIND_WITH_FLASH=0
 
@@ -45,7 +59,8 @@ Options:
   --full                     run unit + sim(all stress=10) + py stress
   --with-burn                include firmware burn stage (non-interactive)
   --with-serial              include serial smoke capture stage
-  --with-link-cycle          include serial connect->leave->reconnect test
+  --with-link-cycle          include serial member reboot-restore + leave/rejoin test
+  --with-relay-cycle         include three-board relay reboot/failover test
   --with-role-bind           include post-flash role bind stage (one leader -> all members)
   --role-bind-with-flash     run flash inside role-bind stage (use instead of --with-burn to avoid duplicate flashing)
   --ports <p1,p2,...>        serial ports for burn/serial stage
@@ -59,6 +74,19 @@ Options:
   --link-channel <id>        channel used by link-cycle (default 17)
   --link-no-bootstrap-roles  skip role bootstrap before link-cycle
   --link-leader-suffix <hex> leader MAC suffix (4 hex chars) for bootstrap, auto-detect if omitted
+  --link-skip-reboot-cycle   skip member reboot/auto-restore check
+  --link-member-reboot-cmd <cmd> command used to reboot member (default reboot)
+  --link-reboot-offline-timeout <s> timeout for leader offline event after member reboot
+  --link-member-boot-timeout <s> timeout for member NV restore log after reboot
+  --link-no-auto-rejoin-s <s> duration to prove manual leave does not auto-rejoin
+  --relay-id <id>            relay route id for relay-cycle (default -1: auto)
+  --relay-child-id <id>      child route id for relay-cycle (default -1: auto)
+  --relay-reboot-cmd <cmd>   command used to reboot relay member (default reboot)
+  --relay-no-parent-check    do not require child to initially select relay as parent
+  --relay-skip-pos-report    skip child POS_REPORT validation after relay loss
+  --relay-offline-timeout <s> timeout for leader offline event after relay reboot
+  --relay-boot-timeout <s>   timeout for relay NV restore after reboot
+  --relay-failover-timeout <s> timeout for child failover/recovery evidence
   --role-bind-member-join    send join after role member in role-bind stage
   --skip-build               skip remote build command in burn stage
   -h, --help                 show this help
@@ -80,6 +108,8 @@ while [[ $# -gt 0 ]]; do
       DO_SERIAL=1; shift ;;
     --with-link-cycle)
       DO_LINK_CYCLE=1; shift ;;
+    --with-relay-cycle)
+      DO_RELAY_CYCLE=1; shift ;;
     --with-role-bind)
       DO_ROLE_BIND=1; shift ;;
     --role-bind-with-flash)
@@ -106,6 +136,32 @@ while [[ $# -gt 0 ]]; do
       LINK_BOOTSTRAP_ROLES=0; shift ;;
     --link-leader-suffix)
       LINK_LEADER_SUFFIX="${2:-}"; shift 2 ;;
+    --link-skip-reboot-cycle)
+      LINK_SKIP_REBOOT_CYCLE=1; shift ;;
+    --link-member-reboot-cmd)
+      LINK_MEMBER_REBOOT_COMMAND="${2:-}"; shift 2 ;;
+    --link-reboot-offline-timeout)
+      LINK_REBOOT_OFFLINE_TIMEOUT_S="${2:-}"; shift 2 ;;
+    --link-member-boot-timeout)
+      LINK_MEMBER_BOOT_TIMEOUT_S="${2:-}"; shift 2 ;;
+    --link-no-auto-rejoin-s)
+      LINK_NO_AUTO_REJOIN_S="${2:-}"; shift 2 ;;
+    --relay-id)
+      RELAY_ID="${2:-}"; shift 2 ;;
+    --relay-child-id)
+      RELAY_CHILD_ID="${2:-}"; shift 2 ;;
+    --relay-reboot-cmd)
+      RELAY_REBOOT_COMMAND="${2:-}"; shift 2 ;;
+    --relay-no-parent-check)
+      RELAY_REQUIRE_CHILD_PARENT=0; shift ;;
+    --relay-skip-pos-report)
+      RELAY_SKIP_POS_REPORT=1; shift ;;
+    --relay-offline-timeout)
+      RELAY_OFFLINE_TIMEOUT_S="${2:-}"; shift 2 ;;
+    --relay-boot-timeout)
+      RELAY_BOOT_TIMEOUT_S="${2:-}"; shift 2 ;;
+    --relay-failover-timeout)
+      RELAY_FAILOVER_TIMEOUT_S="${2:-}"; shift 2 ;;
     --role-bind-member-join)
       ROLE_BIND_MEMBER_JOIN=1; shift ;;
     --skip-build)
@@ -124,8 +180,23 @@ done
 [[ "$LINK_LEADER_ID" =~ ^-?[0-9]+$ ]] || die "--link-leader-id must be integer"
 [[ "$LINK_MEMBER_ID" =~ ^[0-9]+$ ]] || die "--link-member-id must be integer"
 [[ "$LINK_CHANNEL" =~ ^[0-9]+$ ]] || die "--link-channel must be integer"
+[[ "$LINK_REBOOT_OFFLINE_TIMEOUT_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--link-reboot-offline-timeout must be numeric"
+[[ "$LINK_MEMBER_BOOT_TIMEOUT_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--link-member-boot-timeout must be numeric"
+[[ "$LINK_NO_AUTO_REJOIN_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--link-no-auto-rejoin-s must be numeric"
+[[ "$RELAY_ID" =~ ^-?[0-9]+$ ]] || die "--relay-id must be integer"
+[[ "$RELAY_CHILD_ID" =~ ^-?[0-9]+$ ]] || die "--relay-child-id must be integer"
+[[ "$RELAY_OFFLINE_TIMEOUT_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--relay-offline-timeout must be numeric"
+[[ "$RELAY_BOOT_TIMEOUT_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--relay-boot-timeout must be numeric"
+[[ "$RELAY_FAILOVER_TIMEOUT_S" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--relay-failover-timeout must be numeric"
 if [[ -n "$LINK_LEADER_SUFFIX" ]] && [[ ! "$LINK_LEADER_SUFFIX" =~ ^[0-9A-Fa-f]{4}$ ]]; then
   die "--link-leader-suffix must be 4 hex digits"
+fi
+if [[ "$DO_RELAY_CYCLE" == "1" ]]; then
+  [[ -n "$SERIAL_PORTS" ]] || die "--with-relay-cycle requires --ports leader,relay,child"
+  IFS=',' read -r -a RELAY_PREFLIGHT_PORTS <<< "$SERIAL_PORTS"
+  [[ "${#RELAY_PREFLIGHT_PORTS[@]}" -ge 3 ]] || die "--with-relay-cycle requires three ports: leader,relay,child"
+  python3 "$ROOT_DIR/automation/ws63/tools/ws63_serial_preflight.py" --mode relay-cycle --ports "$SERIAL_PORTS" ||
+    die "relay-cycle serial preflight failed"
 fi
 
 mkdir -p "$RUN_DIR"
@@ -155,7 +226,7 @@ run_cmd() {
   echo
   echo "- Timestamp: $TS"
   echo "- Run Dir: $RUN_DIR"
-  echo "- Config: unit=$DO_UNIT sim=$DO_SIM burn=$DO_BURN serial=$DO_SERIAL sim_stress=$SIM_STRESS py_stress=$PY_STRESS"
+  echo "- Config: unit=$DO_UNIT sim=$DO_SIM burn=$DO_BURN serial=$DO_SERIAL link_cycle=$DO_LINK_CYCLE relay_cycle=$DO_RELAY_CYCLE sim_stress=$SIM_STRESS py_stress=$PY_STRESS"
 } > "$REPORT"
 
 FAIL_COUNT=0
@@ -164,18 +235,23 @@ if [[ "$DO_UNIT" == "1" ]]; then
   log_step "Unit Tests"
   run_cmd "unit_python_sim" python3 -m unittest tools/test_sle_team_python_sim.py || FAIL_COUNT=$((FAIL_COUNT + 1))
   run_cmd "unit_ws63_auto_burn" python3 -m unittest automation/ws63/tests/test_ws63_auto_burn.py || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "unit_ws63_link_cycle" python3 -m unittest automation/ws63/tests/test_ws63_link_cycle_test.py || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "unit_ws63_relay_cycle" python3 -m unittest automation/ws63/tests/test_ws63_relay_cycle_test.py || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "unit_ws63_serial_preflight" python3 -m unittest automation/ws63/tests/test_ws63_serial_preflight.py || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "unit_ws63_system_script" python3 -m unittest automation/ws63/tests/test_ws63_system_script.py || FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
 if [[ "$DO_SIM" == "1" ]]; then
   log_step "Simulation"
   run_cmd "sim_all" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=all --stress="$SIM_STRESS" || FAIL_COUNT=$((FAIL_COUNT + 1))
   run_cmd "sim_python_stress" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=20 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=18 --py-packet-loss-rate=0.2 --py-jitter-min-ms=10 --py-jitter-max-ms=120 --py-batch-fail-relay-count=1 --py-batch-fail-relay-ticks=6 || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "sim_python_1v30_relay_failover" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=30 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=16 --py-packet-loss-rate=0.0 --py-jitter-min-ms=0 --py-jitter-max-ms=80 --py-batch-fail-relay-count=2 --py-batch-fail-relay-ticks=8,12 --py-seed=20260604 || FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
 if [[ "$DO_BURN" == "1" ]]; then
   log_step "Build & Burn"
   if [[ "$SKIP_BUILD" != "1" ]]; then
-    run_cmd "build_ubuntu" env UBUNTU_HOST="${UBUNTU_HOST:-}" UBUNTU_USER="${UBUNTU_USER:-}" UBUNTU_PASS="${UBUNTU_PASS:-}" UBUNTU_SDK="${UBUNTU_SDK:-}" BUILD_JOBS="${BUILD_JOBS:-4}" "$ROOT_DIR/scripts/ws63_build_team_ubuntu.sh" unified || FAIL_COUNT=$((FAIL_COUNT + 1))
+    run_cmd "build_ubuntu" env UBUNTU_HOST="${UBUNTU_HOST:-}" UBUNTU_USER="${UBUNTU_USER:-}" UBUNTU_PASS="${UBUNTU_PASS:-}" UBUNTU_SDK="${UBUNTU_SDK:-}" BUILD_JOBS="${BUILD_JOBS:-4}" "$ROOT_DIR/scripts/ws63_build_v4_ubuntu.sh" unified || FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
 
   if [[ -z "$SERIAL_PORTS" ]]; then
@@ -243,8 +319,15 @@ if [[ "$DO_LINK_CYCLE" == "1" ]]; then
         --leader-id "$LINK_LEADER_ID"
         --member-id "$LINK_MEMBER_ID"
         --channel "$LINK_CHANNEL"
+        --member-reboot-command "$LINK_MEMBER_REBOOT_COMMAND"
+        --reboot-offline-timeout-s "$LINK_REBOOT_OFFLINE_TIMEOUT_S"
+        --member-boot-timeout-s "$LINK_MEMBER_BOOT_TIMEOUT_S"
+        --no-auto-rejoin-s "$LINK_NO_AUTO_REJOIN_S"
         --log-dir "$RUN_DIR"
       )
+      if [[ "$LINK_SKIP_REBOOT_CYCLE" == "1" ]]; then
+        link_cmd+=(--skip-reboot-cycle)
+      fi
       if [[ "$LINK_BOOTSTRAP_ROLES" == "1" ]]; then
         link_cmd+=(--bootstrap-roles)
         if [[ -n "$LINK_LEADER_SUFFIX" ]]; then
@@ -252,6 +335,55 @@ if [[ "$DO_LINK_CYCLE" == "1" ]]; then
         fi
       fi
       run_cmd "link_cycle" "${link_cmd[@]}" || FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+  fi
+fi
+
+if [[ "$DO_RELAY_CYCLE" == "1" ]]; then
+  log_step "Relay Cycle"
+  if [[ -z "$SERIAL_PORTS" ]]; then
+    echo "[auto-test] relay-cycle requested but no --ports" | tee -a "$SUMMARY"
+    printf -- "- relay_cycle: FAIL (no --ports)\\n" >> "$REPORT"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  else
+    IFS=',' read -r -a PORT_ARR <<< "$SERIAL_PORTS"
+    if [[ "${#PORT_ARR[@]}" -lt 3 ]]; then
+      echo "[auto-test] relay-cycle requires three ports: leader,relay,child" | tee -a "$SUMMARY"
+      printf -- "- relay_cycle: FAIL (need three ports)\\n" >> "$REPORT"
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    else
+      LEADER_PORT="${PORT_ARR[0]// /}"
+      RELAY_PORT="${PORT_ARR[1]// /}"
+      CHILD_PORT="${PORT_ARR[2]// /}"
+      relay_cmd=(
+        python3 "$ROOT_DIR/automation/ws63/tools/ws63_relay_cycle_test.py"
+        --leader-port "$LEADER_PORT"
+        --relay-port "$RELAY_PORT"
+        --child-port "$CHILD_PORT"
+        --team-id "$LINK_TEAM_ID"
+        --leader-id "$LINK_LEADER_ID"
+        --relay-id "$RELAY_ID"
+        --child-id "$RELAY_CHILD_ID"
+        --channel "$LINK_CHANNEL"
+        --relay-reboot-command "$RELAY_REBOOT_COMMAND"
+        --relay-offline-timeout-s "$RELAY_OFFLINE_TIMEOUT_S"
+        --relay-boot-timeout-s "$RELAY_BOOT_TIMEOUT_S"
+        --failover-timeout-s "$RELAY_FAILOVER_TIMEOUT_S"
+        --log-dir "$RUN_DIR"
+      )
+      if [[ "$LINK_BOOTSTRAP_ROLES" == "1" ]]; then
+        relay_cmd+=(--bootstrap-roles)
+        if [[ -n "$LINK_LEADER_SUFFIX" ]]; then
+          relay_cmd+=(--leader-suffix "$LINK_LEADER_SUFFIX")
+        fi
+      fi
+      if [[ "$RELAY_REQUIRE_CHILD_PARENT" != "1" ]]; then
+        relay_cmd+=(--no-require-child-parent-relay)
+      fi
+      if [[ "$RELAY_SKIP_POS_REPORT" == "1" ]]; then
+        relay_cmd+=(--skip-pos-report)
+      fi
+      run_cmd "relay_cycle" "${relay_cmd[@]}" || FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
   fi
 fi

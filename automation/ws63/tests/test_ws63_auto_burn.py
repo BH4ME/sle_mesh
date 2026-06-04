@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -101,6 +103,36 @@ class Ws63AutoBurnTest(unittest.TestCase):
         args = parser.parse_args(["-p", "/dev/null", "--software-reset-only", "firmware.fwpkg"])
         self.assertTrue(args.software_reset_only)
 
+    def test_firmware_version_guard_checks_package_bytes(self):
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as f:
+                path = f.name
+                f.write(b"boot data v4.4.57 app data")
+                f.flush()
+
+            self.assertTrue(ws63_auto_burn.firmware_contains_version(path, "v4.4.57"))
+            self.assertFalse(ws63_auto_burn.firmware_contains_version(path, "v4.4.56"))
+            self.assertTrue(ws63_auto_burn.firmware_contains_version(path, ""))
+        finally:
+            if path is not None:
+                os.unlink(path)
+
+    def test_main_refuses_stale_firmware_before_flash(self):
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as f:
+                path = f.name
+                f.write(b"boot data v4.4.37 app data")
+                f.flush()
+
+            ret = ws63_auto_burn.main(["-p", "/dev/null", "--no-auto-reset", "--expected-version", "v4.4.57", path])
+        finally:
+            if path is not None:
+                os.unlink(path)
+
+        self.assertEqual(ret, 3)
+
     def test_main_returns_nonzero_when_flash_fails(self):
         class FailingBurner:
             def __init__(self, *_args, **_kwargs):
@@ -109,10 +141,44 @@ class Ws63AutoBurnTest(unittest.TestCase):
             def flash(self, _firmware):
                 return False
 
-        with mock.patch.object(ws63_auto_burn, "AutoResetWs63BurnTools", FailingBurner):
-            ret = ws63_auto_burn.main(["-p", "/dev/null", "--no-auto-reset", "firmware.fwpkg"])
+        with mock.patch.object(ws63_auto_burn, "HAVE_XF_BURN_TOOLS", True), \
+                mock.patch.object(ws63_auto_burn, "AutoResetWs63BurnTools", FailingBurner):
+            ret = ws63_auto_burn.main([
+                "-p", "/dev/null",
+                "--no-auto-reset",
+                "--expected-version", "",
+                "firmware.fwpkg",
+            ])
 
         self.assertNotEqual(ret, 0)
+
+    def test_main_defaults_to_current_expected_firmware_version(self):
+        parser = ws63_auto_burn.build_arg_parser()
+
+        args = parser.parse_args(["-p", "/dev/null", "--software-reset-only", "firmware.fwpkg"])
+
+        self.assertEqual(args.expected_version, "v4.4.57")
+
+    def test_main_show_mode_does_not_apply_version_guard(self):
+        class FakeFwpkg:
+            def __init__(self, firmware_file):
+                self.firmware_file = firmware_file
+
+            def show(self):
+                return None
+
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            path = f.name
+            f.write(b"boot data v4.4.57 app data")
+            f.flush()
+        try:
+            with mock.patch.object(ws63_auto_burn, "HAVE_XF_BURN_TOOLS", True), \
+                    mock.patch.object(ws63_auto_burn, "Fwpkg", FakeFwpkg):
+                ret = ws63_auto_burn.main(["--show", "--expected-version", "v4.4.57", path])
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(ret, 0)
 
 
 if __name__ == "__main__":

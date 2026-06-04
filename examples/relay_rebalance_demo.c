@@ -149,6 +149,14 @@ static demo_member_t *demo_find_member(demo_cluster_t *cluster, uint8_t member_i
     return NULL;
 }
 
+static void demo_set_member_rssi(demo_cluster_t *cluster, uint8_t member_id, int8_t rssi_dbm)
+{
+    demo_member_t *member = demo_find_member(cluster, member_id);
+
+    assert(member != NULL);
+    member->last_rssi_dbm = rssi_dbm;
+}
+
 static void demo_seed_members(demo_cluster_t *cluster)
 {
     uint8_t id;
@@ -167,10 +175,10 @@ static void demo_seed_members(demo_cluster_t *cluster)
     }
 
     /* Make member 5 the top fallback candidate once a relay slot becomes available. */
-    demo_find_member(cluster, 5U)->last_rssi_dbm = -55;
-    demo_find_member(cluster, 6U)->last_rssi_dbm = -60;
-    demo_find_member(cluster, 7U)->last_rssi_dbm = -65;
-    demo_find_member(cluster, 3U)->last_rssi_dbm = -58;
+    demo_set_member_rssi(cluster, 5U, -55);
+    demo_set_member_rssi(cluster, 6U, -60);
+    demo_set_member_rssi(cluster, 7U, -65);
+    demo_set_member_rssi(cluster, 3U, -58);
 }
 
 int main(void)

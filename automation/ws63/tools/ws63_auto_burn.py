@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import logging
 import math
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -65,6 +66,7 @@ class ResetConfig:
 
 
 DEFAULT_CONTROL_SEQUENCE = "rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05"
+DEFAULT_EXPECTED_FW_VERSION = "v4.4.57"
 
 
 def parse_bool(value: str) -> bool:
@@ -106,6 +108,17 @@ def parse_control_sequence(text: str) -> List[ControlStep]:
                 raise ValueError(f"unknown control signal: {name}")
         steps.append(ControlStep(dtr=dtr, rts=rts, delay_s=delay_s))
     return steps
+
+
+def firmware_contains_version(firmware_file: str, expected_version: str) -> bool:
+    if not expected_version:
+        return True
+    needle = expected_version.encode("ascii")
+    try:
+        with open(firmware_file, "rb") as f:
+            return needle in f.read()
+    except OSError:
+        return False
 
 
 def perform_auto_reset(
@@ -308,6 +321,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0.05,
         help="delay between repeated handshake probes in seconds",
     )
+    parser.add_argument(
+        "--expected-version",
+        default=os.environ.get("EXPECTED_FW_VERSION", DEFAULT_EXPECTED_FW_VERSION),
+        help="refuse to burn unless firmware package contains this version string; empty disables the check",
+    )
     return parser
 
 
@@ -317,11 +335,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s")
 
-    if not HAVE_XF_BURN_TOOLS:
-        logging.error("xf_burn_tools is not installed. Please install vendor burn tools to use flashing.")
-        return 2
-
     if args.show:
+        if not HAVE_XF_BURN_TOOLS:
+            logging.error("xf_burn_tools is not installed. Please install vendor burn tools to inspect firmware.")
+            return 2
         Fwpkg(args.firmware_file).show()
         return 0
     if not args.port:
@@ -338,6 +355,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("--manual-retry-timeout must be >= 0")
     if args.handshake_interval < 0.0:
         parser.error("--handshake-interval must be >= 0")
+    if args.expected_version and not firmware_contains_version(args.firmware_file, args.expected_version):
+        logging.error("Firmware package does not contain expected version: %s", args.expected_version)
+        logging.error("Refusing to flash stale package: %s", args.firmware_file)
+        logging.error("Use --expected-version '' or EXPECTED_FW_VERSION= to override intentionally.")
+        return 3
+
+    if not HAVE_XF_BURN_TOOLS:
+        logging.error("xf_burn_tools is not installed. Please install vendor burn tools to use flashing.")
+        return 2
 
     reset_config = None
     if not args.no_auto_reset:

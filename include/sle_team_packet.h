@@ -56,6 +56,7 @@ typedef enum {
     SLE_TEAM_ALERT_DISTANCE = 1,
     SLE_TEAM_ALERT_TIMEOUT = 2,
     SLE_TEAM_ALERT_LOW_BATTERY = 3,
+    SLE_TEAM_ALERT_LEAVE = 4,
 } sle_team_alert_reason_t;
 
 typedef enum {

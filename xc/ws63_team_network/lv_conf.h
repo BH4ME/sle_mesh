@@ -7,9 +7,9 @@
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
 
-/* Keep LVGL heap small enough to leave contiguous heap for SLE central scan. */
+/* Keep LVGL heap bounded while leaving contiguous heap for SLE central scan. */
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (12U * 1024U)
+#define LV_MEM_SIZE (20U * 1024U)
 #define LV_MEM_BUF_MAX_NUM 8
 #define LV_MEMCPY_MEMSET_STD 1
 

@@ -26,6 +26,7 @@ const mainSource = readRepoText("webui/src/main.ts");
 const clientSource = readRepoText("webui/src/api/client.ts");
 const firmwareKconfigSource = readRepoText("xc/ws63_team_network/Kconfig");
 const displaySource = readRepoText("xc/ws63_team_network/src/ws63_st7789_display.c");
+const lvConfSource = readRepoText("xc/ws63_team_network/lv_conf.h");
 const nodeSource = readRepoText("src/sle_team_node.c");
 const cmakeSource = readRepoText("xc/ws63_team_network/CMakeLists.txt");
 const gitmodulesPath = path.join(repoRoot, ".gitmodules");
@@ -86,17 +87,91 @@ test("firmware exposes unified config over HTTP and serial", () => {
   assert.match(firmwareSource, /team_cfg_status_write_json/);
 });
 
-test("v4.4.37 keeps firmware-visible version and project SOP entry points in sync", () => {
-  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.37"/);
-  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v4\.4\.37 board map"/);
-  assert.match(displaySource, /SLE %s %s/);
-  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.37`/);
+test("v4.4.57 makes ST7789 member events readable and panel-styled", () => {
+  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.57"/);
+  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v4\.4\.57 board map"/);
+  assert.match(displaySource, /SLE\/\/BOOT/);
+  assert.match(displaySource, /LINK-MESH/);
+  assert.match(displaySource, /g_st7789_lv_panel_status/);
+  assert.match(displaySource, /g_st7789_lv_panel_event/);
+  assert.match(displaySource, /g_st7789_lv_event_rail/);
+  assert.match(displaySource, /LV_LABEL_LONG_WRAP/);
+  assert.match(displaySource, /NODE ONLINE/);
+  assert.match(displaySource, /MANUAL LEAVE/);
+  assert.match(displaySource, /HEARTBEAT T\/O/);
+  assert.match(displaySource, /BACK ONLINE/);
+  assert.match(lvConfSource, /#define LV_MEM_SIZE \(20U \* 1024U\)/);
+  assert.match(displaySource, /int ws63_st7789_show_event\(uint8_t event, const char \*member_label/);
+  assert.doesNotMatch(displaySource, /ws63_st7789_show_alert/);
+  assert.doesNotMatch(displaySource, /LOST M%u/);
+  assert.match(firmwareSource, /TEAM_DISPLAY_EVENT_JOIN/);
+  assert.match(firmwareSource, /TEAM_DISPLAY_EVENT_LEFT/);
+  assert.match(firmwareSource, /TEAM_DISPLAY_EVENT_TIMEOUT/);
+  assert.match(firmwareSource, /TEAM_DISPLAY_EVENT_LOST/);
+  assert.match(firmwareSource, /TEAM_DISPLAY_EVENT_REJOIN/);
+  assert.match(firmwareSource, /team_display_format_member_label/);
+  assert.match(firmwareSource, /team_display_note_member_joined/);
+  assert.match(firmwareSource, /team_display_note_member_offline/);
+  assert.match(firmwareSource, /team_display_event_name/);
+  assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
+  assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
+  assert.match(rootReadmeSource, /当前仓库记录版本：`v4\.4\.57`/);
+  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.57`/);
   assert.match(rootReadmeSource, /meta\/PROJECT_OPERATION_SOP\.md/);
-  assert.match(rootReadmeSource, /versions\/v4\.4\.37\/VERSION\.md/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.37\]\(\.\/v4\.4\.37\/VERSION\.md\)/);
+  assert.match(rootReadmeSource, /versions\/v4\.4\.57\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.57\]\(\.\/v4\.4\.57\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.56\]\(\.\/v4\.4\.56\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.55\]\(\.\/v4\.4\.55\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.54\]\(\.\/v4\.4\.54\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.53\]\(\.\/v4\.4\.53\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.52\]\(\.\/v4\.4\.52\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.51\]\(\.\/v4\.4\.51\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.50\]\(\.\/v4\.4\.50\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.49\]\(\.\/v4\.4\.49\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.48\]\(\.\/v4\.4\.48\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.47\]\(\.\/v4\.4\.47\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.46\]\(\.\/v4\.4\.46\/VERSION\.md\)/);
   assert.match(projectSopSource, /每次代码行为变化都必须升版本/);
   assert.match(projectSopSource, /远程 Ubuntu 编译/);
   assert.match(projectSopSource, /自动烧录/);
+});
+
+test("v4.4.57 keeps disconnect-to-display identity and makes LOST idempotent", () => {
+  assert.match(firmwareSource, /static uint8_t team_route_member_by_conn\(uint16_t conn_id/);
+  assert.match(firmwareSource, /uint8_t tracked_member_id = 0U;/);
+  assert.match(firmwareSource, /uint8_t routed_member_id = 0U;/);
+  assert.match(firmwareSource, /display_member_last_events\[SLE_TEAM_MAX_MEMBERS\]/);
+  assert.match(firmwareSource, /static uint8_t team_display_member_last_event\(uint8_t member_id/);
+  assert.match(firmwareSource, /team_route_member_by_conn\(conn_id, dir, &routed_member_id\)/);
+  assert.match(
+    firmwareSource,
+    /tracked_member_id = track->route_id;[\s\S]+team_conn_track_update\(conn_id, dir, addr\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_mark_member_offline\(disconnected_member_id, "conn_disconnected"\)/,
+  );
+  assert.match(firmwareSource, /\[team\] disconnect lookup conn=%u dir=%u known=%u member=%u tracked=%u routed=%u/);
+  assert.match(firmwareSource, /already_offline = 1U;/);
+  assert.match(firmwareSource, /reason=conn_disconnected already_offline=1 last_event=LEFT/);
+  assert.match(firmwareSource, /member offline id=%u reason=%s last_seen=%lu already_offline=%u last_event=%u/);
+  assert.match(firmwareSource, /was_relay = already_offline == 0U \? member->relay_allowed : 0U;/);
+});
+
+test("protocol separates manual leave from link-lost auto recovery", () => {
+  assert.match(nodeSource, /alert\.reason = SLE_TEAM_ALERT_LEAVE;/);
+  assert.match(nodeSource, /node->state = SLE_TEAM_NET_IDLE;/);
+  assert.match(nodeSource, /node->cfg\.leader_id = 0U;/);
+  assert.match(nodeSource, /int sle_team_node_member_link_lost\(sle_team_node_t \*node\)/);
+  assert.match(nodeSource, /return sle_team_member_recover_link\(node, "link lost, rejoining"\);/);
+  assert.match(
+    nodeSource,
+    /static int sle_team_member_recover_link[\s\S]+node->state = SLE_TEAM_NET_DISCOVERING;[\s\S]+sle_team_node_disable_member_relay\(node,\s*0U\);/,
+  );
+  assert.match(
+    nodeSource,
+    /node->cfg\.leader_id != 0U[\s\S]+node->state != SLE_TEAM_NET_IDLE[\s\S]+sle_team_node_send_hello\(node,\s*node->cfg\.leader_id\);/,
+  );
 });
 
 test("v4.4.37 keeps board HTTP WebUI auto-start enabled by default", () => {
@@ -125,17 +200,34 @@ test("v4.4.30 restores leader reboot membership using persisted allowlist and fi
   assert.match(sleUartClientSource, /if \(property == NULL \|\| status != ERRCODE_SLE_SUCCESS\)/);
 });
 
-test("v4.4.37 treats nv flush failures as fatal for persistent config writes", () => {
-  const persistentNvReturns = [
-    ...firmwareSource.matchAll(
-      /return \(ret == ERRCODE_SUCC && flush_ret == ERRCODE_SUCC\) \? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;/g,
-    ),
+test("v4.4.47 treats nv flush warnings as non-fatal after successful writes", () => {
+  const writeOnlyNvReturns = [
+    ...firmwareSource.matchAll(/return ret == ERRCODE_SUCC \? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;/g),
   ];
   assert.match(firmwareSource, /flush_ret = uapi_nv_flush\(\)/);
   assert.match(firmwareSource, /ret=0x%x flush=0x%x/);
-  assert.ok(persistentNvReturns.length >= 3, "config save, config clear, and allowlist save must check flush_ret");
+  assert.ok(
+    writeOnlyNvReturns.length >= 3,
+    "config save, config clear, and allowlist save must not fail on flush warnings",
+  );
+  assert.doesNotMatch(
+    firmwareSource,
+    /return \(ret == ERRCODE_SUCC && flush_ret == ERRCODE_SUCC\) \? SLE_TEAM_OK : SLE_TEAM_ERR_UNSUPPORTED;/,
+  );
   assert.match(serialCfgSource, /\[ValidateSet\("leader", "member", "status", "apply", "clear", "reboot"\)\]/);
   assert.match(serialCfgSource, /"apply" \{ return "cfg apply" \}/);
+});
+
+test("v4.4.48 accepts idempotent runtime role config without reopening SLE", () => {
+  assert.match(firmwareSource, /static uint8_t team_serial_cfg_matches_runtime\(const sle_team_web_config_nv_t \*cfg\)/);
+  assert.match(firmwareSource, /g_team_node\.cfg\.team_id != cfg->team_id/);
+  assert.match(firmwareSource, /g_team_node\.cfg\.channel_hash != cfg->channel_hash/);
+  assert.match(firmwareSource, /g_team_node\.cfg\.leader_id != leader_id/);
+  assert.match(firmwareSource, /runtime already matches role=%u team=%u channel=%u leader_suffix=%04X/);
+  assert.match(
+    firmwareSource,
+    /if \(g_team_rt\.role_configured != 0U\) \{[\s\S]+team_serial_cfg_matches_runtime\(cfg\)[\s\S]+return SLE_TEAM_OK;[\s\S]+return SLE_TEAM_ERR_UNSUPPORTED;/,
+  );
 });
 
 test("v4.4.30 keeps member server advertising stable after an upstream connection", () => {
@@ -245,13 +337,18 @@ test("logical member rejoin reuses an offline slot instead of duplicating record
   );
 });
 
-test("v4.4.37 keeps member online state ownership centralized", () => {
+test("v4.4.45 keeps member online state ownership centralized", () => {
   const coreOnlineWrites = [...nodeSource.matchAll(/\b(?:member|free_slot)->online\s*=\s*[01]U/g)].map(
     (match) => match[0],
   );
   const firmwareOnlineWrites = [...firmwareSource.matchAll(/\bmember->online\s*=\s*[01]U/g)].map((match) => match[0]);
 
-  assert.deepEqual(coreOnlineWrites, ["member->online = 1U", "free_slot->online = 1U", "member->online = 0U"]);
+  assert.deepEqual(coreOnlineWrites, [
+    "member->online = 1U",
+    "free_slot->online = 1U",
+    "member->online = 0U",
+    "member->online = 0U",
+  ]);
   assert.deepEqual(firmwareOnlineWrites, ["member->online = 0U"]);
   assert.match(nodeSource, /static void sle_team_prune_stale_members/);
   assert.match(firmwareSource, /static uint8_t team_leader_mark_member_offline/);
@@ -506,13 +603,12 @@ test("hello ack path keeps relay_enabled sync when config is cached before ack",
   assert.match(nodeSource, /node->cfg\.relay_enabled = node->cfg\.relay_allowed != 0U \? 1U : 0U;/);
 });
 
-test("upstream disconnect prefers lightweight parent switch before full leave", () => {
+test("upstream disconnect uses link-lost recovery instead of manual leave", () => {
   const firmware = firmwareSource;
   assert.match(firmware, /switch_ret = sle_team_node_try_parent_switch\(&g_team_node\)/);
-  assert.match(
-    firmware,
-    /if \(switch_ret != SLE_TEAM_OK && switch_ret != SLE_TEAM_ERR_UNSUPPORTED\) \{\s*\(void\)sle_team_node_member_leave\(&g_team_node\);/s,
-  );
+  assert.match(firmware, /recover_ret = sle_team_node_member_link_lost\(&g_team_node\)/);
+  assert.match(firmware, /\[team\] upstream link lost switch_ret=%d recover_ret=%d/);
+  assert.doesNotMatch(firmware, /switch_ret[\s\S]{0,240}sle_team_node_member_leave\(&g_team_node\)/);
 });
 
 test("pair approve rolls back newly-added allowlist entry when member slot allocation fails", () => {
