@@ -1,51 +1,43 @@
 # sle_mesh
 
+`sle_mesh` is a WS63 SLE mesh networking project with runtime leader/member role configuration, relay failover, a board-side HTTP UI, and a browser WebUI.
+
 ## Current Release
 
-- Current repo record: `v4.4.95`
-- Current firmware version: `v4.4.95`
-- Current version record: [versions/v4.4.95/VERSION.md](versions/v4.4.95/VERSION.md)
-- Flash/test logs should be saved under `logs/burn/` and referenced from the matching `versions/<version>/` notes.
+- Repository record: `v4.4.95`
+- Firmware version: `v4.4.95`
+- Version notes: [versions/v4.4.95/VERSION.md](versions/v4.4.95/VERSION.md)
+- Release index: [versions/README.md](versions/README.md)
 
-`sle_mesh` �?WS63 星闪组网工程。根目录保留编译、烧录、验证、版本记录和审查入口；板端业务代码在 `xc/ws63_team_network/`，域�?上位�?WebUI �?`webui/`�?
+## What Is Included
 
-## 文档入口
+- Shared protocol headers and logic in [include/](include) and [src/](src)
+- Local examples and regression programs in [examples/](examples)
+- WS63 board firmware under [xc/ws63_team_network/](xc/ws63_team_network)
+- Browser WebUI under [webui/](webui)
+- Build, flash, serial configuration, and validation helpers under [scripts/](scripts)
+- WS63 automation tools under [automation/ws63/](automation/ws63)
+- Version and hardware validation records under [versions/](versions)
 
-- [docs/README.md](docs/README.md)：总索�?
-- [docs/v0/README.md](docs/v0/README.md)：V0�?vs2 / 1vs8�?
-- [docs/v1/README.md](docs/v1/README.md)：V1（手�?relay�?
-- [docs/v2/README.md](docs/v2/README.md)：V2（自动组网）
-- [docs/v3/README.md](docs/v3/README.md)：V3（手机定位桥接）
-- [docs/v4/README.md](docs/v4/README.md)：V4（WS63 模块 + ST7789�?
-- [versions/README.md](versions/README.md)：版本记�?
-- [versions/v4.4.95/VERSION.md](versions/v4.4.95/VERSION.md)：当�?v4.4.95 仓库记录
-- [meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md)：每次改代码、远程编译、自动烧录和版本管理前必须读取的作业 SOP
-- [meta/DOC_WORKFLOW.md](meta/DOC_WORKFLOW.md)：文档编写与维护流程
+## Documentation
 
-## 当前版本
+- [docs/README.md](docs/README.md): documentation index
+- [docs/branch_strategy.md](docs/branch_strategy.md): branch roles and merge policy
+- [docs/v4/README.md](docs/v4/README.md): current WS63/ST7789 line
+- [meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md): operating SOP
+- [meta/DOC_WORKFLOW.md](meta/DOC_WORKFLOW.md): documentation workflow
 
-- 当前仓库记录版本：`v4.4.95`
-- 当前固件版本：`v4.4.95`
-- 统一固件：所�?WS63 节点烧同一�?`.fwpkg`，leader/member 通过 WebUI 或串口运行时配置�?- 板端 SoftAP/HTTP WebUI 默认自动启动；域�?上位�?WebUI 仍依赖板�?HTTP API 做一键配置和状态读取�?- ST7789 已确认参数：`240x135`，offset `40,53`，MADCTL `0x60`�?
-- BLK/backlight 不再�?GPIO11 控制；背光按硬件默认开启�?
-- GPS 当前只保�?pinmap 和日志，不做完整 NMEA/GPS 数据解析�?
-- WS2812 �?Kconfig 默认�?`n`，构建脚本会�?v4 板子启用 IO0�?
-- 蜂鸣器默认关闭，只做安全拉低/命令控制�?
-- SLE 广播实际发射功率和广播声明字段统一�?`18 dBm`�?- ST7789/LVGL 屏幕事件显示已同步为科技感链路面板：`JOIN/LEFT/TIMEOUT/LOST/REJOIN + Mxxxx`，其�?`Mxxxx` 使用成员 MAC 后四位，避免再出�?`M241` 这种内部十进�?ID；v4.4.95 保留动�?relay budget，并增加 relay swap 滞回：非 relay 比最�?relay �?8 dB 且持�?30s 才交换�?
-## 目录
+## v4.4.95 Highlights
 
-- [include/](include)：协议公共头文件�?
-- [src/](src)：协议、组网状态机、串�?CLI、Web API 序列化�?
-- [examples/](examples)：本地协议测试和接入示例�?
-- [xc/ws63_team_network/](xc/ws63_team_network)：WS63 上板样例和板�?WebUI�?
-- [webui/](webui)：域�?上位�?WebUI，支�?WiFi HTTP �?WebSerial�?
-- [versions/](versions)：版本记录、烧录记录和硬件问题记录�?
-- [scripts/](scripts)：编译、烧录、串口配置脚本�?
-- [automation/ws63/](automation/ws63)：自动化烧录、角色绑定与回归工具�?
+- Preserves already-online members when a leader pairing window is closed.
+- Keeps the dynamic relay budget introduced in the v4.4 line.
+- Keeps relay swap hysteresis: a non-relay candidate must stay at least 8 dB stronger than the weakest active relay for 30 seconds before swapping.
+- Supports natural four-board validation without forcing `cfg direct`.
+- Uses one unified firmware package for all WS63 nodes; leader/member roles are selected at runtime through serial commands or the WebUI.
 
-## WS63 使用
+## Board WebUI
 
-板端 WiFi�?
+Default board-side Wi-Fi:
 
 ```text
 SSID: SLE-TEAM-V4-XXXX
@@ -53,14 +45,14 @@ Password: 123456789
 URL: http://192.168.43.1/
 ```
 
-常用页面�?
+Useful pages:
 
-- `/`：状态�?
-- `/nodes`：已入队节点�?
-- `/events`：最近收发事件�?
-- `/pairing`：角色选择、leader 配队、member 选择 leader、手机定位上报�?
+- `/`: status view
+- `/nodes`: joined nodes
+- `/events`: recent send/receive events
+- `/pairing`: role selection, pairing, leader selection, and phone location
 
-常用 API�?
+Useful API endpoints:
 
 - `GET /api/status`
 - `GET /api/nodes`
@@ -78,9 +70,9 @@ URL: http://192.168.43.1/
 - `GET /api/member/leave`
 - `GET /api/factory-reset`
 
-## 批量串口配置
+## Serial Configuration
 
-v4.4 起支持通过串口一键配置，适合 30 个节点批量部署，不需要逐个连接每块板子�?WiFi�?
+Common serial commands:
 
 ```text
 cfg status
@@ -91,7 +83,7 @@ cfg clear
 cfg reboot
 ```
 
-Windows PowerShell 脚本�?
+Windows PowerShell helper:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM7 -Mode leader -Team 7 -Channel 33
@@ -99,11 +91,9 @@ powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 
 powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode status
 ```
 
-域名/上位�?WebUI �?`Settings -> One-click node config` 也支�?WebSerial：选择串口后可以读�?`[cfg-json]`、写�?leader/member 配置、apply/clear/reboot，并显示串口日志�?
+## Remote Build
 
-## 编译和烧�?
-
-优先使用局域网 Ubuntu 编译机：
+Preferred build path uses the LAN Ubuntu build host:
 
 ```sh
 UBUNTU_HOST=192.168.6.5 \
@@ -114,13 +104,13 @@ BUILD_JOBS=4 \
 scripts/ws63_build_v4_ubuntu.sh unified
 ```
 
-输出统一固件�?
+Unified firmware output:
 
 ```text
 <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
-COM16 自动烧录命令�?
+## Flash Example
 
 ```powershell
 python <repo-root>\automation\ws63\tools\ws63_auto_burn.py `
@@ -135,9 +125,7 @@ python <repo-root>\automation\ws63\tools\ws63_auto_burn.py `
   <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
-固定烧录流程�?[meta/PROJECT_OPERATION_SOP.md](meta/PROJECT_OPERATION_SOP.md)，成功烧录记录见 [versions/v4.4/AUTO_FLASH_NOTES.md](versions/v4.4/AUTO_FLASH_NOTES.md)�?
-
-## 本地验证
+## Local Verification
 
 ```sh
 npm --prefix webui test
@@ -145,7 +133,7 @@ npm --prefix webui run build
 git diff --check
 ```
 
-协议本地测试�?
+Protocol smoke tests:
 
 ```sh
 cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_NETWORK_TEST \
