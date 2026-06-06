@@ -232,19 +232,19 @@ python3 -m pip install --user xf-burn-tools rich
 工具命令路径：
 
 ```text
-/Users/bh4me_macair/Library/Python/3.9/bin/burn
+<python-user-bin>/burn
 ```
 
 查看帮助：
 
 ```sh
-/Users/bh4me_macair/Library/Python/3.9/bin/burn --help
+<python-user-bin>/burn --help
 ```
 
 查看固件包内容：
 
 ```sh
-/Users/bh4me_macair/Library/Python/3.9/bin/burn -s \
+<python-user-bin>/burn -s \
   <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg
 ```
 
@@ -254,7 +254,7 @@ python3 -m pip install --user xf-burn-tools rich
 
 ```sh
 printf 'flash leader\n' | \
-  <repo-root>/scripts/ws63_flash_team.sh \
+  <repo-root>/scripts/flash/ws63_flash_team.sh \
   leader /dev/tty.usbserial-10
 ```
 
@@ -263,14 +263,14 @@ printf 'flash leader\n' | \
 - 新版 `xc/ws63_team_network` 固件支持串口 CLI `reboot/reset`，烧录脚本会先发 `reboot`。
 - 脚本也会尝试 DTR/RTS 脉冲；是否有效取决于当前 USB 转串口/烧录器是否把控制线接到板子的复位控制脚。
 - 第一次从老固件升级时，老固件没有 `reboot` 命令，仍可能需要手按一次 `RESET/RST`。小熊派 WS63 没有 BOOT 键时按 RESET 即可；带 BOOT 下载键的板子才需要按住 BOOT 再点 RESET。
-- 关闭自动复位可用：`AUTO_RESET=0 scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10`。
+- 关闭自动复位可用：`AUTO_RESET=0 scripts/flash/ws63_flash_team.sh leader /dev/tty.usbserial-10`。
 
 底层 `xf-burn-tools` 命令仍是：
 
 最终成功命令：
 
 ```sh
-/Users/bh4me_macair/Library/Python/3.9/bin/burn \
+<python-user-bin>/burn \
   -p /dev/tty.usbserial-10 \
   -b 115200 \
   <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg
@@ -353,7 +353,7 @@ ERROR Error transferring root_loaderboot_sign.bin
 如果你来不及按复位，可以临时把安装包里的：
 
 ```text
-/Users/bh4me_macair/Library/Python/3.9/lib/python/site-packages/xf_burn_tools/ws63flash.py
+<python-site-packages>/xf_burn_tools/ws63flash.py
 ```
 
 从：
@@ -478,7 +478,7 @@ rsync -a --exclude=/output source/ fresh/
 
 ### 工具一直等待 reset
 
-优先解决：升级到支持串口 CLI `reboot/reset` 的 `xc/ws63_team_network` 固件，然后用 `scripts/ws63_flash_team.sh` 默认自动复位烧录。
+优先解决：升级到支持串口 CLI `reboot/reset` 的 `xc/ws63_team_network` 固件，然后用 `scripts/flash/ws63_flash_team.sh` 默认自动复位烧录。
 
 如果是第一次从老固件升级，或当前烧录器没有接复位控制线，按板子复位；如果有 BOOT 键，按住 BOOT 再点 RESET。
 
@@ -504,7 +504,7 @@ python3 build.py ws63-liteos-app -j4
 烧录：
 
 ```sh
-/Users/bh4me_macair/Library/Python/3.9/bin/burn \
+<python-user-bin>/burn \
   -p /dev/tty.usbserial-10 \
   -b 115200 \
   <sdk-root>/output_from_vm/ws63-liteos-app_all.fwpkg

@@ -1,70 +1,23 @@
-# 任务计划：V4 WS63 + ST7789 + 节点失联上报
+# V4 Task Plan Summary
 
-## 目标
-基于现有 v3 代码和原理图，建立 v4 版本，完成 WS63 引脚与外设适配、1.14 寸 ST7789 显示接入，以及子节点丢失时向主节点上报最后位置的核心闭环。
+## Goal
 
-## 当前阶段
-Phase 5
+Build the V4 WS63 firmware line with ST7789 display support, runtime leader/member role configuration, and member lost/offline reporting.
 
-## 阶段划分
+## Completed Phases
 
-### Phase 1：需求与依据确认
-- [x] 读取现有 v3 工程结构
-- [x] 读取原理图并提取关键外设
-- [x] 确认 v4 的引脚分配边界
-- [x] 确认显示、组网、失联上报三块的优先级
-- [x] 把发现写入 `findings.md`
-- **Status:** complete
+1. Confirmed hardware mapping and V4 scope.
+2. Added V4 board firmware structure under `xc/ws63_team_network/`.
+3. Integrated ST7789 display support.
+4. Preserved networking as the primary behavior.
+5. Added runtime role configuration through serial/WebUI.
+6. Added relay budget and relay recovery behavior across later v4.4 versions.
+7. Added automated build, flash, simulation and multi-board test tooling.
 
-### Phase 2：方案与目录规划
-- [x] 确定 v4 目录结构
-- [x] 确定哪些代码从 v3 继承，哪些模块重写
-- [x] 确定配置项、默认引脚和外设初始化顺序
-- **Status:** complete
+## Current Follow-Up
 
-### Phase 3：实现
-- [x] 调整 WS63 引脚定义与默认参数
-- [x] 接入 ST7789 显示驱动
-- [x] 把 ST7789 初始化接入 v4 启动路径
-- [x] 把 ST7789 文本从占位伪字体换成可读 6x8 点阵
-- [x] 保留组网主流程
-- [x] 增加子节点丢失上报与最后位置保留逻辑
-- [x] 显式打开 v4 WebUI/SoftAP 和 SPI master 依赖
-- **Status:** complete
+The current repository organization work is tracked as `v4.4.96`:
 
-### Phase 4：测试与验证
-- [x] 先做本地格式/配置检查
-- [x] 再做协议/状态机回归
-- [x] Ubuntu 交叉构建
-- [ ] 最后做上板验证
-- **Status:** in_progress
-
-### Phase 5：交付
-- [x] 汇总变更点
-- [x] 汇总验证结果
-- [ ] 给你看最终可烧录版本
-- **Status:** in_progress
-
-## 关键问题
-1. WS63 模块上，哪些 GPIO 负责 RGB、ST7789、UART 和保留功能？
-2. 1.14 寸 ST7789 是否有独立背光控制脚，还是直接上电常亮？
-3. v4 是否保留当前 WebUI/CLI 的全部能力，还是只保留最小控制面？
-4. 子节点失联后，上报给主节点的消息格式是否沿用现有位置报文？
-
-## 已做决定
-| Decision | Rationale |
-|----------|-----------|
-| 以 `v3.0.0-alpha8` 为基线 | 当前仓库 HEAD 就在这个版本，适合作为 v4 起点 |
-| 文档归档到 `docs/v4/`，代码汇总到 `xc/ws63_team_network/` | 与现有版本目录规范对齐，避免根目录临时区长期漂移 |
-| 组网优先，显示其次 | 你明确说工程主线是组网 |
-| `CONFIG_SLE_TEAM_LED_PIN=255` 禁用旧 LED | v4 原理图里 IO2 是 `CHRG`，不能作为活动灯输出 |
-| 普通 member 超时也广播 `ALERT_TIMEOUT` | 满足“子节点丢失向主节点上报，并有最后位置”的核心闭环 |
-| v4 默认 SSID 前缀为 `SLE-TEAM-V4` | 和 v4 固件区分，避免现场和 v3 混淆 |
-| ST7789 默认 `x_offset=52`、`y_offset=40` | 适配常见 1.14 寸 135x240 ST7789 可视窗口 |
-
-## 已遇到的问题
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-| `python` 命令不存在 | 1 | 改用 `python3` 跑 session catchup |
-| macOS 直接用 WS63 SDK 头链做语法检查时持续缺平台宏/porting 头 | 1 | 记录为本地 SDK 限制，实际验证走 Ubuntu 交叉构建 |
-| Ubuntu 编译机 `192.168.6.5:22` 连接超时 | 1 | 改用 Tailscale 主机 `100.91.84.124`，`scripts/ws63_build_v4_ubuntu.sh unified` 已构建通过 |
+- scripts are split by build/flash/serial/sim/test/review;
+- hardware assets are published under `hardware/`;
+- root README and public indexes are UTF-8 Chinese-capable.

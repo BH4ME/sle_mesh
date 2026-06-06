@@ -19,7 +19,7 @@ const webReadmeSource = readRepoText("webui/README.md");
 const rootReadmeSource = readRepoText("README.md");
 const versionsReadmeSource = readRepoText("versions/README.md");
 const projectSopSource = readRepoText("meta/PROJECT_OPERATION_SOP.md");
-const buildScriptSource = readRepoText("scripts/ws63_build_v4_ubuntu.sh");
+const buildScriptSource = readRepoText("scripts/build/ws63_build_v4_ubuntu.sh");
 const firmwareSource = readRepoText("xc/ws63_team_network/src/ws63_team_network_app.c");
 const webApiSource = readRepoText("src/sle_team_web_api.c");
 const mainSource = readRepoText("webui/src/main.ts");
@@ -40,7 +40,7 @@ const lvglPatchSource = fs.existsSync(lvglPatchPath)
   : "";
 const sleUartClientSource = readRepoText("xc/ws63_team_network/sle_uart_client/sle_uart_client.c");
 const sleUartServerSource = readRepoText("xc/ws63_team_network/sle_uart_server/sle_uart_server.c");
-const serialCfgSource = readRepoText("scripts/ws63_serial_cfg.ps1");
+const serialCfgSource = readRepoText("scripts/serial/ws63_serial_cfg.ps1");
 
 test("WS63 API contract lists the current board HTTP routes", () => {
   assert.deepEqual(
@@ -115,10 +115,14 @@ test("current firmware makes ST7789 member events readable and panel-styled", ()
   assert.match(firmwareSource, /team_display_event_name/);
   assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
   assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
-  assert.match(rootReadmeSource, /Current repo record: `v4\.4\.95`/);
-  assert.match(rootReadmeSource, /Current firmware version: `v4\.4\.95`/);
-  assert.match(rootReadmeSource, /meta\/PROJECT_OPERATION_SOP\.md/);
+  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.96`/);
+  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.95`/);
+  assert.match(rootReadmeSource, /docs\/version_management\.md/);
+  assert.match(rootReadmeSource, /hardware\/enclosures\/sle-pcb-enclosure\/v1\.1\.4/);
+  assert.match(rootReadmeSource, /scripts\/build\/ws63_build_v4_ubuntu\.sh/);
+  assert.match(rootReadmeSource, /scripts\/flash\/ws63_flash_multi\.ps1/);
   assert.match(rootReadmeSource, /versions\/v4\.4\.95\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.96\]\(\.\/v4\.4\.96\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.95\]\(\.\/v4\.4\.95\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.94\]\(\.\/v4\.4\.94\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.93\]\(\.\/v4\.4\.93\/VERSION\.md\)/);
@@ -362,7 +366,7 @@ test("v4.4.30 leader rescans when members are offline and keeps 30 logical membe
     /assert\(leader\.cfg\.allowed_member_count == 30U\)/,
   );
   assert.match(
-    fs.readFileSync(path.join(repoRoot, "scripts/simulate_python_1v20.sh"), "utf8"),
+    fs.readFileSync(path.join(repoRoot, "scripts/sim/simulate_python_1v20.sh"), "utf8"),
     /--members 30/,
   );
 });

@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/run_review_with_service.sh [--scope "<scope>"] [--goal-doc <path>] [--model <model>] [--dry-run]
+  scripts/review/run_review_with_service.sh [--scope "<scope>"] [--goal-doc <path>] [--model <model>] [--dry-run]
 
 Options:
   --scope      审查范围。默认: 全量审查（新仓库/大版本）

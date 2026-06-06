@@ -47,14 +47,14 @@ hardware validation run, and always keep the burn/test logs as proof.
 
 ## Current Flash Flow Template
 
-For WS63 v4 work, use `scripts/ws63_flash_multi.ps1` instead of rebuilding burn commands by hand.
+For WS63 v4 work, use `scripts/flash/ws63_flash_multi.ps1` instead of rebuilding burn commands by hand.
 
 This section records the standard flash command shape only. It does not mean v4.4.94 has been flashed; v4.4.94 burn was intentionally not run in the relay swap hysteresis session.
 
 Sequential flash:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\flash\ws63_flash_multi.ps1 `
   -Ports COM16 `
   -ExpectedVersion v4.4.94 `
   -WaitTimeout 45 `
@@ -64,7 +64,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.p
 Parallel flash:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\flash\ws63_flash_multi.ps1 `
   -Ports COM16,COM13,COM17,COM18 `
   -ExpectedVersion v4.4.94 `
   -Parallel `
@@ -172,7 +172,7 @@ UBUNTU_USER=owen \
 UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
 BUILD_JOBS=4 \
-scripts/ws63_build_v4_ubuntu.sh unified
+scripts/build/ws63_build_v4_ubuntu.sh unified
 ```
 
 输出固件固定记录为：
@@ -255,9 +255,9 @@ cfg reboot
 Windows helper：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM7 -Mode leader -Team 7 -Channel 33
-powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode member -LeaderSuffix 9A2F -Team 7 -Channel 33
-powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode status
+powershell -ExecutionPolicy Bypass -File scripts/serial/ws63_serial_cfg.ps1 -Port COM7 -Mode leader -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/serial/ws63_serial_cfg.ps1 -Port COM8 -Mode member -LeaderSuffix 9A2F -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/serial/ws63_serial_cfg.ps1 -Port COM8 -Mode status
 ```
 
 域名 WebUI 的 `Settings -> One-click node config` 使用 WebSerial 读取 `[cfg-json]` 并显示串口日志。
@@ -287,7 +287,7 @@ UBUNTU_USER=owen \
 UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
 BUILD_JOBS=4 \
-scripts/ws63_build_v4_ubuntu.sh unified
+scripts/build/ws63_build_v4_ubuntu.sh unified
 ```
 
 如果修改协议核心，补跑对应 C 侧或 Python 仿真测试，并把命令写入 `MANIFEST.md`。

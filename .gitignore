@@ -5,6 +5,12 @@
 *.map
 *.log
 logs/
+$logPath
+.planning/
+3D/
+_schem_review/
+models/
+v3.pdf
 .DS_Store
 .cxresume_sessions*
 *冲突副本*

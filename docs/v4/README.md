@@ -1,52 +1,42 @@
-# V4 文档入口（WS63 模块 + ST7789 + 节点失联上报）
+# V4 Documentation
 
-`docs/v4/` 记录从 `v3.0.0-alpha8` 演进到 V4 的第一阶段能力：
+`docs/v4/` 记录 WS63 模块、ST7789 显示、板端 WebUI、运行时角色配置和 relay 组网验证相关内容。
 
-- WS63 模块引脚按新原理图重映射
-- 1.14 寸 ST7789 显示接入（角色、在线数、失联提示）
-- 组网主流程保持不变
-- 子节点超时失联时向主节点上报并保留最后位置
+## 当前主线
 
-版本命名说明：
+- 当前固件版本：`v4.4.95`
+- 最新仓库整理记录：`v4.4.96`
+- 固件工程：[../../xc/ws63_team_network/](../../xc/ws63_team_network/)
+- 远程构建脚本：[../../scripts/build/ws63_build_v4_ubuntu.sh](../../scripts/build/ws63_build_v4_ubuntu.sh)
+- 烧录脚本：[../../scripts/flash/](../../scripts/flash/)
+- 仿真脚本：[../../scripts/sim/](../../scripts/sim/)
 
-- 当前对外交付版本是 `v4.3`。
+## V4 能力边界
 
-## 当前里程碑
+- 所有 WS63 节点烧录同一份统一固件包。
+- leader/member 角色通过 WebUI 或串口 `cfg` 命令在运行时配置。
+- leader 支持 pending/member 管理、配队窗口、allowlist 和成员在线/离线事件。
+- member 可直连 leader，也可在 leader 直连容量受限时通过 relay 转发。
+- relay 选择由固件根据连接状态、RSSI 和 relay budget 自适应处理。
+- ST7789 显示用于角色、在线状态、成员事件和故障提示。
 
-- `v4.3`：
-  - 基于原理图固定 `显示/ST7789 + 蜂鸣器 + WS 灯 + GPS` 四项映射；
-  - 合并烧录自动复位链路与 v4 WebUI 连通性修复；
-  - 作为本阶段对外交付标签版本。
-- `v4.2.3`：
-  - 按原理图再次确认并固定 `显示/ST7789 + 蜂鸣器 + WS 灯 + GPS` 四项引脚映射；
-  - GPS 映射进入 Kconfig 与启动日志，便于现场核对接线；
-  - 下载电路相关逻辑未改动（按“未焊接下载电路”要求保持不动）。
-- `v4.2.2`：
-  - 恢复 `GET /api/location`；
-  - `/pairing` 增加 `Phone Location`（手动发送、单次 GPS、自动持续上报）；
-  - `/api/location` 返回补充 `ret/reason`，便于定位 `NOT_READY_OR_NO_ROUTE / WRITE_FAIL`。
-- `v4.2.1`：
-  - 固定 `v4.2` 线稳定基线（统一固件 + 运行时角色切换 + v4.1 板级约束）。
-- `v4.0.0-alpha1`：
-  - 默认 UART 改为 `IO21/IO22`
-  - 禁用旧 `GPIO2` 活动灯（`CHRG` 占用）
-  - ST7789 SPI 驱动接入与启动显示
-  - 超时失联 `ALERT_TIMEOUT` 闭环补齐
-  - 远端 Ubuntu 编译脚本 `scripts/ws63_build_v4_ubuntu.sh`
+## 常用入口
 
-## 工作记录
+```sh
+scripts/build/ws63_build_v4_ubuntu.sh unified
+scripts/sim/simulate_v2.sh --suite=python --stress=1
+python -m unittest discover -s automation/ws63/tests -t .
+```
 
-- [task_plan.md](<repo-root>/docs/v4/task_plan.md)
-- [findings.md](<repo-root>/docs/v4/findings.md)
-- [progress.md](<repo-root>/docs/v4/progress.md)
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/serial/ws63_serial_cfg.ps1 -Port COM16 -Mode status
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/flash/ws63_flash_multi.ps1 -Ports COM16,COM13,COM17,COM18 -Parallel
+```
 
-## 代码位置
+## 历史记录
 
-- V4 上板工程统一维护在：
-  - [xc/ws63_team_network](<repo-root>/xc/ws63_team_network)
+- [task_plan.md](task_plan.md)
+- [findings.md](findings.md)
+- [progress.md](progress.md)
 
-## 版本管理
-
-1. 每个版本必须包含 `versions/<version>/VERSION.md` 与 `MANIFEST.md`。
-2. 每次发布必须更新 `versions/README.md` 顶部“当前版本”列表。
-3. 每次发布至少执行一轮可复现验证（协议测试 / 构建 / 上板）。
+这些文件保留阶段内的历史工作记录；最新仓库结构以 [../repository_layout.md](../repository_layout.md) 和根目录 [../../README.md](../../README.md) 为准。

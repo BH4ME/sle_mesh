@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs/sim"
 LOG_FILE="$LOG_DIR/python_1v20.log"
 

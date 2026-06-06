@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SIM_SCRIPT="$ROOT_DIR/scripts/simulate_v2.sh"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+SIM_SCRIPT="$ROOT_DIR/scripts/sim/simulate_v2.sh"
 LOG_DIR="$ROOT_DIR/logs/sim"
 NETWORK_LOG="$LOG_DIR/network_test.log"
 PACKET_LOG="$LOG_DIR/packet_test.log"

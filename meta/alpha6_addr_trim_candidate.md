@@ -41,5 +41,5 @@
 
 4. 回归门槛：
 - `cc ... team_network_demo ...` 通过；
-- `./scripts/simulate_v2.sh --suite=failover --stress=10` 通过；
+- `./scripts/sim/simulate_v2.sh --suite=failover --stress=10` 通过；
 - `python3 tools/sle_team_python_sim.py ... --stress 10` 通过。

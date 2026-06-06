@@ -4,9 +4,9 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/ws63_build_team_vm.sh unified
-  scripts/ws63_build_team_vm.sh leader   # compatibility alias; still builds unified firmware
-  scripts/ws63_build_team_vm.sh member   # compatibility alias; still builds unified firmware
+  scripts/build/ws63_build_team_vm.sh unified
+  scripts/build/ws63_build_team_vm.sh leader   # compatibility alias; still builds unified firmware
+  scripts/build/ws63_build_team_vm.sh member   # compatibility alias; still builds unified firmware
 
 Builds the WS63 team firmware inside the local Ubuntu VM and copies the
 resulting .fwpkg back to the Mac output_from_vm directory.
@@ -47,7 +47,7 @@ VM_PORT="${VM_PORT:-2222}"
 VM_USER="${VM_USER:-builder}"
 VM_PASS="${VM_PASS:-builder}"
 VM_SDK="${VM_SDK:-/home/builder/workspace/bearpi-pico_h3863_fresh}"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 CONFIG_PATH="$VM_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"

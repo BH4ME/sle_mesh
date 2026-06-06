@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/ws63_build_team_ubuntu.sh unified
+  scripts/build/ws63_build_team_ubuntu.sh unified
 
 Builds the WS63 team firmware on a LAN Ubuntu build machine.
 
@@ -44,7 +44,7 @@ case "$role" in
     ;;
 esac
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 UBUNTU_HOST="${UBUNTU_HOST:-}"
 UBUNTU_PORT="${UBUNTU_PORT:-22}"
 UBUNTU_USER="${UBUNTU_USER:-builder}"

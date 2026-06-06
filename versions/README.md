@@ -1,6 +1,24 @@
 # Versions
 
+这个目录保存仓库、固件、测试和硬件资料的版本记录。
 
+## 当前版本
+
+- 最新仓库记录：[v4.4.96](./v4.4.96/VERSION.md)
+- 当前固件版本：[v4.4.95](./v4.4.95/VERSION.md)
+- 当前外壳版本：[hardware/enclosures/sle-pcb-enclosure/v1.1.4](../hardware/enclosures/sle-pcb-enclosure/v1.1.4/)
+
+## 版本规则
+
+- 仓库记录版本用于记录目录整理、文档、脚本布局、硬件资料等仓库层面的变化。
+- 固件版本用于记录会改变 WS63 固件行为或烧录包的变化。
+- 硬件版本用于记录 PCB、原理图、外壳和制造文件变化。
+- 每个版本目录至少包含 `VERSION.md`；涉及文件和验证范围较多时同时包含 `MANIFEST.md`。
+- 旧版本目录保留当时的验证记录，除非有安全或编码问题，不批量改写历史证据。
+
+## v4.4
+
+- [v4.4.96](./v4.4.96/VERSION.md)
 - [v4.4.95](./v4.4.95/VERSION.md)
 - [v4.4.94](./v4.4.94/VERSION.md)
 - [v4.4.93](./v4.4.93/VERSION.md)
@@ -28,10 +46,6 @@
 - [v4.4.68](./v4.4.68/VERSION.md)
 - [v4.4.67](./v4.4.67/VERSION.md)
 - [v4.4.66](./v4.4.66/VERSION.md)
-
-这个目录用于保存协议和代码版本记录。详细阶段说明统一�?`docs/v0`、`docs/v1`、`docs/v2`、`docs/v3`、`docs/v4`�?
-
-当前版本�?
 - [v4.4.65](./v4.4.65/VERSION.md)
 - [v4.4.64](./v4.4.64/VERSION.md)
 - [v4.4.63](./v4.4.63/VERSION.md)
@@ -84,62 +98,46 @@
 - [v4.4.2](./v4.4.2/VERSION.md)
 - [v4.4.1](./v4.4.1/VERSION.md)
 - [v4.4](./v4.4/VERSION.md)
-- [v4.3](<repo-root>/versions/v4.3/VERSION.md)
-- [v4.2.3](<repo-root>/versions/v4.2.3/VERSION.md)
-- [v4.2.2](<repo-root>/versions/v4.2.2/VERSION.md)
-- [v4.2.1](<repo-root>/versions/v4.2.1/VERSION.md)
-- [v4.0.0-alpha1](<repo-root>/versions/v4.0.0-alpha1/VERSION.md)
-- [v3.0.0-alpha8](<repo-root>/versions/v3.0.0-alpha8/VERSION.md)
-- [v3.0.0-alpha7](<repo-root>/versions/v3.0.0-alpha7/VERSION.md)
-- [v3.0.0-alpha6](<repo-root>/versions/v3.0.0-alpha6/VERSION.md)
-- [v3.0.0-alpha5](<repo-root>/versions/v3.0.0-alpha5/VERSION.md)
-- [v3.0.0-alpha4](<repo-root>/versions/v3.0.0-alpha4/VERSION.md)
-- [v3.0.0-alpha3](<repo-root>/versions/v3.0.0-alpha3/VERSION.md)
-- [v3.0.0-alpha2](<repo-root>/versions/v3.0.0-alpha2/VERSION.md)
-- [v3.0.0-alpha1](<repo-root>/versions/v3.0.0-alpha1/VERSION.md)
-- [v2.0.0-alpha18](<repo-root>/versions/v2.0.0-alpha18/VERSION.md)
-- [v2.0.0-alpha17](<repo-root>/versions/v2.0.0-alpha17/VERSION.md)
-- [v2.0.0-alpha16](<repo-root>/versions/v2.0.0-alpha16/VERSION.md)
-- [v2.0.0-alpha15](<repo-root>/versions/v2.0.0-alpha15/VERSION.md)
-- [v2.0.0-alpha14](<repo-root>/versions/v2.0.0-alpha14/VERSION.md)
-- [v2.0.0-alpha13](<repo-root>/versions/v2.0.0-alpha13/VERSION.md)
-- [v2.0.0-alpha12](<repo-root>/versions/v2.0.0-alpha12/VERSION.md)
-- [v2.0.0-alpha11](<repo-root>/versions/v2.0.0-alpha11/VERSION.md)
-- [v2.0.0-alpha10](<repo-root>/versions/v2.0.0-alpha10/VERSION.md)
-- [v2.0.0-alpha9](<repo-root>/versions/v2.0.0-alpha9/VERSION.md)
-- [v2.0.0-alpha8](<repo-root>/versions/v2.0.0-alpha8/VERSION.md)
-- [v2.0.0-alpha7](<repo-root>/versions/v2.0.0-alpha7/VERSION.md)
-- [v2.0.0-alpha6](<repo-root>/versions/v2.0.0-alpha6/VERSION.md)
-- [v2.0.0-alpha5](<repo-root>/versions/v2.0.0-alpha5/VERSION.md)
-- [v2.0.0-alpha4](<repo-root>/versions/v2.0.0-alpha4/VERSION.md)
-- [v2.0.0-alpha3](<repo-root>/versions/v2.0.0-alpha3/VERSION.md)
-- [v2.0.0-alpha2](<repo-root>/versions/v2.0.0-alpha2/VERSION.md)
-- [v2.0.0-alpha1](<repo-root>/versions/v2.0.0-alpha1/VERSION.md)
-- [v1.2.10](<repo-root>/versions/v1.2.10/VERSION.md)
-- [v1.2.9](<repo-root>/versions/v1.2.9/VERSION.md)
-- [v1.2.8](<repo-root>/versions/v1.2.8/VERSION.md)
-- [v1.2.7](<repo-root>/versions/v1.2.7/VERSION.md)
-- [v1.2.6](<repo-root>/versions/v1.2.6/VERSION.md)
-- [v1.2.5](<repo-root>/versions/v1.2.5/VERSION.md)
-- [v1.2.4](<repo-root>/versions/v1.2.4/VERSION.md)
-- [v1.2.3](<repo-root>/versions/v1.2.3/VERSION.md)
-- [v1.2.2](<repo-root>/versions/v1.2.2/VERSION.md)
 
-## 规则
+## Older Lines
 
-- 每次代码行为变化必须升版本，默认补丁号加一，例�?`v4.4` -> `v4.4.1`�?
-- 每次开工前必须先读 [../meta/PROJECT_OPERATION_SOP.md](../meta/PROJECT_OPERATION_SOP.md)，流程变化时同步更新 SOP�?
-- `VERSION.md`：版本说�?
-- `MANIFEST.md`：版本内容清�?
-- `VERSION.md` 只写这个版本解决了什么�?
-- `MANIFEST.md` 只写这个版本涉及哪些文件和怎么验证�?
-- 不再在每个版本目录复制大量源码快照，避免版本目录膨胀�?
-
-### V3 起版本管理约�?
-
-- 命名规则：`v3.0.0-alphaN`（功能开发阶段），后续按 `beta/rc/stable` 演进�?
-- 每完成一批功能都要提交一次并更新对应版本目录�?
-- 每次提交前至少执行本次变更影响范围内的自动化验证�?
-  - WebUI 变更：`npm --prefix webui test` �?`npm --prefix webui run build`
-  - 协议/状态机变更：补充并执行对应 C 侧验证用�?
-- `versions/README.md` 顶部“当前版本”必须指向最新版本�?
+- [v4.3](./v4.3/VERSION.md)
+- [v4.2.3](./v4.2.3/VERSION.md)
+- [v4.2.2](./v4.2.2/VERSION.md)
+- [v4.2.1](./v4.2.1/VERSION.md)
+- [v4.0.0-alpha1](./v4.0.0-alpha1/VERSION.md)
+- [v3.0.0-alpha8](./v3.0.0-alpha8/VERSION.md)
+- [v3.0.0-alpha7](./v3.0.0-alpha7/VERSION.md)
+- [v3.0.0-alpha6](./v3.0.0-alpha6/VERSION.md)
+- [v3.0.0-alpha5](./v3.0.0-alpha5/VERSION.md)
+- [v3.0.0-alpha4](./v3.0.0-alpha4/VERSION.md)
+- [v3.0.0-alpha3](./v3.0.0-alpha3/VERSION.md)
+- [v3.0.0-alpha2](./v3.0.0-alpha2/VERSION.md)
+- [v3.0.0-alpha1](./v3.0.0-alpha1/VERSION.md)
+- [v2.0.0-alpha18](./v2.0.0-alpha18/VERSION.md)
+- [v2.0.0-alpha17](./v2.0.0-alpha17/VERSION.md)
+- [v2.0.0-alpha16](./v2.0.0-alpha16/VERSION.md)
+- [v2.0.0-alpha15](./v2.0.0-alpha15/VERSION.md)
+- [v2.0.0-alpha14](./v2.0.0-alpha14/VERSION.md)
+- [v2.0.0-alpha13](./v2.0.0-alpha13/VERSION.md)
+- [v2.0.0-alpha12](./v2.0.0-alpha12/VERSION.md)
+- [v2.0.0-alpha11](./v2.0.0-alpha11/VERSION.md)
+- [v2.0.0-alpha10](./v2.0.0-alpha10/VERSION.md)
+- [v2.0.0-alpha9](./v2.0.0-alpha9/VERSION.md)
+- [v2.0.0-alpha8](./v2.0.0-alpha8/VERSION.md)
+- [v2.0.0-alpha7](./v2.0.0-alpha7/VERSION.md)
+- [v2.0.0-alpha6](./v2.0.0-alpha6/VERSION.md)
+- [v2.0.0-alpha5](./v2.0.0-alpha5/VERSION.md)
+- [v2.0.0-alpha4](./v2.0.0-alpha4/VERSION.md)
+- [v2.0.0-alpha3](./v2.0.0-alpha3/VERSION.md)
+- [v2.0.0-alpha2](./v2.0.0-alpha2/VERSION.md)
+- [v2.0.0-alpha1](./v2.0.0-alpha1/VERSION.md)
+- [v1.2.10](./v1.2.10/VERSION.md)
+- [v1.2.9](./v1.2.9/VERSION.md)
+- [v1.2.8](./v1.2.8/VERSION.md)
+- [v1.2.7](./v1.2.7/VERSION.md)
+- [v1.2.6](./v1.2.6/VERSION.md)
+- [v1.2.5](./v1.2.5/VERSION.md)
+- [v1.2.4](./v1.2.4/VERSION.md)
+- [v1.2.3](./v1.2.3/VERSION.md)
+- [v1.2.2](./v1.2.2/VERSION.md)

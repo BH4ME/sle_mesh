@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs/sim"
 BUILD_DIR="${TMPDIR:-/tmp}/sle_team_sim"
 NETWORK_BIN="$BUILD_DIR/sle_team_network_test"

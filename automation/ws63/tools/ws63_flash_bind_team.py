@@ -150,8 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--flash", action="store_true", help="flash before role binding")
     parser.add_argument(
         "--flash-script",
-        default="scripts/ws63_flash_team.sh",
-        help="flash script path (default scripts/ws63_flash_team.sh)",
+        default="scripts/flash/ws63_flash_team.sh",
+        help="flash script path (default scripts/flash/ws63_flash_team.sh)",
     )
     parser.add_argument("--flash-role", default="unified", choices=["leader", "member", "unified"])
     parser.add_argument("--flash-gap-s", type=float, default=0.5)

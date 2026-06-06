@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the WS63 v4 unified firmware on the LAN Ubuntu SDK host.
 
-This is the Python/Paramiko equivalent of scripts/ws63_build_v4_ubuntu.sh.
+This is the Python/Paramiko equivalent of scripts/build/ws63_build_v4_ubuntu.sh.
 It avoids depending on local ssh/rsync/WSL tooling and prints visible progress.
 """
 

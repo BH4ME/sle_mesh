@@ -7,9 +7,9 @@ class Ws63SystemScriptTest(unittest.TestCase):
         repo_root = pathlib.Path(__file__).resolve().parents[3]
         script = (repo_root / "automation/ws63/scripts/ws63_test_system.sh").read_text(encoding="utf-8")
 
-        self.assertIn("scripts/ws63_build_v4_ubuntu.sh", script)
+        self.assertIn("scripts/build/ws63_build_v4_ubuntu.sh", script)
         burn_stage = script.split('if [[ "$DO_BURN" == "1" ]]', 1)[1]
-        self.assertNotIn("scripts/ws63_build_team_ubuntu.sh", burn_stage)
+        self.assertNotIn("scripts/build/ws63_build_team_ubuntu.sh", burn_stage)
 
     def test_relay_cycle_stage_uses_three_board_tool(self):
         repo_root = pathlib.Path(__file__).resolve().parents[3]

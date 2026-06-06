@@ -4,14 +4,17 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/ws63_build_v4_local_wsl.sh unified
+  scripts/build/ws63_build_v4_ubuntu.sh unified
 
-Builds the v4 WS63 team firmware inside local WSL using the SDK on the
-Windows filesystem.
+Builds the v4 WS63 team firmware on a LAN Ubuntu build machine.
 
-Environment:
-  WSL_SDK=/mnt/d/bearpi-pico_h3863-master
-  OUT_ROOT=/path/to/sle/output_from_vm
+Environment is the same as scripts/build/ws63_build_team_ubuntu.sh:
+  UBUNTU_HOST=192.168.1.50
+  UBUNTU_PORT=22
+  UBUNTU_USER=builder
+  UBUNTU_PASS=builder
+  UBUNTU_SDK=/home/builder/workspace/bearpi-pico_h3863_fresh
+  OUT_ROOT=/path/to/output_from_vm
   BUILD_JOBS=4
 USAGE
 }
@@ -34,38 +37,97 @@ case "$role" in
     ;;
 esac
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WSL_SDK="${WSL_SDK:-/mnt/d/bearpi-pico_h3863-master}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+UBUNTU_HOST="${UBUNTU_HOST:-}"
+UBUNTU_PORT="${UBUNTU_PORT:-22}"
+UBUNTU_USER="${UBUNTU_USER:-builder}"
+UBUNTU_PASS="${UBUNTU_PASS:-}"
+UBUNTU_SDK="${UBUNTU_SDK:-/home/builder/workspace/bearpi-pico_h3863_fresh}"
 OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 
-CONFIG_PATH="$WSL_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
-REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
-REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
-REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
+if [[ -z "$UBUNTU_HOST" ]]; then
+  echo "UBUNTU_HOST is required, for example: UBUNTU_HOST=192.168.1.50 $0 $role" >&2
+  exit 2
+fi
+
+CONFIG_PATH="$UBUNTU_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
+REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
+REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
+REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
+LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
-export PATH="$HOME/.local/bin:$PATH"
+ssh_opts=(
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
+)
 
-echo "WS63 local WSL build"
+if [[ -n "$UBUNTU_PASS" ]]; then
+  ssh_base=(sshpass -p "$UBUNTU_PASS" ssh "${ssh_opts[@]}")
+  rsync_ssh=(sshpass -p "$UBUNTU_PASS" ssh "${ssh_opts[@]}" -p "$UBUNTU_PORT")
+else
+  ssh_base=(ssh "${ssh_opts[@]}")
+  rsync_ssh=(ssh "${ssh_opts[@]}" -p "$UBUNTU_PORT")
+fi
+
+ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
+
+echo "WS63 Ubuntu build"
 echo "profile:    v4.4.95 unified runtime role (relay swap hysteresis)"
-echo "sdk:        $WSL_SDK"
+echo "fallback id:$self_id"
+echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
+echo "sdk:        $UBUNTU_SDK"
 echo "local out:  $LOCAL_OUT"
 echo
 
-command -v cmake >/dev/null || { echo "cmake not found in PATH=$PATH" >&2; exit 2; }
-command -v ninja >/dev/null || { echo "ninja not found in PATH=$PATH" >&2; exit 2; }
-test -f "$CONFIG_PATH" || { echo "config not found: $CONFIG_PATH" >&2; exit 2; }
+"${ssh_cmd[@]}" "test -f '$CONFIG_PATH' && mkdir -p '$REMOTE_PROTO' '$REMOTE_APP'"
 
-mkdir -p "$REMOTE_PROTO" "$REMOTE_APP"
-rsync -a --delete --exclude '.git' --exclude 'build' --exclude 'dist' --exclude 'node_modules' \
-  "$ROOT_DIR/include/" "$REMOTE_PROTO/include/"
-rsync -a --delete --exclude '.git' --exclude 'build' --exclude 'dist' --exclude 'node_modules' \
-  "$ROOT_DIR/src/" "$REMOTE_PROTO/src/"
-rsync -a --delete --exclude '.git' --exclude 'build' --exclude 'dist' --exclude 'node_modules' \
-  "$ROOT_DIR/xc/ws63_team_network/" "$REMOTE_APP/"
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/include/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PROTO/include/"
 
-python3 - "$CONFIG_PATH" "$self_id" <<'PY'
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/src/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PROTO/src/"
+
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude 'node_modules' \
+  -e "${rsync_ssh[*]}" \
+  "$ROOT_DIR/xc/ws63_team_network/" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_APP/"
+
+"${ssh_cmd[@]}" "bash -s -- '$LVGL_PATCH' '$REMOTE_APP'" <<'SH'
+LVGL_PATCH="$1"
+REMOTE_APP="$2"
+if [ -f "$LVGL_PATCH" ]; then
+  cd "$REMOTE_APP/third_party/lvgl"
+  if grep -q "lv_area_t center_coords;" src/draw/sw/lv_draw_sw_rect.c &&
+    grep -q "bool mask_any_center = false;" src/draw/sw/lv_draw_sw_rect.c; then
+    echo "LVGL patch already present in source"
+  elif git apply --unidiff-zero --check "$LVGL_PATCH"; then
+    git apply --unidiff-zero "$LVGL_PATCH"
+  elif git apply --unidiff-zero --reverse --check "$LVGL_PATCH"; then
+    echo "LVGL patch already applied"
+  else
+    echo "LVGL patch check failed: $LVGL_PATCH" >&2
+    exit 1
+  fi
+fi
+SH
+
+"${ssh_cmd[@]}" "python3 - '$CONFIG_PATH' '$self_id'" <<'PY'
 from pathlib import Path
 import sys
 
@@ -106,17 +168,14 @@ def unset_kconfig_bool(text, key):
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_SELF_ID", self_id)
 s = set_kconfig_value(s, "CONFIG_SAMPLE_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK", "y")
-for key in [
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART",
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART_SERVER",
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART_CLIENT",
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART_1_VS_8",
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART_SERVER_1_VS_8",
-    "CONFIG_SAMPLE_SUPPORT_SLE_UART_CLIENT_1_VS_8",
-    "CONFIG_SAMPLE_SUPPORT_BLE_UART",
-    "CONFIG_SAMPLE_SUPPORT_SLE_GETAWAY",
-]:
-    s = unset_kconfig_bool(s, key)
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART_SERVER")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART_CLIENT")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART_1_VS_8")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART_SERVER_1_VS_8")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_UART_CLIENT_1_VS_8")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_BLE_UART")
+s = unset_kconfig_bool(s, "CONFIG_SAMPLE_SUPPORT_SLE_GETAWAY")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LEADER_ID", "1")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_BUS", "0")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_UART_TXD_PIN", "21")
@@ -155,13 +214,12 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.95 local WSL pinmap and team-network sample")
+print("configured v4.4.95 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer default disabled (IO14 safe off), gps UART1(IO17/18) mapped, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled, dynamic relay budget enabled, relay swap hysteresis enabled, trusted route-id tracking enabled")
 PY
 
-cd "$WSL_SDK"
-python3 build.py -c ws63-liteos-app -j"$BUILD_JOBS"
+"${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
 
-python3 - "$WSL_SDK" <<'PY'
+"${ssh_cmd[@]}" "python3 - '$UBUNTU_SDK'" <<'PY'
 from pathlib import Path
 import sys
 
@@ -169,17 +227,24 @@ sdk = Path(sys.argv[1])
 cfg_path = sdk / "build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
 map_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.map"
 elf_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.elf"
+app_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_team_network_app.c"
+proto_source_path = sdk / "third_party/sle_mesh/src/sle_team_node.c"
+
 cfg = cfg_path.read_text(errors="replace")
 map_text = map_path.read_text(errors="replace")
 elf = elf_path.read_bytes()
+app_source = app_source_path.read_text(errors="replace")
+proto_source = proto_source_path.read_text(errors="replace")
 
-for item in [
+required_cfg = [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
     "CONFIG_SLE_TEAM_ST7789_ENABLE=y",
     "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL=y",
-]:
+]
+for item in required_cfg:
     if item not in cfg:
         raise SystemExit(f"post-build guard failed: missing {item}")
+
 for forbidden in [
     "CONFIG_SAMPLE_SUPPORT_SLE_UART=y",
     "CONFIG_SAMPLE_SUPPORT_SLE_UART_1_VS_8=y",
@@ -188,14 +253,17 @@ for forbidden in [
 ]:
     if forbidden in cfg:
         raise SystemExit(f"post-build guard failed: official UART sample still enabled: {forbidden}")
-for item in [
+
+required_map = [
     "ws63_team_network_app.c.obj",
     "ws63_st7789_display.c.obj",
     "sle_team_node.c.obj",
-]:
+]
+for item in required_map:
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
-for item in [
+
+required_bytes = [
     b"v4.4.95",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
@@ -209,18 +277,34 @@ for item in [
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
+    b"relay failover begin",
+    b"relay failover holding relay target",
+    b"relay config notify pending",
+    b"liveness preserved",
+    b"direct cap prune confirmed",
+    b"direct cap prune disconnect",
     b"TeamDisplayTask",
     b"relay rebalance demand",
     b"relay swap observe",
     b"swap-promote",
     b"swap-demote",
     b"v4.4.95 pairing allowlist preserve",
-]:
+]
+for item in required_bytes:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.95")
+
+for source_name, source_text, item in [
+    ("sle_team_node.c", proto_source, "Route updates are leader policy hints"),
+    ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
+    ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
+]:
+    if item not in source_text:
+        raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")
+
+print("post-build guard passed: team-network app, ST7789/LVGL display, version strings, and direct-cap source guards are present")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"
-cp "$REMOTE_PKG" "$LOCAL_OUT"
+rsync -az -e "${rsync_ssh[*]}" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PKG" "$LOCAL_OUT"
 ls -lh "$LOCAL_OUT"

@@ -65,7 +65,7 @@ Options:
   --role-bind-with-flash     run flash inside role-bind stage (use instead of --with-burn to avoid duplicate flashing)
   --ports <p1,p2,...>        serial ports for burn/serial stage
   --flash-role <role>        leader|member|unified (default unified)
-  --sim-stress <n>           stress for simulate_v2.sh all suite
+  --sim-stress <n>           stress for scripts/sim/simulate_v2.sh all suite
   --py-stress <n>            stress for python suite
   --serial-seconds <n>       per-port capture seconds (default 20)
   --link-team-id <id>        team id used by link-cycle (default 1)
@@ -243,15 +243,15 @@ fi
 
 if [[ "$DO_SIM" == "1" ]]; then
   log_step "Simulation"
-  run_cmd "sim_all" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=all --stress="$SIM_STRESS" || FAIL_COUNT=$((FAIL_COUNT + 1))
-  run_cmd "sim_python_stress" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=20 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=18 --py-packet-loss-rate=0.2 --py-jitter-min-ms=10 --py-jitter-max-ms=120 --py-batch-fail-relay-count=1 --py-batch-fail-relay-ticks=6 || FAIL_COUNT=$((FAIL_COUNT + 1))
-  run_cmd "sim_python_1v30_relay_failover" "$ROOT_DIR/scripts/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=30 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=16 --py-packet-loss-rate=0.0 --py-jitter-min-ms=0 --py-jitter-max-ms=80 --py-batch-fail-relay-count=2 --py-batch-fail-relay-ticks=8,12 --py-seed=20260604 || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "sim_all" "$ROOT_DIR/scripts/sim/simulate_v2.sh" --suite=all --stress="$SIM_STRESS" || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "sim_python_stress" "$ROOT_DIR/scripts/sim/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=20 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=18 --py-packet-loss-rate=0.2 --py-jitter-min-ms=10 --py-jitter-max-ms=120 --py-batch-fail-relay-count=1 --py-batch-fail-relay-ticks=6 || FAIL_COUNT=$((FAIL_COUNT + 1))
+  run_cmd "sim_python_1v30_relay_failover" "$ROOT_DIR/scripts/sim/simulate_v2.sh" --suite=python --stress="$PY_STRESS" --py-members=30 --py-direct-cap=8 --py-relay-target=3 --py-fail-tick=6 --py-recover-tick=10 --py-ticks=16 --py-packet-loss-rate=0.0 --py-jitter-min-ms=0 --py-jitter-max-ms=80 --py-batch-fail-relay-count=2 --py-batch-fail-relay-ticks=8,12 --py-seed=20260604 || FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
 if [[ "$DO_BURN" == "1" ]]; then
   log_step "Build & Burn"
   if [[ "$SKIP_BUILD" != "1" ]]; then
-    run_cmd "build_ubuntu" env UBUNTU_HOST="${UBUNTU_HOST:-}" UBUNTU_USER="${UBUNTU_USER:-}" UBUNTU_PASS="${UBUNTU_PASS:-}" UBUNTU_SDK="${UBUNTU_SDK:-}" BUILD_JOBS="${BUILD_JOBS:-4}" "$ROOT_DIR/scripts/ws63_build_v4_ubuntu.sh" unified || FAIL_COUNT=$((FAIL_COUNT + 1))
+    run_cmd "build_ubuntu" env UBUNTU_HOST="${UBUNTU_HOST:-}" UBUNTU_USER="${UBUNTU_USER:-}" UBUNTU_PASS="${UBUNTU_PASS:-}" UBUNTU_SDK="${UBUNTU_SDK:-}" BUILD_JOBS="${BUILD_JOBS:-4}" "$ROOT_DIR/scripts/build/ws63_build_v4_ubuntu.sh" unified || FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
 
   if [[ -z "$SERIAL_PORTS" ]]; then
@@ -262,7 +262,7 @@ if [[ "$DO_BURN" == "1" ]]; then
     for port in "${PORT_ARR[@]}"; do
       port="${port// /}"
       [[ -n "$port" ]] || continue
-      run_cmd "flash_${FLASH_ROLE}_$(basename "$port")" env WS63_FLASH_NO_CONFIRM=1 "$ROOT_DIR/scripts/ws63_flash_team.sh" --yes "$FLASH_ROLE" "$port" || FAIL_COUNT=$((FAIL_COUNT + 1))
+      run_cmd "flash_${FLASH_ROLE}_$(basename "$port")" env WS63_FLASH_NO_CONFIRM=1 "$ROOT_DIR/scripts/flash/ws63_flash_team.sh" --yes "$FLASH_ROLE" "$port" || FAIL_COUNT=$((FAIL_COUNT + 1))
     done
   fi
 fi
@@ -426,7 +426,7 @@ if [[ "$DO_ROLE_BIND" == "1" ]]; then
           --channel "$LINK_CHANNEL"
         )
         if [[ "$ROLE_BIND_WITH_FLASH" == "1" ]]; then
-          bind_cmd+=(--flash --flash-script "$ROOT_DIR/scripts/ws63_flash_team.sh" --flash-role "$FLASH_ROLE")
+          bind_cmd+=(--flash --flash-script "$ROOT_DIR/scripts/flash/ws63_flash_team.sh" --flash-role "$FLASH_ROLE")
         fi
         if [[ -n "$LINK_LEADER_SUFFIX" ]]; then
           bind_cmd+=(--leader-suffix "$LINK_LEADER_SUFFIX")

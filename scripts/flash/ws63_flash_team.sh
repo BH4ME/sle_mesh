@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 AUTO_BURN_TOOL="$ROOT_DIR/automation/ws63/tools/ws63_auto_burn.py"
 BURN_TOOL="${BURN_TOOL:-$AUTO_BURN_TOOL}"
 FW_ROOT="${FW_ROOT:-$ROOT_DIR/output_from_vm}"
@@ -19,9 +19,9 @@ NO_CONFIRM="${WS63_FLASH_NO_CONFIRM:-0}"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/ws63_flash_team.sh [--yes] leader [port]
-  scripts/ws63_flash_team.sh [--yes] member [port]
-  scripts/ws63_flash_team.sh [--yes] unified [port]
+  scripts/flash/ws63_flash_team.sh [--yes] leader [port]
+  scripts/flash/ws63_flash_team.sh [--yes] member [port]
+  scripts/flash/ws63_flash_team.sh [--yes] unified [port]
 
 Defaults:
   leader port: /dev/tty.usbserial-10
