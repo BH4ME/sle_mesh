@@ -10,7 +10,7 @@ Date: 2026-06-05
 
 ```text
 firmware version string: v4.4.66
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 ## What Changed
@@ -33,10 +33,10 @@ This workflow version is accepted only when logs prove:
 ## Command Log Slots
 
 ```text
-local regression log: E:\codex_documents\sle\logs\local\v4.4.68_20260605_094309\local_regression.log
-staggered parallel flash log: E:\codex_documents\sle\logs\burn\v4.4.66_20260605_094335\run_summary.txt
-post-flash status confirm log: E:\codex_documents\sle\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
-COM16 blocker doc: E:\codex_documents\sle\versions\v4.4.68\COM16_BLOCKER.md
+local regression log: <repo-root>\logs\local\v4.4.68_20260605_094309\local_regression.log
+staggered parallel flash log: <repo-root>\logs\burn\v4.4.66_20260605_094335\run_summary.txt
+post-flash status confirm log: <repo-root>\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
+COM16 blocker doc: <repo-root>\versions\v4.4.68\COM16_BLOCKER.md
 ```
 
 ## Verification Result

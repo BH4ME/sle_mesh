@@ -26,27 +26,27 @@ COM16 Windows port exists:
   USB-SERIAL CH340 (COM16), USB VID:PID=1A86:7523, LOCATION=1-5.4.3
 
 COM16 app cfg probe:
-  E:\codex_documents\sle\logs\live\v4.4.67_four_board_com16_probe_20260605_084714\run.log
+  <repo-root>\logs\live\v4.4.67_four_board_com16_probe_20260605_084714\run.log
   result: cfg status attempted 3 times, 0 bytes, no cfg-json
 
 COM16 software-reset flash retry:
-  E:\codex_documents\sle\logs\burn\v4.4.66_20260605_084749\COM16.log
+  <repo-root>\logs\burn\v4.4.66_20260605_084749\COM16.log
   result: reset commands sent, no boot handshake before manual retry timeout
 
 COM16 multi-baud serial probe:
-  E:\codex_documents\sle\logs\serial\v4.4.67_com16_probe_20260605_085414\com16_probe.log
+  <repo-root>\logs\serial\v4.4.67_com16_probe_20260605_085414\com16_probe.log
   result: 0 bytes at 115200, 230400, 460800, 921600, and 9600
 
 COM16 DTR/RTS probe:
-  E:\codex_documents\sle\logs\serial\v4.4.67_com16_dtr_rts_probe_20260605_085547\com16_dtr_rts_probe.log
+  <repo-root>\logs\serial\v4.4.67_com16_dtr_rts_probe_20260605_085547\com16_dtr_rts_probe.log
   result: 0 bytes after tested RTS/DTR pulse and hold sequences
 
 COM16 no-reset boot handshake:
-  E:\codex_documents\sle\logs\burn\v4.4.67_com16_noreset_20260605_085647\COM16_noreset.log
+  <repo-root>\logs\burn\v4.4.67_com16_noreset_20260605_085647\COM16_noreset.log
   result: no boot handshake
 
 COM16 recovery probe:
-  E:\codex_documents\sle\logs\serial\v4.4.67_com16_recovery_probe_20260605_091540\com16_recovery_probe.log
+  <repo-root>\logs\serial\v4.4.67_com16_recovery_probe_20260605_091540\com16_recovery_probe.log
   result: serial break, long RTS/DTR holds, reopen/listen attempts all returned 0 bytes
 ```
 

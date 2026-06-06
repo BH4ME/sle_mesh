@@ -1,6 +1,6 @@
 # Code Review Feedback
 
-**Reviewer:** DeepSeek Flash (deepseek-v4-flash)
+**Reviewer:** Review Service (configured-provider)
 **Date:** 2026-05-10
 **Version:** v2.0.0-alpha11
 **Branch:** line/v2-auto-networking

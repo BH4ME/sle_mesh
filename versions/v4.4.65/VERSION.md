@@ -46,7 +46,7 @@ This version is accepted only when logs prove:
 ```text
 local regression log: pending
 build log: pending
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 burn log: pending
 three-board test log: pending
 COM16 status: pending

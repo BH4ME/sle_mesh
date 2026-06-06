@@ -23,7 +23,7 @@ Passed locally:
 
 ```sh
 python -m unittest automation.ws63.tests.test_ws63_link_cycle_test
-bash -lc "cc -Wall -Werror -I/mnt/e/codex_documents/sle/include /mnt/e/codex_documents/sle/examples/team_node_regression_test.c /mnt/e/codex_documents/sle/src/sle_team_packet.c /mnt/e/codex_documents/sle/src/sle_team_node.c -o /tmp/team_node_regression_test && /tmp/team_node_regression_test"
+bash -lc "cc -Wall -Werror -I/path/to/sle/include /path/to/sle/examples/team_node_regression_test.c /path/to/sle/src/sle_team_packet.c /path/to/sle/src/sle_team_node.c -o /tmp/team_node_regression_test && /tmp/team_node_regression_test"
 bash scripts/simulate_v2.sh --suite=all --iterations=1
 bash automation/ws63/scripts/ws63_test_system.sh --quick
 npm --prefix webui test

@@ -1,4 +1,4 @@
-﻿# Version v4.4.70
+# Version v4.4.70
 
 Date: 2026-06-05
 
@@ -25,7 +25,7 @@ return any firmware CLI response.
 Latest COM16 probe:
 
 ```text
-log: E:\codex_documents\sle\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
+log: <repo-root>\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
 result: FAIL
 reason: cfg status returned 0 bytes on COM16 for 3 attempts
 tail: [tx] cfg status[tx] cfg status[tx] cfg status
@@ -76,9 +76,9 @@ PASS: relay reboot/loss recovered child route leader=241 relay=224 child=86
 Key evidence:
 
 ```text
-leader log: E:\codex_documents\sle\logs\live\v4.4.69_three_board_fallback_20260605_100452\leader_COM13.log
-child log:  E:\codex_documents\sle\logs\live\v4.4.69_three_board_fallback_20260605_100452\child_COM18.log
-relay log:  E:\codex_documents\sle\logs\live\v4.4.69_three_board_fallback_20260605_100452\relay_COM17.log
+leader log: <repo-root>\logs\live\v4.4.69_three_board_fallback_20260605_100452\leader_COM13.log
+child log:  <repo-root>\logs\live\v4.4.69_three_board_fallback_20260605_100452\child_COM18.log
+relay log:  <repo-root>\logs\live\v4.4.69_three_board_fallback_20260605_100452\relay_COM17.log
 
 leader saw relay offline: member offline id=224
 child detected parent loss: parent timeout, requesting new parent

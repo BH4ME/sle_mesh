@@ -1,4 +1,4 @@
-﻿# v4.4.71 Manifest
+# v4.4.71 Manifest
 
 Date: 2026-06-05
 
@@ -30,7 +30,7 @@ COM16 leader probe:
 
 ```text
 command: automation/ws63/tools/ws63_four_board_relay_test.py with COM16 as leader
-log: E:\codex_documents\sle\logs\live\v4.4.70_four_board_com16_probe_20260605_101328
+log: <repo-root>\logs\live\v4.4.70_four_board_com16_probe_20260605_101328
 result: FAIL, COM16 returned 0 bytes to cfg status
 ```
 

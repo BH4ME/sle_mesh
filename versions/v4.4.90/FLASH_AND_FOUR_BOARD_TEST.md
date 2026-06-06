@@ -1,4 +1,4 @@
-﻿# v4.4.90 Flash And Four-Board Test
+# v4.4.90 Flash And Four-Board Test
 
 Date: 2026-06-05
 
@@ -59,7 +59,7 @@ leader direct capacity: 1
 
 ```powershell
 $ts = Get-Date -Format 'yyyyMMdd_HHmmss'
-$logDir = "E:\codex_documents\sle\logs\live\v4.4.90_four_board_com16_leader_$ts"
+$logDir = "<repo-root>\logs\live\v4.4.90_four_board_com16_leader_$ts"
 python .\automation\ws63\tools\ws63_four_board_relay_test.py `
   --leader-port COM16 `
   --relay-port COM13 `

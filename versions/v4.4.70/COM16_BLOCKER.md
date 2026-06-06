@@ -1,4 +1,4 @@
-﻿# COM16 Leader Blocker
+# COM16 Leader Blocker
 
 Date: 2026-06-05
 
@@ -10,7 +10,7 @@ answer CLI commands on that port.
 Latest probe:
 
 ```text
-log: E:\codex_documents\sle\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
+log: <repo-root>\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
 command: cfg status
 attempts: 3
 result: 0 bytes, no [cfg-json]

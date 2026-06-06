@@ -46,4 +46,4 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
 结果：通过。
 
 补充说明：
-- `scripts/run_review_with_deepseek.sh` 本地执行受当前 API Key 状态影响（本轮返回 authentication invalid），需在可用密钥环境重跑以更新 `review_feedback.md`。
+- `scripts/run_review_with_service.sh` 本地执行受当前 API Key 状态影响（本轮返回 authentication invalid），需在可用密钥环境重跑以更新 `review_feedback.md`。

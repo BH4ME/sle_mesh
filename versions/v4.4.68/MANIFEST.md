@@ -30,8 +30,8 @@ git diff --check
 ## Evidence
 
 ```text
-local regression: E:\codex_documents\sle\logs\local\v4.4.68_20260605_094309\local_regression.log
-staggered parallel flash: E:\codex_documents\sle\logs\burn\v4.4.66_20260605_094335\run_summary.txt
-status confirm: E:\codex_documents\sle\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
+local regression: <repo-root>\logs\local\v4.4.68_20260605_094309\local_regression.log
+staggered parallel flash: <repo-root>\logs\burn\v4.4.66_20260605_094335\run_summary.txt
+status confirm: <repo-root>\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
 COM16 blocker: no cfg-json and no boot handshake in v4.4.67 probes
 ```

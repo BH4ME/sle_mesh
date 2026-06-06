@@ -9,7 +9,7 @@ hardware run is specifically to verify the route bookkeeping fix from the
 Use this package after a successful `v4.4.82` build:
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 Before flashing, verify the package contains:
@@ -29,7 +29,7 @@ COM17: child member
 COM18: child member
 ```
 
-Run this from `E:\codex_documents\sle` only after the user asks to burn:
+Run this from `<repo-root>` only after the user asks to burn:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
@@ -53,7 +53,7 @@ no manual reset fallback during automated runs
 
 ## Four-Board Configuration And Test
 
-Run this from `E:\codex_documents\sle` after all boards report `v4.4.82`:
+Run this from `<repo-root>` after all boards report `v4.4.82`:
 
 ```powershell
 $stamp=Get-Date -Format 'yyyyMMdd_HHmmss'

@@ -39,11 +39,11 @@ This version is accepted only when logs prove:
 ## Command Log Slots
 
 ```text
-local regression log: E:\codex_documents\sle\logs\local\v4.4.66_20260605_082102\local_regression.log
-build log: E:\codex_documents\sle\logs\build\v4.4.66_20260605_082241\remote_build.log
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
-burn log: E:\codex_documents\sle\logs\burn\v4.4.66_direct_20260605_082821\run_summary.txt
-three-board test log: E:\codex_documents\sle\logs\live\v4.4.66_three_board_cfg_relay_20260605_084012\run.log
+local regression log: <repo-root>\logs\local\v4.4.66_20260605_082102\local_regression.log
+build log: <repo-root>\logs\build\v4.4.66_20260605_082241\remote_build.log
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+burn log: <repo-root>\logs\burn\v4.4.66_direct_20260605_082821\run_summary.txt
+three-board test log: <repo-root>\logs\live\v4.4.66_three_board_cfg_relay_20260605_084012\run.log
 COM16 status: blocked/no app reply unless new evidence appears
 ```
 

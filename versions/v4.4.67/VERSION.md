@@ -18,7 +18,7 @@ The active test goal is:
 
 ```text
 firmware version string: v4.4.66
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 ## What Changed
@@ -44,17 +44,17 @@ This workflow version is accepted only when logs prove:
 ## Command Log Slots
 
 ```text
-local regression log: E:\codex_documents\sle\logs\local\v4.4.67_20260605_092345\local_regression.log
-parallel flash log: E:\codex_documents\sle\logs\burn\v4.4.66_20260605_085733\run_summary.txt
-COM16 app/status probe log: E:\codex_documents\sle\logs\live\v4.4.67_four_board_com16_probe_20260605_084714\run.log
-COM16 flash retry log: E:\codex_documents\sle\logs\burn\v4.4.66_20260605_084749\COM16.log
-COM16 serial multi-baud probe log: E:\codex_documents\sle\logs\serial\v4.4.67_com16_probe_20260605_085414\com16_probe.log
-COM16 DTR/RTS probe log: E:\codex_documents\sle\logs\serial\v4.4.67_com16_dtr_rts_probe_20260605_085547\com16_dtr_rts_probe.log
-COM16 no-reset boot handshake log: E:\codex_documents\sle\logs\burn\v4.4.67_com16_noreset_20260605_085647\COM16_noreset.log
-COM16 recovery probe log: E:\codex_documents\sle\logs\serial\v4.4.67_com16_recovery_probe_20260605_091540\com16_recovery_probe.log
-post-parallel status confirm log: E:\codex_documents\sle\logs\serial\v4.4.67_parallel_confirm_20260605_090106\confirm.log
+local regression log: <repo-root>\logs\local\v4.4.67_20260605_092345\local_regression.log
+parallel flash log: <repo-root>\logs\burn\v4.4.66_20260605_085733\run_summary.txt
+COM16 app/status probe log: <repo-root>\logs\live\v4.4.67_four_board_com16_probe_20260605_084714\run.log
+COM16 flash retry log: <repo-root>\logs\burn\v4.4.66_20260605_084749\COM16.log
+COM16 serial multi-baud probe log: <repo-root>\logs\serial\v4.4.67_com16_probe_20260605_085414\com16_probe.log
+COM16 DTR/RTS probe log: <repo-root>\logs\serial\v4.4.67_com16_dtr_rts_probe_20260605_085547\com16_dtr_rts_probe.log
+COM16 no-reset boot handshake log: <repo-root>\logs\burn\v4.4.67_com16_noreset_20260605_085647\COM16_noreset.log
+COM16 recovery probe log: <repo-root>\logs\serial\v4.4.67_com16_recovery_probe_20260605_091540\com16_recovery_probe.log
+post-parallel status confirm log: <repo-root>\logs\serial\v4.4.67_parallel_confirm_20260605_090106\confirm.log
 four-board test log: not run to completion because COM16 has no app/bootloader reply
-COM16 blocker doc: E:\codex_documents\sle\versions\v4.4.67\COM16_BLOCKER.md
+COM16 blocker doc: <repo-root>\versions\v4.4.67\COM16_BLOCKER.md
 ```
 
 ## Verification Result

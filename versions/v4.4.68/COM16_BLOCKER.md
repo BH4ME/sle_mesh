@@ -5,7 +5,7 @@ This file carries forward the `v4.4.67` blocker: `COM16` is visible as a CH340 s
 Authoritative prior evidence:
 
 ```text
-E:\codex_documents\sle\versions\v4.4.67\COM16_BLOCKER.md
+<repo-root>\versions\v4.4.67\COM16_BLOCKER.md
 ```
 
 Before using `COM16` as leader, prove:

@@ -5,9 +5,9 @@
 Latest resumed evidence:
 
 ```text
-E:\codex_documents\sle\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
-E:\codex_documents\sle\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
-E:\codex_documents\sle\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
+<repo-root>\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
+<repo-root>\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
+<repo-root>\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
 ```
 
 Observed:
@@ -24,8 +24,8 @@ no boot handshake is observed.
 Previous software-side probes are recorded in:
 
 ```text
-E:\codex_documents\sle\versions\v4.4.68\COM16_BLOCKER.md
-E:\codex_documents\sle\versions\v4.4.67\COM16_BLOCKER.md
+<repo-root>\versions\v4.4.68\COM16_BLOCKER.md
+<repo-root>\versions\v4.4.67\COM16_BLOCKER.md
 ```
 
 Do not mark the four-board test complete until COM16 returns:

@@ -11,7 +11,7 @@ Windows filesystem.
 
 Environment:
   WSL_SDK=/mnt/d/bearpi-pico_h3863-master
-  OUT_ROOT=/mnt/e/codex_documents/sle/output_from_vm
+  OUT_ROOT=/path/to/sle/output_from_vm
   BUILD_JOBS=4
 USAGE
 }

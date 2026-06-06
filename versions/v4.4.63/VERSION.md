@@ -57,11 +57,11 @@ This version is accepted only when serial logs prove:
 Current evidence:
 
 ```text
-build log: E:\codex_documents\sle\logs\build\v4.4.63_20260605_011817\remote_build.log
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
-burn log, parallel attempt: E:\codex_documents\sle\logs\burn\v4.4.63_20260605_012433
-burn log, COM17 foreground failed: E:\codex_documents\sle\logs\burn\v4.4.63_COM17_foreground_20260605_013025\COM17.log
-burn log, COM17 visible failed: E:\codex_documents\sle\logs\burn\v4.4.63_COM17_visible_20260605_043820\COM17.log
+build log: <repo-root>\logs\build\v4.4.63_20260605_011817\remote_build.log
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+burn log, parallel attempt: <repo-root>\logs\burn\v4.4.63_20260605_012433
+burn log, COM17 foreground failed: <repo-root>\logs\burn\v4.4.63_COM17_foreground_20260605_013025\COM17.log
+burn log, COM17 visible failed: <repo-root>\logs\burn\v4.4.63_COM17_visible_20260605_043820\COM17.log
 four-board test log: pending
 child reboot log: pending
 relay reboot log: pending

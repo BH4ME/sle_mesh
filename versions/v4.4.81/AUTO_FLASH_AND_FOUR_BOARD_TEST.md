@@ -7,7 +7,7 @@
 Use this package unless a newer version directory explicitly replaces it:
 
 ```text
-E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 Before flashing, the wrapper verifies that the package contains the expected
@@ -30,7 +30,7 @@ COM17: child member
 COM18: child member
 ```
 
-Run this from `E:\codex_documents\sle`:
+Run this from `<repo-root>`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
@@ -83,7 +83,7 @@ relay. The expected converged route metric is:
 route metrics active=3 direct=1 relayed=2 stale=0 unreachable=0 plan=0 converged=1
 ```
 
-Run this from `E:\codex_documents\sle`:
+Run this from `<repo-root>`:
 
 ```powershell
 $stamp=Get-Date -Format 'yyyyMMdd_HHmmss'

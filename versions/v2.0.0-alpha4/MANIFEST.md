@@ -41,4 +41,4 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
 结果：通过。
 
 补充：
-- 审查执行建议：`scripts/run_review_with_deepseek.sh --scope "V2 alpha4"`，输出覆盖根目录 `review_feedback.md`。
+- 审查执行建议：`scripts/run_review_with_service.sh --scope "V2 alpha4"`，输出覆盖根目录 `review_feedback.md`。

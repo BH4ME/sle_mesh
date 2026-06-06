@@ -31,9 +31,9 @@ Success still requires a separate `cfg status` confirmation for every board.
 Current verified evidence:
 
 ```text
-local regression: PASS, E:\codex_documents\sle\logs\local\v4.4.68_20260605_094309\local_regression.log
-staggered parallel flash: PASS, E:\codex_documents\sle\logs\burn\v4.4.66_20260605_094335\run_summary.txt
-post-flash status confirm COM13/COM17/COM18: PASS, E:\codex_documents\sle\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
+local regression: PASS, <repo-root>\logs\local\v4.4.68_20260605_094309\local_regression.log
+staggered parallel flash: PASS, <repo-root>\logs\burn\v4.4.66_20260605_094335\run_summary.txt
+post-flash status confirm COM13/COM17/COM18: PASS, <repo-root>\logs\serial\v4.4.68_staggered_parallel_confirm_20260605_094640\confirm.log
 COM16 status confirm: FAIL, 0 bytes / no cfg-json
 ```
 

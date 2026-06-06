@@ -31,7 +31,7 @@
 ## 3. 审查流程
 
 1. 审查规则文档固定：`docs/v2/review_framework.md`。
-2. 执行脚本：`scripts/run_review_with_deepseek.sh`。
+2. 执行脚本：`scripts/run_review_with_service.sh`。
 3. 输出文件固定：`meta/review_feedback.md`（覆盖写入）。
 
 ## 4. 版本更新时机
@@ -64,10 +64,10 @@
 
 1. `find docs -maxdepth 4 -type f | sort` 是否仍简洁。
 2. `README.md` 与 `docs/README.md` 入口是否可用（v0~v4）。
-3. `scripts/run_review_with_deepseek.sh --dry-run` 是否正常。
+3. `scripts/run_review_with_service.sh --dry-run` 是否正常。
 4. `rg` 检查是否还有指向已删除 md 的链接。
 
-## 7. 给审查模型（DeepSeek/GPT）的执行指令
+## 7. 给审查服务（审查服务）的执行指令
 
 每次审查必须按这个顺序：
 
@@ -91,6 +91,6 @@
 1. 先判断变更属于 `v0 / v1 / v2 / v3 / v4` 哪条线，只改对应目录。
 2. 同主题优先改现有文档，不新建重复 md。
 3. 改完后跑链接与结构检查（第 6 节清单）。
-4. 需要审查时，使用 `scripts/run_review_with_deepseek.sh`，并确认输出落在`meta/review_feedback.md`。
+4. 需要审查时，使用 `scripts/run_review_with_service.sh`，并确认输出落在`meta/review_feedback.md`。
 5. 如果是里程碑改动，同步更新 `versions/`（`VERSION.md` + `MANIFEST.md` + `versions/README.md`）。
 6. 保持根目录“操作文档少而清晰”，避免再次堆叠临时文档。

@@ -1,4 +1,4 @@
-﻿# Version v4.4.71
+# Version v4.4.71
 
 Date: 2026-06-05
 
@@ -24,10 +24,10 @@ The full four-board test is still blocked by `COM16`.
 Latest probe:
 
 ```text
-log: E:\codex_documents\sle\logs\live\v4.4.70_four_board_com16_probe_20260605_101328
+log: <repo-root>\logs\live\v4.4.70_four_board_com16_probe_20260605_101328
 result: FAIL
 reason: COM16 returned 0 bytes to cfg status for 3 attempts
-leader log: E:\codex_documents\sle\logs\live\v4.4.70_four_board_com16_probe_20260605_101328\leader_COM16.log
+leader log: <repo-root>\logs\live\v4.4.70_four_board_com16_probe_20260605_101328\leader_COM16.log
 leader log content: [tx] cfg status[tx] cfg status[tx] cfg status
 ```
 

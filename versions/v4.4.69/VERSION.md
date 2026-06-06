@@ -19,10 +19,10 @@ leader direct cap: 1
 ## Current Evidence
 
 ```text
-resume status log: E:\codex_documents\sle\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
-COM16 manual-window burn log: E:\codex_documents\sle\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
-final status log: E:\codex_documents\sle\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
-previous COM16 blocker doc: E:\codex_documents\sle\versions\v4.4.68\COM16_BLOCKER.md
+resume status log: <repo-root>\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
+COM16 manual-window burn log: <repo-root>\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
+final status log: <repo-root>\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
+previous COM16 blocker doc: <repo-root>\versions\v4.4.68\COM16_BLOCKER.md
 ```
 
 ## Verification Result

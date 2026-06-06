@@ -23,7 +23,7 @@ No new firmware image was produced for this record.
 
 ```text
 current firmware baseline: v4.4.66
-firmware package: E:\codex_documents\sle\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
+firmware package: <repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
 ## Validation Evidence
@@ -32,7 +32,7 @@ COM16 leader probe:
 
 ```text
 command: automation/ws63/tools/ws63_four_board_relay_test.py with COM16 as leader
-log: E:\codex_documents\sle\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
+log: <repo-root>\logs\live\v4.4.69_four_board_com16_probe_20260605_100307
 result: FAIL, COM16 returned 0 bytes to cfg status
 ```
 
@@ -40,7 +40,7 @@ Three-board fallback relay test:
 
 ```text
 command: automation/ws63/tools/ws63_relay_cycle_test.py with COM13 leader, COM17 relay, COM18 child
-log: E:\codex_documents\sle\logs\live\v4.4.69_three_board_fallback_20260605_100452
+log: <repo-root>\logs\live\v4.4.69_three_board_fallback_20260605_100452
 result: PASS
 ```
 

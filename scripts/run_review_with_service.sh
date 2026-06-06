@@ -4,19 +4,18 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/run_review_with_deepseek.sh [--scope "<scope>"] [--goal-doc <path>] [--model <model>] [--dry-run]
+  scripts/run_review_with_service.sh [--scope "<scope>"] [--goal-doc <path>] [--model <model>] [--dry-run]
 
 Options:
   --scope      审查范围。默认: 全量审查（新仓库/大版本）
   --goal-doc   特性验证目标文档（可选），如 docs/v2/networking-goal.md
-  --model      模型名。默认: deepseek-chat
+  --model      模型名。默认: review-model
   --dry-run    仅打印 prompt，不请求 API
 
 Environment:
-  DEEPSEEK_API_KEY  DeepSeek API Key（优先）
-  OPENAI_API_KEY    兼容读取（当你把 DeepSeek key 放这里时可用）
-  DEEPSEEK_API_URL  可选，默认 https://api.deepseek.com/chat/completions
-  REVIEW_CONTEXT_BYTES  审查上下文最大字节数（可选，默认 200000）
+  REVIEW_API_KEY  review service API key
+  REVIEW_API_URL  review service chat-completions URL
+  REVIEW_CONTEXT_BYTES  review context byte limit (optional, default 200000)
 
 Behavior:
   1) 把 docs/v2/review_framework.md、目标文档、git 变更注入 prompt
@@ -27,7 +26,7 @@ EOF
 
 SCOPE="全量审查（新仓库/大版本）"
 GOAL_DOC=""
-MODEL="deepseek-chat"
+MODEL="${REVIEW_MODEL:-review-model}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -77,23 +76,27 @@ if [[ -n "$GOAL_DOC" && ! -f "$GOAL_DOC" ]]; then
   exit 1
 fi
 
-if ! command -v curl >/dev/null 2>&1; then
+if [[ $DRY_RUN -eq 0 ]] && ! command -v curl >/dev/null 2>&1; then
   echo "curl not found." >&2
   exit 1
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
+if [[ $DRY_RUN -eq 0 ]] && ! command -v jq >/dev/null 2>&1; then
   echo "jq not found. Please install jq first." >&2
   exit 1
 fi
 
-API_KEY="${DEEPSEEK_API_KEY:-${OPENAI_API_KEY:-}}"
+API_KEY="${REVIEW_API_KEY:-}"
 if [[ -z "$API_KEY" && $DRY_RUN -eq 0 ]]; then
-  echo "Missing API key. Set DEEPSEEK_API_KEY (or OPENAI_API_KEY)." >&2
+  echo "Missing API key. Set REVIEW_API_KEY." >&2
   exit 1
 fi
 
-API_URL="${DEEPSEEK_API_URL:-https://api.deepseek.com/chat/completions}"
+API_URL="${REVIEW_API_URL:-}"
+if [[ -z "$API_URL" && $DRY_RUN -eq 0 ]]; then
+  echo "Missing review service URL. Set REVIEW_API_URL." >&2
+  exit 1
+fi
 BRANCH="$(git branch --show-current)"
 TODAY="$(date +%F)"
 MAX_CONTEXT_BYTES="${REVIEW_CONTEXT_BYTES:-200000}"
@@ -166,14 +169,14 @@ append_section_with_limit() {
 }
 
 {
-  echo "你现在是代码审查执行器（DeepSeek）。请严格遵循以下要求："
+  echo "你现在是代码审查执行器。请严格遵循以下要求："
   echo
   echo "1. 你无法直接访问本地仓库；必须仅基于下方提供的上下文进行审查。"
   echo "2. 优先使用 'REVIEW_FRAMEWORK' 执行 Stage，不要跳步。"
   echo "3. Scope 使用：${SCOPE}"
   echo "4. 生成完整 Markdown 审查报告正文（不要解释过程，不要代码块包裹）。"
   echo "5. 报告头信息必须包含："
-  echo "   - Reviewer: DeepSeek Flash (deepseek-v4-flash)"
+  echo "   - Reviewer: Review Service (configured-provider)"
   echo "   - Date: ${TODAY}"
   echo "   - Version: 按 framework 规则从 versions/README.md 读取"
   echo "   - Branch: ${BRANCH}"
@@ -225,14 +228,14 @@ curl -sS "$API_URL" \
   -d @"$REQUEST_JSON" > "$RESP_FILE"
 
 if jq -e '.error' "$RESP_FILE" >/dev/null 2>&1; then
-  echo "DeepSeek API error:" >&2
+  echo "Review service error:" >&2
   jq '.error' "$RESP_FILE" >&2
   exit 1
 fi
 
 CONTENT="$(jq -r '.choices[0].message.content // empty' "$RESP_FILE")"
 if [[ -z "$CONTENT" ]]; then
-  echo "DeepSeek returned empty content." >&2
+  echo "Review service returned empty content." >&2
   jq '.' "$RESP_FILE" >&2
   exit 1
 fi
@@ -244,4 +247,4 @@ if ! rg -q "^# Code Review Feedback" meta/review_feedback.md; then
   exit 1
 fi
 
-echo "meta/review_feedback.md updated by DeepSeek"
+echo "meta/review_feedback.md updated by review service"

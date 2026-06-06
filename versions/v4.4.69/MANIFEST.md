@@ -18,7 +18,7 @@ package: output_from_vm/team_network_v4_unified_runtime_role/ws63-liteos-app_v4_
 ## Evidence
 
 ```text
-resume status: E:\codex_documents\sle\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
-manual-window burn: E:\codex_documents\sle\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
-final status: E:\codex_documents\sle\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
+resume status: <repo-root>\logs\serial\v4.4.68_resume_status_20260605_095007\confirm.log
+manual-window burn: <repo-root>\logs\burn\v4.4.68_com16_manual_window_20260605_095103\COM16_manual_window.log
+final status: <repo-root>\logs\serial\v4.4.69_final_status_20260605_095801\confirm.log
 ```

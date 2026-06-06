@@ -1,4 +1,4 @@
-﻿# Version v4.4.75
+# Version v4.4.75
 
 Date: 2026-06-05
 
@@ -10,7 +10,7 @@ The test had already flashed `v4.4.74` and reached the relay recovery phase, but
 the COM16 leader rebooted during the run. The authoritative failure evidence is:
 
 ```text
-log: E:\codex_documents\sle\logs\live\v4.4.74_four_board_com16_leader_20260605_135942\leader_COM16.log
+log: <repo-root>\logs\live\v4.4.74_four_board_com16_leader_20260605_135942\leader_COM16.log
 failure: APP|Oops:NMI in task TeamNetworkTask
 mepc: 0x2669a0
 ra:   0x266aa6

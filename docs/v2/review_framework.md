@@ -1,8 +1,8 @@
-# Code Review Framework — AI Reviewer Instructions
+# Code Review Framework — Automated Review Instructions
 
-> ⚠️ 本文档是给 AI 审查者（DeepSeek Flash）执行用的操作手册，不是给开发者看的。
+> ⚠️ 本文档是给 自动化审查服务执行用的操作手册，不是给开发者看的。
 >
-> **AI 每次执行代码审查前**，先读本文档，严格按各 Stage 执行。
+> **每次执行代码审查前**，先读本文档，严格按各 Stage 执行。
 > **审查完成后**，将结果写入`meta/review_feedback.md`，开发者只看那个文件。
 
 ---
@@ -14,7 +14,7 @@
 ```markdown
 # Code Review Feedback
 
-**Reviewer:** DeepSeek Flash (deepseek-v4-flash)
+**Reviewer:** Review Service (configured-provider)
 **Date:** YYYY-MM-DD
 **Version:** vX.Y.Z（从 versions/README.md 读取最新版本号）
 **Branch:** <branch-name>
@@ -152,7 +152,7 @@
 ```markdown
 # Code Review Feedback
 
-**Reviewer:** DeepSeek Flash (deepseek-v4-flash)
+**Reviewer:** Review Service (configured-provider)
 **Date:** YYYY-MM-DD
 **Version:** vX.Y.Z
 **Branch:** <branch-name>
