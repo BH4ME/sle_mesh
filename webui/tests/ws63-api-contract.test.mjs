@@ -87,9 +87,9 @@ test("firmware exposes unified config over HTTP and serial", () => {
   assert.match(firmwareSource, /team_cfg_status_write_json/);
 });
 
-test("v4.4.57 makes ST7789 member events readable and panel-styled", () => {
-  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.57"/);
-  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v4\.4\.57 board map"/);
+test("current firmware makes ST7789 member events readable and panel-styled", () => {
+  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.95"/);
+  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v4\.4\.95 pairing allowlist preserve"/);
   assert.match(displaySource, /SLE\/\/BOOT/);
   assert.match(displaySource, /LINK-MESH/);
   assert.match(displaySource, /g_st7789_lv_panel_status/);
@@ -115,28 +115,68 @@ test("v4.4.57 makes ST7789 member events readable and panel-styled", () => {
   assert.match(firmwareSource, /team_display_event_name/);
   assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
   assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
-  assert.match(rootReadmeSource, /当前仓库记录版本：`v4\.4\.57`/);
-  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.57`/);
+  assert.match(rootReadmeSource, /Current repo record: `v4\.4\.95`/);
+  assert.match(rootReadmeSource, /Current firmware version: `v4\.4\.95`/);
   assert.match(rootReadmeSource, /meta\/PROJECT_OPERATION_SOP\.md/);
-  assert.match(rootReadmeSource, /versions\/v4\.4\.57\/VERSION\.md/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.57\]\(\.\/v4\.4\.57\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.56\]\(\.\/v4\.4\.56\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.55\]\(\.\/v4\.4\.55\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.54\]\(\.\/v4\.4\.54\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.53\]\(\.\/v4\.4\.53\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.52\]\(\.\/v4\.4\.52\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.51\]\(\.\/v4\.4\.51\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.50\]\(\.\/v4\.4\.50\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.49\]\(\.\/v4\.4\.49\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.48\]\(\.\/v4\.4\.48\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.47\]\(\.\/v4\.4\.47\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.46\]\(\.\/v4\.4\.46\/VERSION\.md\)/);
+  assert.match(rootReadmeSource, /versions\/v4\.4\.95\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.95\]\(\.\/v4\.4\.95\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.94\]\(\.\/v4\.4\.94\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.93\]\(\.\/v4\.4\.93\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.92\]\(\.\/v4\.4\.92\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.91\]\(\.\/v4\.4\.91\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.90\]\(\.\/v4\.4\.90\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.89\]\(\.\/v4\.4\.89\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.88\]\(\.\/v4\.4\.88\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.76\]\(\.\/v4\.4\.76\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.75\]\(\.\/v4\.4\.75\/VERSION\.md\)/);
   assert.match(projectSopSource, /每次代码行为变化都必须升版本/);
   assert.match(projectSopSource, /远程 Ubuntu 编译/);
   assert.match(projectSopSource, /自动烧录/);
 });
 
-test("v4.4.57 keeps disconnect-to-display identity and makes LOST idempotent", () => {
+test("v4.4.61 keeps runtime direct-cap relay route planning synchronized", () => {
+  assert.match(firmwareSource, /cfg direct %u/);
+  assert.match(firmwareSource, /runtimeDirectCap/);
+  assert.match(firmwareSource, /runtimeRelayBudget/);
+  assert.match(firmwareSource, /static uint8_t team_leader_direct_capacity\(void\)/);
+  assert.match(firmwareSource, /static uint8_t team_leader_relay_budget\(void\)/);
+  assert.match(firmwareSource, /SLE_TEAM_RELAY_MGMT_RAM_BUDGET_BYTES/);
+  assert.match(
+    firmwareSource,
+    /team_leader_relay_target_for_member_count[\s\S]+direct_capacity = team_leader_direct_capacity\(\)/,
+  );
+  assert.match(firmwareSource, /known_count = team_leader_known_member_count\(\)/);
+  assert.match(firmwareSource, /demand_count = known_count > online_count \? known_count : online_count/);
+  assert.match(firmwareSource, /relay rebalance demand online=%u known=%u pending=%u demand=%u direct_cap=%u relay=%u target=%u budget=%u/);
+  assert.match(firmwareSource, /SLE_TEAM_RELAY_SWAP_RSSI_HYST_DBM 8/);
+  assert.match(firmwareSource, /SLE_TEAM_RELAY_SWAP_STABLE_S 30U/);
+  assert.match(firmwareSource, /relay_swap_candidate_id/);
+  assert.match(firmwareSource, /relay_swap_victim_id/);
+  assert.match(firmwareSource, /relay_swap_since_s/);
+  assert.match(firmwareSource, /static uint8_t team_leader_relay_swap_tick/);
+  assert.match(firmwareSource, /static uint8_t team_leader_desired_parent_for_member/);
+  assert.match(firmwareSource, /static uint8_t team_leader_route_parent_matches/);
+  assert.match(firmwareSource, /plan=%u/);
+  assert.match(firmwareSource, /static uint8_t team_member_find_upstream_parent_conn/);
+  assert.match(firmwareSource, /team_member_find_upstream_parent_conn\(&target_conn_id\)/);
+  assert.match(firmwareSource, /sle_uart_client_bind_member_conn\(physical_peer_id,\s*conn_id\)/);
+  assert.match(clientSource, /runtimeDirectCap: numberField\("runtimeDirectCap"\)/);
+  assert.match(clientSource, /runtimeRelayBudget: numberField\("runtimeRelayBudget"\)/);
+  assert.match(webApiSource, /relayTarget\\":%u[\s\S]+relayOnline\\":%u[\s\S]+relayBudget\\":%u/);
+  assert.match(clientSource, /maxDownstream: config\.runtimeDirectCap/);
+});
+
+test("v4.4.61 treats WS63 SLE conn_id zero as a valid route connection", () => {
+  const routeConnBlock =
+    firmwareSource.match(/static uint8_t team_route_conn_is_active[\s\S]+?\n}\n/)?.[0] ?? "";
+
+  assert.match(routeConnBlock, /WS63 SLE reports conn_id 0 as a valid ACL connection/);
+  assert.doesNotMatch(routeConnBlock, /conn_id\s*==\s*0U/);
+  assert.match(routeConnBlock, /return sle_uart_client_has_conn\(conn_id\)/);
+  assert.match(routeConnBlock, /return sle_uart_server_has_conn\(conn_id\)/);
+});
+
+test("v4.4.58 keeps disconnect-to-display identity and makes LOST idempotent", () => {
   assert.match(firmwareSource, /static uint8_t team_route_member_by_conn\(uint16_t conn_id/);
   assert.match(firmwareSource, /uint8_t tracked_member_id = 0U;/);
   assert.match(firmwareSource, /uint8_t routed_member_id = 0U;/);
@@ -416,6 +456,19 @@ test("webui WebSerial uses one background reader so cfg-json lines are not dropp
   assert.doesNotMatch(clientSource, /ReadableStreamReadResult/);
 });
 
+test("webui WebSerial parses current member rows with operator labels and relay fields", () => {
+  const memberParser = clientSource.match(/function cliMemberToNode[\s\S]+?\n}\n/)?.[0] ?? "";
+
+  assert.match(memberParser, /member=\(\\d\+\).*?\\brole=/);
+  assert.match(memberParser, /label=\(M\[0-9A-Fa-f\]\{4\}\)/);
+  assert.match(memberParser, /mac=\(\[0-9A-Fa-f\]\{4\}\)\\s\+ready=\(\\d\+\)/);
+  assert.match(memberParser, /relay=\(\\d\+\)/);
+  assert.match(memberParser, /tier=\(\\d\+\)/);
+  assert.match(memberParser, /max_down=\(\\d\+\)/);
+  assert.match(memberParser, /relayAllowed: relayMatch \? Number\(relayMatch\[1\]\) !== 0 : undefined/);
+  assert.match(memberParser, /macSuffix: macReady \? macMatch\?\.\[1\]\.toUpperCase\(\) : labelSuffix/);
+});
+
 test("webui config actions surface firmware and serial ret failures", () => {
   assert.match(mainSource, /function assertConfigResultOk\(result: DeviceConfigResult\): void/);
   assert.match(mainSource, /if \(!result\.ok\)/);
@@ -589,6 +642,35 @@ test("relay rebalance offline revoke is explicit no-notify path and active paths
   );
 });
 
+test("relay swap requires 8 dB hysteresis for 30 seconds before exchanging roles", () => {
+  assert.match(firmwareSource, /#define SLE_TEAM_RELAY_SWAP_RSSI_HYST_DBM 8/);
+  assert.match(firmwareSource, /#define SLE_TEAM_RELAY_SWAP_STABLE_S 30U/);
+  assert.match(
+    firmwareSource,
+    /rssi_delta = \(int16_t\)candidate->last_rssi_dbm - \(int16_t\)victim->last_rssi_dbm/,
+  );
+  assert.match(
+    firmwareSource,
+    /rssi_delta < \(int16_t\)SLE_TEAM_RELAY_SWAP_RSSI_HYST_DBM/,
+  );
+  assert.match(
+    firmwareSource,
+    /stable_s < SLE_TEAM_RELAY_SWAP_STABLE_S/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(candidate,\s*1U,\s*"swap-promote",\s*1U\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /team_leader_set_member_relay_allowed\(victim,\s*0U,\s*"swap-demote",\s*1U\)/,
+  );
+  assert.match(
+    firmwareSource,
+    /pending_count == 0U && known_count == online_count[\s\S]+team_leader_relay_swap_tick\(now_s,\s*timeout_s,\s*1U\)/,
+  );
+});
+
 test("firmware i32 query parser avoids 32-bit signed overflow at bounds", () => {
   const i32Parser = firmwareSource.match(/static int team_http_query_i32[\s\S]+?\n}\n/)?.[0] ?? "";
   assert.match(i32Parser, /int64_t signed_value;/);
@@ -615,6 +697,19 @@ test("pair approve rolls back newly-added allowlist entry when member slot alloc
   const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
   assert.match(nodeSource, /had_allowed_before = 0U/);
   assert.match(nodeSource, /if \(had_allowed_before == 0U\) \{\s*\(void\)sle_team_node_remove_allowed_member\(node,\s*member_id\);/s);
+});
+
+test("pairing stop preserves members already online before the pairing window", () => {
+  const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
+  const pairingStop = nodeSource.match(/int sle_team_node_pairing_stop[\s\S]+?\n}\n/)?.[0] ?? "";
+
+  assert.match(pairingStop, /Preserve members that were already connected before the pairing window/);
+  assert.match(pairingStop, /known_ids\[known_count\+\+\] = node->members\[i\]\.member_id;/);
+  assert.match(pairingStop, /sle_team_node_add_allowed_member\(node,\s*known_ids\[i\]\)/);
+  assert.ok(
+    pairingStop.indexOf("sle_team_node_add_allowed_member(node, known_ids[i])") <
+      pairingStop.indexOf("sle_team_node_pairing_approve_with_relay(node, pending_ids[i], 0U)"),
+  );
 });
 
 test("firmware numeric query parsing requires a clean terminator", () => {
@@ -647,13 +742,16 @@ test("route update relay enable sync uses explicit relay-grant flag", () => {
   assert.match(nodeSource, /if \(node->cfg\.role == SLE_TEAM_ROLE_LEADER && parent_state != 0U\) \{\s*route_update\.reserved \|= SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT;/s);
 });
 
-test("relay discovery-only nodes ignore non-discovery local broadcasts", () => {
+test("relay discovery-only forwards join control packets and blocks business broadcasts", () => {
   const nodeSource = fs.readFileSync(path.join(repoRoot, "src/sle_team_node.c"), "utf8");
 
-  assert.match(
-    nodeSource,
-    /relay_discovery_only != 0U[\s\S]*app_packet\.dst_id == SLE_TEAM_BROADCAST_ID[\s\S]*app_packet\.app_msg_type != SLE_TEAM_APP_HELLO[\s\S]*app_packet\.app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE/,
-  );
+  assert.match(nodeSource, /sle_team_discovery_only_allows\(uint8_t app_msg_type\)/);
+  assert.match(nodeSource, /app_msg_type == SLE_TEAM_APP_HELLO/);
+  assert.match(nodeSource, /app_msg_type == SLE_TEAM_APP_ROUTE_UPDATE/);
+  assert.match(nodeSource, /app_msg_type == SLE_TEAM_APP_CONFIG/);
+  assert.match(nodeSource, /app_msg_type == SLE_TEAM_APP_ACK/);
+  assert.match(nodeSource, /relay_discovery_only != 0U[\s\S]*sle_team_discovery_only_allows\(app->app_msg_type\) == 0U/);
+  assert.match(nodeSource, /relay_discovery_only != 0U[\s\S]*app_packet\.dst_id == SLE_TEAM_BROADCAST_ID[\s\S]*sle_team_discovery_only_allows\(app_packet\.app_msg_type\) == 0U/);
 });
 
 test("relay tier bucket count is a named constant", () => {

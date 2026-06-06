@@ -66,6 +66,7 @@ export interface RouteMetrics {
   converged: boolean;
   relayTarget: number;
   relayOnline: number;
+  relayBudget: number;
   epoch: number;
   lastChangeS: number;
   lastConvergedS: number;
@@ -189,6 +190,8 @@ export interface DeviceConfigStatus {
   runtimeChannel: number;
   runtimeLeader: number;
   runtimeSelf: number;
+  runtimeDirectCap: number;
+  runtimeRelayBudget: number;
   roleRequestPending: boolean;
   roleRequestRole: ConfigRole;
   roleRequestTeam: number;

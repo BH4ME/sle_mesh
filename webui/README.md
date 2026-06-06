@@ -145,6 +145,7 @@ WiFi 入口不限定 leader。两种方式都可以落地：
     "converged": true,
     "relayTarget": 4,
     "relayOnline": 1,
+    "relayBudget": 4,
     "epoch": 9,
     "lastChangeS": 120,
     "lastConvergedS": 123,

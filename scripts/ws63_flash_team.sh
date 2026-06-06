@@ -13,7 +13,7 @@ RESET_COMMAND_RETRIES="${RESET_COMMAND_RETRIES:-2}"
 RESET_COMMAND_RETRY_GAP="${RESET_COMMAND_RETRY_GAP:-0.2}"
 AUTO_RESET_MODE="${AUTO_RESET_MODE:-software-only}"
 RESET_CONTROL_SEQUENCE="${RESET_CONTROL_SEQUENCE:-rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05}"
-EXPECTED_FW_VERSION="${EXPECTED_FW_VERSION:-v4.4.57}"
+EXPECTED_FW_VERSION="${EXPECTED_FW_VERSION:-v4.4.95}"
 NO_CONFIRM="${WS63_FLASH_NO_CONFIRM:-0}"
 
 usage() {
@@ -39,7 +39,7 @@ Environment:
   RESET_COMMAND_RETRIES=2
   RESET_COMMAND_RETRY_GAP=0.2
   RESET_CONTROL_SEQUENCE='rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05'
-  EXPECTED_FW_VERSION=v4.4.57
+  EXPECTED_FW_VERSION=v4.4.95
 
 The script prints role, port, and firmware path, then asks for an exact
 confirmation before it runs the burn tool.

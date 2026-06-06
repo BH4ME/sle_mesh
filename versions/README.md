@@ -1,9 +1,45 @@
 # Versions
 
-这个目录用于保存协议和代码版本记录。详细阶段说明统一在 `docs/v0`、`docs/v1`、`docs/v2`、`docs/v3`、`docs/v4`。
 
-当前版本：
+- [v4.4.95](./v4.4.95/VERSION.md)
+- [v4.4.94](./v4.4.94/VERSION.md)
+- [v4.4.93](./v4.4.93/VERSION.md)
+- [v4.4.92](./v4.4.92/VERSION.md)
+- [v4.4.91](./v4.4.91/VERSION.md)
+- [v4.4.90](./v4.4.90/VERSION.md)
+- [v4.4.89](./v4.4.89/VERSION.md)
+- [v4.4.88](./v4.4.88/VERSION.md)
+- [v4.4.87](./v4.4.87/VERSION.md)
+- [v4.4.86](./v4.4.86/VERSION.md)
+- [v4.4.85](./v4.4.85/VERSION.md)
+- [v4.4.84](./v4.4.84/VERSION.md)
+- [v4.4.83](./v4.4.83/VERSION.md)
+- [v4.4.82](./v4.4.82/VERSION.md)
+- [v4.4.81](./v4.4.81/VERSION.md)
+- [v4.4.80](./v4.4.80/VERSION.md)
+- [v4.4.79](./v4.4.79/VERSION.md)
+- [v4.4.78](./v4.4.78/VERSION.md)
+- [v4.4.77](./v4.4.77/VERSION.md)
+- [v4.4.76](./v4.4.76/VERSION.md)
+- [v4.4.75](./v4.4.75/VERSION.md)
+- [v4.4.71](./v4.4.71/VERSION.md)
+- [v4.4.70](./v4.4.70/VERSION.md)
+- [v4.4.69](./v4.4.69/VERSION.md)
+- [v4.4.68](./v4.4.68/VERSION.md)
+- [v4.4.67](./v4.4.67/VERSION.md)
+- [v4.4.66](./v4.4.66/VERSION.md)
 
+这个目录用于保存协议和代码版本记录。详细阶段说明统一�?`docs/v0`、`docs/v1`、`docs/v2`、`docs/v3`、`docs/v4`�?
+
+当前版本�?
+- [v4.4.65](./v4.4.65/VERSION.md)
+- [v4.4.64](./v4.4.64/VERSION.md)
+- [v4.4.63](./v4.4.63/VERSION.md)
+- [v4.4.62](./v4.4.62/VERSION.md)
+- [v4.4.61](./v4.4.61/VERSION.md)
+- [v4.4.60](./v4.4.60/VERSION.md)
+- [v4.4.59](./v4.4.59/VERSION.md)
+- [v4.4.58](./v4.4.58/VERSION.md)
 - [v4.4.57](./v4.4.57/VERSION.md)
 - [v4.4.56](./v4.4.56/VERSION.md)
 - [v4.4.55](./v4.4.55/VERSION.md)
@@ -91,19 +127,19 @@
 
 ## 规则
 
-- 每次代码行为变化必须升版本，默认补丁号加一，例如 `v4.4` -> `v4.4.1`。
-- 每次开工前必须先读 [../meta/PROJECT_OPERATION_SOP.md](../meta/PROJECT_OPERATION_SOP.md)，流程变化时同步更新 SOP。
-- `VERSION.md`：版本说明
-- `MANIFEST.md`：版本内容清单
-- `VERSION.md` 只写这个版本解决了什么。
-- `MANIFEST.md` 只写这个版本涉及哪些文件和怎么验证。
-- 不再在每个版本目录复制大量源码快照，避免版本目录膨胀。
+- 每次代码行为变化必须升版本，默认补丁号加一，例�?`v4.4` -> `v4.4.1`�?
+- 每次开工前必须先读 [../meta/PROJECT_OPERATION_SOP.md](../meta/PROJECT_OPERATION_SOP.md)，流程变化时同步更新 SOP�?
+- `VERSION.md`：版本说�?
+- `MANIFEST.md`：版本内容清�?
+- `VERSION.md` 只写这个版本解决了什么�?
+- `MANIFEST.md` 只写这个版本涉及哪些文件和怎么验证�?
+- 不再在每个版本目录复制大量源码快照，避免版本目录膨胀�?
 
-### V3 起版本管理约束
+### V3 起版本管理约�?
 
-- 命名规则：`v3.0.0-alphaN`（功能开发阶段），后续按 `beta/rc/stable` 演进。
-- 每完成一批功能都要提交一次并更新对应版本目录。
-- 每次提交前至少执行本次变更影响范围内的自动化验证：
-  - WebUI 变更：`npm --prefix webui test` 与 `npm --prefix webui run build`
-  - 协议/状态机变更：补充并执行对应 C 侧验证用例
-- `versions/README.md` 顶部“当前版本”必须指向最新版本。
+- 命名规则：`v3.0.0-alphaN`（功能开发阶段），后续按 `beta/rc/stable` 演进�?
+- 每完成一批功能都要提交一次并更新对应版本目录�?
+- 每次提交前至少执行本次变更影响范围内的自动化验证�?
+  - WebUI 变更：`npm --prefix webui test` �?`npm --prefix webui run build`
+  - 协议/状态机变更：补充并执行对应 C 侧验证用�?
+- `versions/README.md` 顶部“当前版本”必须指向最新版本�?

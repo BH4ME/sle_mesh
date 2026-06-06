@@ -1,5 +1,125 @@
 # Project Operation SOP
 
+## v4.4.94 Relay Swap Hysteresis Entry Point
+
+Current code work is tracked in:
+
+```text
+versions\v4.4.94\VERSION.md
+```
+
+This version keeps the dynamic relay budget and adds stable relay optimization: a non-relay node can replace the worst active relay only when its RSSI is at least 8 dB stronger for 30 seconds while the topology is otherwise stable.
+
+For v4.4.94 in this session, remote compile was later run after the user explicitly re-enabled compile work. Hardware flash/burn is still skipped unless the user explicitly asks for it.
+
+## v4.4.93 Dynamic Relay Historical Entry Point
+
+The previous dynamic relay sizing work is tracked in:
+
+```text
+versions\v4.4.93\VERSION.md
+```
+
+This version changes relay sizing policy. Treat `cfg direct 1` as a small-board relay-forcing test setup, not as the normal 30-member deployment profile. Normal scaling analysis should start from the default leader direct capacity and the dynamic `runtimeRelayBudget`/`relayBudget` status fields.
+
+For v4.4.93 in its session, firmware build and hardware burn were intentionally skipped because only four boards were available.
+
+## v4.4.92 Four-Board Historical Entry Point
+
+For the completed v4.4.92 four-board validation objective, do not rediscover commands.
+Use the version runbook first:
+
+```text
+versions\v4.4.92\FLASH_AND_FOUR_BOARD_TEST.md
+```
+
+That runbook records:
+
+- Firmware package path and expected `v4.4.92` package guard.
+- Parallel flash command for `COM16,COM13,COM17,COM18`.
+- COM16 leader, COM13 relay candidate, COM17/COM18 member role assignment.
+- Leader `cfg direct 1` setup for one direct member and two relayed members.
+- Required member reboot, relay reboot, child relay self-election, and recovery-policy checks.
+- Required live logs under `logs\live\v4.4.92_four_board_com16_leader_<timestamp>`.
+
+Current policy: do not flash blindly. Flash only when explicitly continuing the
+hardware validation run, and always keep the burn/test logs as proof.
+
+## Current Flash Flow Template
+
+For WS63 v4 work, use `scripts/ws63_flash_multi.ps1` instead of rebuilding burn commands by hand.
+
+This section records the standard flash command shape only. It does not mean v4.4.94 has been flashed; v4.4.94 burn was intentionally not run in the relay swap hysteresis session.
+
+Sequential flash:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
+  -Ports COM16 `
+  -ExpectedVersion v4.4.94 `
+  -WaitTimeout 45 `
+  -ManualRetryTimeout 0
+```
+
+Parallel flash:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ws63_flash_multi.ps1 `
+  -Ports COM16,COM13,COM17,COM18 `
+  -ExpectedVersion v4.4.94 `
+  -Parallel `
+  -ParallelStartDelayMs 1200 `
+  -WaitTimeout 45 `
+  -ManualRetryTimeout 0
+```
+
+The verified burn flow is:
+
+```text
+software-reset-only + single reboot command + post-package handshake
+```
+
+Success must be proven by burn output and version guard:
+
+```text
+Establishing ymodem session...
+Done. Reseting device...
+expected: v4.4.94
+```
+
+Do not ask for manual reset during normal v4.4.94 flashing. The current boards can enter the loader through the serial `reboot` command. Use `ManualRetryTimeout=0` so failures are real evidence instead of hidden manual intervention.
+
+Do not treat a port as flashed only because the package transfer command was attempted. If there is no boot handshake or the expected version is missing from the package, record the port as blocked and continue debugging from logs.
+
+For multi-board flashing, prefer `-ParallelStartDelayMs 1200` or higher. This keeps the flash jobs parallel but staggers reset/handshake startup so multiple CH340 boards do not all enter the boot handshake at exactly the same moment.
+
+Four-board validation after flashing:
+
+```powershell
+$ts = Get-Date -Format 'yyyyMMdd_HHmmss'
+$logDir = "E:\codex_documents\sle\logs\live\v4.4.92_four_board_com16_leader_$ts"
+python .\automation\ws63\tools\ws63_four_board_relay_test.py `
+  --leader-port COM16 `
+  --relay-port COM13 `
+  --child1-port COM17 `
+  --child2-port COM18 `
+  --expected-fw v4.4.92 `
+  --team-id 1 `
+  --channel 17 `
+  --direct-cap 1 `
+  --initial-drain-s 2 `
+  --cmd-timeout-s 25 `
+  --state-timeout-s 90 `
+  --route-timeout-s 120 `
+  --offline-timeout-s 20 `
+  --boot-timeout-s 75 `
+  --failover-timeout-s 120 `
+  --poll-interval-s 1 `
+  --log-dir $logDir
+```
+
+The four-board tool defaults to clean-start: it sends `cfg clear`, reboots each board, verifies `runtimeConfigured=false`, then configures COM16 as leader and COM13/COM17/COM18 as members. Use `--no-clean-start` only for a deliberate diagnostic replay.
+
 这份文档是 `sle_mesh` 工程的强制作业入口。以后每次改代码、改脚本、改 WebUI、改固件参数、远程编译或烧录前，都先读这里；如果流程变化，必须同步更新这里和本次版本记录。
 
 ## 1. 每次开工前

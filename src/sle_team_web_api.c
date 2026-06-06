@@ -221,7 +221,7 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
         json_append(&writer,
             ",\"routeMetrics\":{\"active\":%u,\"direct\":%u,\"relayed\":%u,"
             "\"unreachable\":%u,\"stale\":%u,\"converged\":%s,"
-            "\"relayTarget\":%u,\"relayOnline\":%u,"
+            "\"relayTarget\":%u,\"relayOnline\":%u,\"relayBudget\":%u,"
             "\"epoch\":%lu,\"lastChangeS\":%lu,\"lastConvergedS\":%lu,"
             "\"routeHintSentTotal\":%lu,\"routeHintFailedTotal\":%lu,"
             "\"routeHintCooldownSkippedTotal\":%lu,"
@@ -234,6 +234,7 @@ int sle_team_web_write_status_json(const sle_team_node_t *node, uint32_t uptime_
             route_metrics->converged != 0U ? "true" : "false",
             route_metrics->relay_target_count,
             route_metrics->relay_online_count,
+            route_metrics->relay_budget_count,
             (unsigned long)route_metrics->epoch,
             (unsigned long)route_metrics->last_change_s,
             (unsigned long)route_metrics->last_converged_s,

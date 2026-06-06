@@ -81,6 +81,7 @@
 #define ST7789_FONT6X8_HEIGHT 8U
 #define ST7789_TEXT_ADVANCE_X 7U
 #define ST7789_LVGL_TICK_FALLBACK_MS 5U
+#define ST7789_LVGL_HANDLER_MIN_INTERVAL_MS 30U
 
 static ws63_st7789_config_t g_st7789_cfg;
 static uint8_t g_st7789_ready;
@@ -1153,6 +1154,9 @@ void ws63_st7789_tick(void)
     }
 #if SLE_TEAM_USE_LVGL_BACKEND
     if (g_st7789_lv_ready != 0U) {
+        if (delta_ms < ST7789_LVGL_HANDLER_MIN_INTERVAL_MS) {
+            return;
+        }
         lv_tick_inc(delta_ms);
         (void)lv_timer_handler();
         g_st7789_last_tick_ms = now_ms;

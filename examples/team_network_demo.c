@@ -365,7 +365,7 @@ int main(void)
 
     leader.cfg.default_ttl = 2U;
     leader_rt.last_tx_len = 0U;
-    assert(sle_team_node_send_route_update(&leader, 2U, 3U, 2U, 3U) == SLE_TEAM_OK);
+    assert(sle_team_node_send_route_update(&leader, 2U, 3U, (uint8_t)SLE_TEAM_PARENT_CONNECTED, 3U) == SLE_TEAM_OK);
     {
         sle_team_app_packet_t route_app;
         sle_team_route_update_body_t route_body;
@@ -380,6 +380,47 @@ int main(void)
     assert(member.upstream_parent_id == 3U);
     assert(member.upstream_parent_reselect_pending == 0U);
     assert(member.cfg.relay_allowed == 0U);
+
+    member.joined = 1U;
+    member.state = SLE_TEAM_NET_ONLINE;
+    member.last_hello_s = 50U;
+    member.last_heartbeat_s = 50U;
+    member.last_config_s = 50U;
+    assert(sle_team_node_send_route_update(&leader, 2U, 3U, (uint8_t)SLE_TEAM_PARENT_RESELECTING, 3U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+    assert(member.upstream_parent_id == 3U);
+    assert(member.upstream_parent_reselect_pending != 0U);
+    assert(member.joined == 0U);
+    assert(member.state == SLE_TEAM_NET_DISCOVERING);
+    assert(member.last_hello_s == 0U);
+    assert(member.last_heartbeat_s == 0U);
+    assert(member.last_config_s == 0U);
+    leader.cfg.report_interval_s = 13U;
+    assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.cfg.report_interval_s == 13U);
+    assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+    assert(member.upstream_parent_id == 3U);
+    assert(member.upstream_parent_reselect_pending != 0U);
+    assert(member.joined == 0U);
+    assert(sle_team_node_send_ack(&leader, 2U, 0U, SLE_TEAM_APP_HELLO, 0U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &member);
+    assert(member.upstream_parent_state == SLE_TEAM_PARENT_RESELECTING);
+    assert(member.upstream_parent_id == 3U);
+    assert(member.upstream_parent_reselect_pending != 0U);
+    assert(member.joined == 0U);
+    member_rt.now_s += 3U;
+    member_rt.last_tx_len = 0U;
+    sle_team_node_tick(&member);
+    assert(member_rt.last_tx_len != 0U);
+    member.joined = 1U;
+    member.state = SLE_TEAM_NET_ONLINE;
+    member.upstream_parent_state = SLE_TEAM_PARENT_CONNECTED;
+    member.upstream_parent_reselect_pending = 0U;
+    member.last_leader_seen_s = member_rt.now_s;
+    member.last_parent_seen_s = member_rt.now_s;
+    member_rt.last_tx_len = 0U;
 
     /* Approve API default is non-relay; relay grant must be explicit and can be toggled later. */
     assert(sle_team_node_pairing_approve(&leader, 2U) == SLE_TEAM_OK);
@@ -428,6 +469,20 @@ int main(void)
     relay_last_packet(&member_rt, &relay);
     assert(relay_rt.last_tx_len != 0U);
     relay_rt.last_tx_len = 0U;
+    member.cfg.report_interval_s = 1U;
+    leader.cfg.report_interval_s = 13U;
+    assert(sle_team_node_send_config(&leader, 2U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &relay);
+    assert(relay_rt.last_tx_len != 0U);
+    relay_last_packet(&relay_rt, &member);
+    assert(member.cfg.report_interval_s == 13U);
+    member.joined = 0U;
+    member.state = SLE_TEAM_NET_DISCOVERING;
+    assert(sle_team_node_send_ack(&leader, 2U, 0U, SLE_TEAM_APP_HELLO, 0U) == SLE_TEAM_OK);
+    relay_last_packet(&leader_rt, &relay);
+    assert(relay_rt.last_tx_len != 0U);
+    relay_last_packet(&relay_rt, &member);
+    assert(member.joined != 0U);
     relay.cfg.relay_discovery_only = 0U;
 
     member.last_leader_seen_s = 1U;

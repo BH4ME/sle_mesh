@@ -10,6 +10,7 @@ continue/recover communication with the leader.
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -25,6 +26,142 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
 
 
 MemberRecord = dict[str, int]
+
+
+def _progress(message: str) -> None:
+    print(f"[relay-cycle] {message}", flush=True)
+
+
+def _send_cli_line(peer: lc.Peer, line: str) -> None:
+    peer.ser.write(b"\r\n")
+    peer.ser.flush()
+    time.sleep(0.03)
+    peer.send_line(line)
+
+
+def _clear_peer_rx(peer: lc.Peer) -> None:
+    try:
+        peer.ser.reset_input_buffer()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _drain_to_text(target: lc.Peer, peers: Iterable[lc.Peer], seconds: float) -> str:
+    end = time.time() + seconds
+    text = ""
+    while time.time() < end:
+        for peer in peers:
+            chunk = lc._read_once(peer)
+            if peer is target and chunk:
+                text += chunk
+        time.sleep(0.02)
+    return text
+
+
+def _send_and_collect(
+    target: lc.Peer,
+    peers: Iterable[lc.Peer],
+    line: str,
+    seconds: float,
+    *,
+    clear_before: bool = True,
+) -> str:
+    if clear_before:
+        _clear_peer_rx(target)
+    _send_cli_line(target, line)
+    return _drain_to_text(target, peers, seconds)
+
+
+def _latest_cfg_json(text: str) -> Optional[dict[str, object]]:
+    latest: Optional[dict[str, object]] = None
+    for match in re.finditer(r"\[cfg-json\]\s*(\{[^\r\n]*\})", text):
+        try:
+            latest = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+    return latest
+
+
+def _query_cfg(
+    peer: lc.Peer,
+    peers: Iterable[lc.Peer],
+    window_s: float = 3.0,
+    attempts: int = 3,
+) -> dict[str, object]:
+    last_text = ""
+    for attempt in range(1, max(1, attempts) + 1):
+        _progress(f"query {peer.name} {peer.port}: cfg status attempt {attempt}/{max(1, attempts)}")
+        text = _send_and_collect(peer, peers, "cfg status", window_s)
+        if text:
+            last_text = text
+        status = _latest_cfg_json(text)
+        if status is not None:
+            return status
+        time.sleep(0.3)
+    tail = "".join(peer.log)[-1000:].replace("\r", "\\r").replace("\n", "\\n")
+    raise RuntimeError(f"{peer.name} cfg status did not return cfg-json; last_rx={len(last_text)} tail={tail}")
+
+
+def _assert_fw(peers: Iterable[lc.Peer], all_peers: Iterable[lc.Peer], expected_fw: str) -> dict[str, dict[str, object]]:
+    out: dict[str, dict[str, object]] = {}
+    for peer in peers:
+        status = _query_cfg(peer, all_peers)
+        fw = status.get("fw")
+        if expected_fw and fw != expected_fw:
+            raise RuntimeError(f"{peer.name} firmware mismatch: expected {expected_fw}, got {fw}")
+        out[peer.name] = status
+        _progress(f"{peer.name} {peer.port} fw={fw} suffix={status.get('selfSuffix')} route={status.get('routeId')}")
+    return out
+
+
+def _wait_cfg_field(
+    peer: lc.Peer,
+    peers: Iterable[lc.Peer],
+    *,
+    key: str,
+    expected: object,
+    timeout_s: float,
+    note: str,
+) -> dict[str, object]:
+    end = time.time() + timeout_s
+    last: Optional[dict[str, object]] = None
+    while time.time() < end:
+        try:
+            last = _query_cfg(peer, peers)
+            if last.get(key) == expected:
+                return last
+        except RuntimeError:
+            pass
+        time.sleep(0.5)
+    raise RuntimeError(f"timeout waiting for {note}: {key}={expected}, last={last}")
+
+
+def _send_cfg_and_wait(
+    peer: lc.Peer,
+    peers: Iterable[lc.Peer],
+    *,
+    command: str,
+    pattern: str,
+    timeout_s: float,
+    note: str,
+) -> None:
+    rx = re.compile(pattern)
+    end = time.time() + timeout_s
+    start = len(peer.log)
+    attempt = 0
+    while time.time() < end:
+        attempt += 1
+        _progress(f"{note}: send attempt {attempt}")
+        _send_cli_line(peer, command)
+        attempt_end = min(end, time.time() + 2.5)
+        while time.time() < attempt_end:
+            text = "".join(peer.log[start:])
+            if rx.search(text):
+                return
+            for item in peers:
+                lc._read_once(item)
+            time.sleep(0.02)
+    raise RuntimeError(f"timeout waiting for {note}: pattern={pattern}")
 
 
 def _parse_member_records(text: str) -> dict[int, MemberRecord]:
@@ -183,12 +320,31 @@ def _configure_member(
     channel: int,
     approve_relay: int,
     bootstrap_roles: bool,
+    cfg_runtime_roles: bool,
     cmd_timeout_s: float,
     state_timeout_s: float,
     poll_interval_s: float,
     note: str,
 ) -> None:
-    if bootstrap_roles:
+    if cfg_runtime_roles:
+        _progress(f"configure {note}: cfg member now {leader_suffix:04X} {team_id} {channel}")
+        _send_cfg_and_wait(
+            member,
+            peers,
+            command=f"cfg member now {leader_suffix:04X} {team_id} {channel}",
+            pattern=rf"member-now queued ret=0 leader_suffix={leader_suffix:04X}",
+            timeout_s=cmd_timeout_s,
+            note=f"{note} cfg member now",
+        )
+        _wait_cfg_field(
+            member,
+            peers,
+            key="runtimeRole",
+            expected="member",
+            timeout_s=state_timeout_s,
+            note=f"{note} runtime member",
+        )
+    elif bootstrap_roles:
         member.send_line(f"role member {leader_suffix:04X}")
         lc._wait_regex(member, peers, r"role member leader_suffix=[0-9A-Fa-f]{4} .*ret=0", cmd_timeout_s,
                        f"{note} role member")
@@ -205,14 +361,26 @@ def _configure_member(
         timeout_s=state_timeout_s,
         poll_s=poll_interval_s,
     )
-    leader.send_line(f"pairing approve {member_id} {'relay' if approve_relay else 'norelay'}")
-    lc._wait_regex(
-        leader,
-        peers,
-        rf"pairing approve member={member_id} relay={approve_relay} ret=0",
-        cmd_timeout_s,
-        f"{note} approve",
-    )
+    approve_command = f"pairing approve {member_id} {'relay' if approve_relay else 'norelay'}"
+    approve_pattern = rf"pairing approve member={member_id} relay={approve_relay} ret=0"
+    if cfg_runtime_roles:
+        _send_cfg_and_wait(
+            leader,
+            peers,
+            command=approve_command,
+            pattern=approve_pattern,
+            timeout_s=cmd_timeout_s,
+            note=f"{note} approve",
+        )
+    else:
+        leader.send_line(approve_command)
+        lc._wait_regex(
+            leader,
+            peers,
+            approve_pattern,
+            cmd_timeout_s,
+            f"{note} approve",
+        )
     _wait_member_record(
         leader,
         peers,
@@ -259,29 +427,75 @@ def run(args: argparse.Namespace) -> int:
 
         lc._drain(peers, args.initial_drain_s)
 
-        leader_suffix = lc._detect_suffix(
-            leader,
-            peers,
-            args.leader_suffix,
-            args.bootstrap_timeout_s,
-            "leader wifi status",
-        )
-        leader_id = args.leader_id if args.leader_id > 0 else lc._route_id_from_suffix(leader_suffix)
-        relay_id = _detect_route_id(relay, peers, provided_id=args.relay_id,
-                                    timeout_s=args.bootstrap_timeout_s, note="relay wifi status")
-        child_id = _detect_route_id(child, peers, provided_id=args.child_id,
-                                    timeout_s=args.bootstrap_timeout_s, note="child wifi status")
+        if args.cfg_runtime_roles or args.expected_fw:
+            statuses = _assert_fw(peers, peers, args.expected_fw)
+            leader_suffix_text = args.leader_suffix or str(statuses["leader"]["selfSuffix"])
+            leader_suffix = int(leader_suffix_text, 16)
+            leader_id = args.leader_id if args.leader_id > 0 else int(statuses["leader"]["routeId"])
+            relay_id = args.relay_id if args.relay_id > 0 else int(statuses["relay"]["routeId"])
+            child_id = args.child_id if args.child_id > 0 else int(statuses["child"]["routeId"])
+        else:
+            leader_suffix = lc._detect_suffix(
+                leader,
+                peers,
+                args.leader_suffix,
+                args.bootstrap_timeout_s,
+                "leader wifi status",
+            )
+            leader_id = args.leader_id if args.leader_id > 0 else lc._route_id_from_suffix(leader_suffix)
+            relay_id = _detect_route_id(relay, peers, provided_id=args.relay_id,
+                                        timeout_s=args.bootstrap_timeout_s, note="relay wifi status")
+            child_id = _detect_route_id(child, peers, provided_id=args.child_id,
+                                        timeout_s=args.bootstrap_timeout_s, note="child wifi status")
         if len({leader_id, relay_id, child_id}) != 3:
             raise RuntimeError(f"route ids must be unique: leader={leader_id} relay={relay_id} child={child_id}")
 
-        if args.bootstrap_roles:
+        if args.cfg_runtime_roles:
+            _progress(f"configure leader: cfg leader now {args.team_id} {args.channel}")
+            _send_cfg_and_wait(
+                leader,
+                peers,
+                command=f"cfg leader now {args.team_id} {args.channel}",
+                pattern=rf"leader-now queued ret=0 team={args.team_id} channel={args.channel}",
+                timeout_s=args.cmd_timeout_s,
+                note="leader cfg now",
+            )
+            _wait_cfg_field(
+                leader,
+                peers,
+                key="runtimeRole",
+                expected="leader",
+                timeout_s=args.state_timeout_s,
+                note="leader runtime",
+            )
+            _progress(f"configure leader direct cap: cfg direct {args.direct_cap}")
+            _send_cfg_and_wait(
+                leader,
+                peers,
+                command=f"cfg direct {args.direct_cap}",
+                pattern=rf"\[cfg\] direct cap={args.direct_cap}\b.*ret=0",
+                timeout_s=args.cmd_timeout_s,
+                note="leader direct cap",
+            )
+        elif args.bootstrap_roles:
             leader.send_line("role leader")
             lc._wait_regex(leader, peers, r"role leader ret=0", args.bootstrap_timeout_s, "set leader role")
             lc._wait_role(leader, peers, expected_role=1, timeout_s=args.bootstrap_timeout_s,
                           poll_s=args.poll_interval_s)
 
-        leader.send_line("pairing start")
-        lc._wait_regex(leader, peers, r"pairing start ret=0", args.cmd_timeout_s, "pairing start")
+        pairing_start_pattern = r"(pairing started|pairing start ret=0|leader force rescan reason=pairing_window)"
+        if args.cfg_runtime_roles:
+            _send_cfg_and_wait(
+                leader,
+                peers,
+                command="pairing start",
+                pattern=pairing_start_pattern,
+                timeout_s=args.cmd_timeout_s,
+                note="pairing start",
+            )
+        else:
+            leader.send_line("pairing start")
+            lc._wait_regex(leader, peers, pairing_start_pattern, args.cmd_timeout_s, "pairing start")
 
         _configure_member(
             leader,
@@ -294,6 +508,7 @@ def run(args: argparse.Namespace) -> int:
             channel=args.channel,
             approve_relay=1,
             bootstrap_roles=args.bootstrap_roles,
+            cfg_runtime_roles=args.cfg_runtime_roles,
             cmd_timeout_s=args.cmd_timeout_s,
             state_timeout_s=args.state_timeout_s,
             poll_interval_s=args.poll_interval_s,
@@ -312,6 +527,7 @@ def run(args: argparse.Namespace) -> int:
             channel=args.channel,
             approve_relay=0,
             bootstrap_roles=args.bootstrap_roles,
+            cfg_runtime_roles=args.cfg_runtime_roles,
             cmd_timeout_s=args.cmd_timeout_s,
             state_timeout_s=args.state_timeout_s,
             poll_interval_s=args.poll_interval_s,
@@ -328,8 +544,19 @@ def run(args: argparse.Namespace) -> int:
                 log_start=child_parent_log_start,
             )
 
-        leader.send_line("pairing stop")
-        lc._wait_regex(leader, peers, r"pairing stop ret=0", args.cmd_timeout_s, "pairing stop")
+        pairing_stop_pattern = r"(pairing stopped|pairing stop ret=0)"
+        if args.cfg_runtime_roles:
+            _send_cfg_and_wait(
+                leader,
+                peers,
+                command="pairing stop",
+                pattern=pairing_stop_pattern,
+                timeout_s=args.cmd_timeout_s,
+                note="pairing stop",
+            )
+        else:
+            leader.send_line("pairing stop")
+            lc._wait_regex(leader, peers, pairing_stop_pattern, args.cmd_timeout_s, "pairing stop")
 
         leader_offline_log_start = len(leader.log)
         child_failover_log_start = len(child.log)
@@ -416,6 +643,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--relay-port", required=True, help="relay member serial port")
     parser.add_argument("--child-port", required=True, help="child member serial port")
     parser.add_argument("--baudrate", type=int, default=115200)
+    parser.add_argument("--expected-fw", default="")
+    parser.add_argument("--cfg-runtime-roles", action="store_true", help="use cfg leader/member now runtime config")
     parser.add_argument("--bootstrap-roles", action="store_true", help="configure leader/member roles before test")
     parser.add_argument("--leader-suffix", default="", help="optional leader MAC suffix hex")
     parser.add_argument("--team-id", type=int, default=1)
@@ -423,6 +652,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--relay-id", type=int, default=-1)
     parser.add_argument("--child-id", type=int, default=-1)
     parser.add_argument("--channel", type=int, default=17)
+    parser.add_argument("--direct-cap", type=int, default=1)
     parser.add_argument("--relay-reboot-command", default="reboot")
     parser.add_argument("--initial-drain-s", type=float, default=1.0)
     parser.add_argument("--bootstrap-timeout-s", type=float, default=20.0)

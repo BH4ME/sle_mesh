@@ -48,7 +48,7 @@ LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.57 unified runtime role (display event audit panel)"
+echo "profile:    v4.4.95 unified runtime role (relay swap hysteresis)"
 echo "sdk:        $WSL_SDK"
 echo "local out:  $LOCAL_OUT"
 echo
@@ -155,7 +155,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.57 local WSL pinmap and team-network sample")
+print("configured v4.4.95 local WSL pinmap and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -196,17 +196,29 @@ for item in [
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.57",
+    b"v4.4.95",
+    b"seek stop timeout, fallback connect pending",
+    b"connect request addr:",
+    b"cfg direct",
+    b"runtimeDirectCap",
+    b"runtimeRelayBudget",
+    b"plan=%u",
     b"[display] st7789 ready",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
+    b"TeamDisplayTask",
+    b"relay rebalance demand",
+    b"relay swap observe",
+    b"swap-promote",
+    b"swap-demote",
+    b"v4.4.95 pairing allowlist preserve",
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.57")
+print("post-build guard passed: local WSL v4.4.95")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

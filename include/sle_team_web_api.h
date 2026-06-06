@@ -46,6 +46,7 @@ typedef struct {
     uint8_t converged;
     uint8_t relay_target_count;
     uint8_t relay_online_count;
+    uint8_t relay_budget_count;
     uint32_t epoch;
     uint32_t last_change_s;
     uint32_t last_converged_s;

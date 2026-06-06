@@ -393,6 +393,7 @@ function renderRouteMetrics(): string {
           <div><span>Unreachable</span><strong>${metrics.unreachable}</strong></div>
           <div><span>Stale</span><strong>${metrics.stale}</strong></div>
           <div><span>Relay Online</span><strong>${metrics.relayOnline}/${metrics.relayTarget}</strong></div>
+          <div><span>Relay Budget</span><strong>${metrics.relayBudget}</strong></div>
           <div><span>Route Update RX</span><strong>${metrics.routeUpdateRxTotal}</strong></div>
           <div><span>Reparent</span><strong>${metrics.routeReparentTotal}</strong></div>
         `

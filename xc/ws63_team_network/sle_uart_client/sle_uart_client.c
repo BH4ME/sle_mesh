@@ -39,6 +39,7 @@
 #define SLE_UART_DEFAULT_PROPERTY_HANDLE 2U
 #define SLE_UART_RSSI_FAIL_RECOVER_THRESHOLD 3U
 #define SLE_UART_SCAN_RESTART_MIN_INTERVAL_MS 200U
+#define SLE_UART_CONNECT_SEEK_STOP_TIMEOUT_MS 800U
 
 static ssapc_find_service_result_t g_sle_uart_find_service_result = { 0 };
 static sle_announce_seek_callbacks_t g_sle_uart_seek_cbk = { 0 };
@@ -68,6 +69,7 @@ static uint8_t g_sle_uart_enable_failed = 0U;
 static uint32_t g_sle_uart_scan_start_ms = 0U;
 static uint8_t g_sle_uart_seek_active = 0U;
 static uint8_t g_sle_uart_seek_stop_for_connect = 0U;
+static uint32_t g_sle_uart_seek_stop_start_ms = 0U;
 
 static void sle_uart_client_sample_seek_cbk_register(void);
 static void sle_uart_client_sample_ssapc_cbk_register(ssapc_notification_callback notification_cb,
@@ -367,6 +369,46 @@ void sle_uart_client_force_rescan(void)
     }
 }
 
+static void sle_uart_client_connect_pending_remote(const char *reason)
+{
+    errcode_t ret;
+
+    g_sle_uart_seek_stop_for_connect = 0U;
+    g_sle_uart_seek_stop_start_ms = 0U;
+    g_sle_uart_seek_active = 0U;
+    g_sle_uart_scan_start_ms = 0U;
+    ret = sle_connect_remote_device(&g_sle_uart_remote_addr);
+    osal_printk("%s connect request addr:%02x:**:**:**:%02x:%02x reason:%s ret:0x%x\r\n",
+        SLE_UART_CLIENT_LOG,
+        g_sle_uart_remote_addr.addr[0],
+        g_sle_uart_remote_addr.addr[4],
+        g_sle_uart_remote_addr.addr[5],
+        reason != NULL ? reason : "unknown",
+        ret);
+    if (ret != ERRCODE_SLE_SUCCESS) {
+        sle_uart_start_scan();
+    }
+}
+
+void sle_uart_client_tick(void)
+{
+    uint32_t now_ms;
+
+    if (g_sle_uart_seek_stop_for_connect == 0U || g_sle_uart_seek_stop_start_ms == 0U) {
+        return;
+    }
+    now_ms = sle_uart_client_now_ms();
+    if ((now_ms - g_sle_uart_seek_stop_start_ms) < SLE_UART_CONNECT_SEEK_STOP_TIMEOUT_MS) {
+        return;
+    }
+    osal_printk("%s seek stop timeout, fallback connect pending addr:%02x:**:**:**:%02x:%02x\r\n",
+        SLE_UART_CLIENT_LOG,
+        g_sle_uart_remote_addr.addr[0],
+        g_sle_uart_remote_addr.addr[4],
+        g_sle_uart_remote_addr.addr[5]);
+    sle_uart_client_connect_pending_remote("seek-stop-timeout");
+}
+
 ssapc_write_param_t *get_g_sle_uart_send_param(void)
 {
     return &g_sle_uart_send_param;
@@ -416,12 +458,16 @@ static void sle_uart_client_sample_sle_enable_cbk(errcode_t status)
         g_sle_uart_enable_failed = 1U;
         g_sle_uart_enabled = 0U;
         g_sle_uart_seek_active = 0U;
+        g_sle_uart_seek_stop_for_connect = 0U;
+        g_sle_uart_seek_stop_start_ms = 0U;
         osal_printk("%s sle enable callback failed status:0x%x\r\n", SLE_UART_CLIENT_LOG, status);
         return;
     }
     g_sle_uart_enable_failed = 0U;
     g_sle_uart_enabled = 1U;
     g_sle_uart_seek_active = 0U;
+    g_sle_uart_seek_stop_for_connect = 0U;
+    g_sle_uart_seek_stop_start_ms = 0U;
     g_sle_uart_scan_start_ms = 0U;
     sle_uart_client_sample_seek_cbk_register();
     sle_uart_client_sample_ssapc_cbk_register(sle_uart_notification_cb, sle_uart_indication_cb);
@@ -477,7 +523,12 @@ static void sle_uart_client_sample_seek_result_info_cbk(sle_seek_result_info_t *
             seek_result_data->data[2]);
     }
     if (g_sle_uart_conn_num < SLE_UART_CLIENT_MAX_CON && matched_name != 0U) {
+        errcode_t stop_ret;
+
         if (passed_filter == 0U) {
+            return;
+        }
+        if (g_sle_uart_seek_stop_for_connect != 0U) {
             return;
         }
         if (sle_uart_client_find_conn_by_addr(&seek_result_data->addr) != NULL) {
@@ -488,7 +539,12 @@ static void sle_uart_client_sample_seek_result_info_cbk(sle_seek_result_info_t *
             seek_result_data->addr.addr[5], g_sle_uart_conn_num);
         memcpy_s(&g_sle_uart_remote_addr, sizeof(sle_addr_t), &seek_result_data->addr, sizeof(sle_addr_t));
         g_sle_uart_seek_stop_for_connect = 1U;
-        sle_stop_seek();
+        g_sle_uart_seek_stop_start_ms = sle_uart_client_now_ms();
+        stop_ret = sle_stop_seek();
+        osal_printk("%s stop seek for connect ret:0x%x\r\n", SLE_UART_CLIENT_LOG, stop_ret);
+        if (stop_ret != ERRCODE_SLE_SUCCESS) {
+            sle_uart_client_connect_pending_remote("stop-seek-fail");
+        }
     }
 }
 
@@ -497,13 +553,17 @@ static void sle_uart_client_sample_seek_disable_cbk(errcode_t status)
     uint8_t do_connect = g_sle_uart_seek_stop_for_connect;
 
     g_sle_uart_seek_active = 0U;
-    g_sle_uart_seek_stop_for_connect = 0U;
     g_sle_uart_scan_start_ms = 0U;
     if (status != 0) {
         osal_printk("%s sle_uart_client_sample_seek_disable_cbk,status error = %x\r\n", SLE_UART_CLIENT_LOG, status);
+        if (do_connect != 0U) {
+            sle_uart_client_connect_pending_remote("seek-disable-error");
+        }
     } else if (do_connect != 0U) {
-        sle_connect_remote_device(&g_sle_uart_remote_addr);
+        sle_uart_client_connect_pending_remote("seek-disable-cbk");
     } else {
+        g_sle_uart_seek_stop_for_connect = 0U;
+        g_sle_uart_seek_stop_start_ms = 0U;
         osal_printk("%s seek disabled without connect target\r\n", SLE_UART_CLIENT_LOG);
     }
 }

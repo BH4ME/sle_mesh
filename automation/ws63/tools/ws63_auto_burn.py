@@ -62,11 +62,12 @@ class ResetConfig:
     command_delay_s: float = 0.3
     command_retries: int = 2
     retry_gap_s: float = 0.2
+    send_preamble: bool = True
     sequence: Iterable[ControlStep] = ()
 
 
 DEFAULT_CONTROL_SEQUENCE = "rts=0,dtr=0:0.05;rts=0,dtr=1:0.12;rts=0,dtr=0:0.05"
-DEFAULT_EXPECTED_FW_VERSION = "v4.4.57"
+DEFAULT_EXPECTED_FW_VERSION = "v4.4.95"
 
 
 def parse_bool(value: str) -> bool:
@@ -137,6 +138,11 @@ def perform_auto_reset(
     retries = max(1, config.command_retries)
     for attempt in range(retries):
         for command in command_list:
+            if config.send_preamble:
+                ser.write(b"\r\n")
+                ser.flush()
+                if config.command_delay_s > 0.0:
+                    sleep_fn(min(config.command_delay_s, 0.05))
             payload = command.encode("ascii") + b"\r\n"
             log_fn(f"Auto reset: sending CLI command '{command}'")
             ser.write(payload)
@@ -175,12 +181,14 @@ class AutoResetWs63BurnTools(Ws63BurnTools):
         wait_timeout_s: float,
         handshake_interval_s: float,
         manual_retry_timeout_s: float,
+        legacy_reset_order: bool = False,
     ) -> None:
         super().__init__(com, baudrate)
         self.reset_config = reset_config
         self.wait_timeout_s = wait_timeout_s
         self.handshake_interval_s = handshake_interval_s
         self.manual_retry_timeout_s = manual_retry_timeout_s
+        self.legacy_reset_order = legacy_reset_order
 
     def _try_wait_for_handshake(self, timeout_s: float) -> bool:
         t0 = time.time()
@@ -200,7 +208,7 @@ class AutoResetWs63BurnTools(Ws63BurnTools):
     def flash(self, name) -> bool:  # noqa: C901 - mirrors xf_burn_tools to keep its protocol behavior.
         self.ser = serial.Serial(self.com, 115200, timeout=1)
         self.ser.setRTS(False)
-        if self.reset_config is not None:
+        if self.reset_config is not None and self.legacy_reset_order:
             perform_auto_reset(self.ser, self.reset_config)
 
         self.fwpkg = Fwpkg(name)
@@ -214,6 +222,9 @@ class AutoResetWs63BurnTools(Ws63BurnTools):
             return False
 
         self.fwpkg.show()
+
+        if self.reset_config is not None and not self.legacy_reset_order:
+            perform_auto_reset(self.ser, self.reset_config)
 
         logging.info("Waiting for device reset...")
         if not self._try_wait_for_handshake(self.wait_timeout_s):
@@ -280,6 +291,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="do not send fallback CLI reset command",
     )
     parser.add_argument("--no-reset-command", action="store_true", help="do not send a CLI reboot command")
+    parser.add_argument(
+        "--no-reset-preamble",
+        action="store_true",
+        help="do not send a blank CRLF before each CLI reset command",
+    )
+    parser.add_argument(
+        "--legacy-reset-order",
+        action="store_true",
+        help="send CLI reset commands before parsing/showing the fwpkg, matching the historical COM16 flow",
+    )
     parser.add_argument("--reset-command-delay", type=float, default=0.3, help="delay after reset command, seconds")
     parser.add_argument(
         "--reset-command-retries",
@@ -380,6 +401,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             command_delay_s=args.reset_command_delay,
             command_retries=args.reset_command_retries,
             retry_gap_s=args.reset_command_retry_gap,
+            send_preamble=not args.no_reset_preamble,
             sequence=sequence,
         )
 
@@ -390,6 +412,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         wait_timeout_s=args.wait_timeout,
         handshake_interval_s=args.handshake_interval,
         manual_retry_timeout_s=args.manual_retry_timeout,
+        legacy_reset_order=args.legacy_reset_order,
     )
     return 0 if tools.flash(args.firmware_file) else 1
 

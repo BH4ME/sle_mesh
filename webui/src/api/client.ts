@@ -366,9 +366,16 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
 
 function cliMemberToNode(line: string): TeamNode | undefined {
   const match = line.match(
-    /member=(\d+)\s+role=(\d+)\s+online=(\d+)\s+battery=(\d+)\s+fix=(\d+)\s+rssi=(-?\d+)\s+last_seq=(\d+)\s+last_seen=(\d+)/,
+    /member=(\d+).*?\brole=(\d+).*?\bonline=(\d+).*?\bbattery=(\d+).*?\bfix=(\d+).*?\brssi=(-?\d+).*?\blast_seq=(\d+).*?\blast_seen=(\d+)/,
   );
   if (!match) return undefined;
+  const labelMatch = line.match(/\blabel=(M[0-9A-Fa-f]{4})\b/);
+  const macMatch = line.match(/\bmac=([0-9A-Fa-f]{4})\s+ready=(\d+)/);
+  const relayMatch = line.match(/\brelay=(\d+)/);
+  const tierMatch = line.match(/\btier=(\d+)/);
+  const maxDownMatch = line.match(/\bmax_down=(\d+)/);
+  const macReady = macMatch ? Number(macMatch[2]) !== 0 : undefined;
+  const labelSuffix = labelMatch ? labelMatch[1].replace(/^M/, "").toUpperCase() : undefined;
   return {
     id: Number(match[1]),
     role: Number(match[2]) === 1 ? "leader" : "member",
@@ -376,6 +383,11 @@ function cliMemberToNode(line: string): TeamNode | undefined {
     batteryPercent: Number(match[4]),
     fixStatus: Number(match[5]),
     lastRssiDbm: Number(match[6]) === 127 ? null : Number(match[6]),
+    macReady,
+    macSuffix: macReady ? macMatch?.[1].toUpperCase() : labelSuffix,
+    relayAllowed: relayMatch ? Number(relayMatch[1]) !== 0 : undefined,
+    relayTier: tierMatch ? Number(tierMatch[1]) : undefined,
+    maxDownstream: maxDownMatch ? Number(maxDownMatch[1]) : undefined,
     lastSeq: Number(match[7]),
     lastSeenS: Number(match[8]),
   };
@@ -412,6 +424,8 @@ function defaultConfigStatus(): DeviceConfigStatus {
     runtimeChannel: 0,
     runtimeLeader: 0,
     runtimeSelf: 0,
+    runtimeDirectCap: 0,
+    runtimeRelayBudget: 0,
     roleRequestPending: false,
     roleRequestRole: "none",
     roleRequestTeam: 0,
@@ -464,6 +478,8 @@ function normalizeConfigStatus(value: unknown): DeviceConfigStatus {
     runtimeChannel: numberField("runtimeChannel"),
     runtimeLeader: numberField("runtimeLeader"),
     runtimeSelf: numberField("runtimeSelf"),
+    runtimeDirectCap: numberField("runtimeDirectCap"),
+    runtimeRelayBudget: numberField("runtimeRelayBudget"),
     roleRequestPending: booleanField("roleRequestPending"),
     roleRequestRole: roleField("roleRequestRole"),
     roleRequestTeam: numberField("roleRequestTeam"),
@@ -540,6 +556,7 @@ function configStatusToRuntimeStatus(config: DeviceConfigStatus): TeamStatus | U
     role: config.runtimeRole,
     state: config.roleRequestPending ? "joining" : "idle",
     joined: config.runtimeRole === "leader",
+    maxDownstream: config.runtimeDirectCap,
     nextSeq: 0,
     uptimeS: 0,
     transport: "serial",

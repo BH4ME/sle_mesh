@@ -75,7 +75,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.57 unified runtime role (display event audit panel)"
+echo "profile:    v4.4.95 unified runtime role (relay swap hysteresis)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -214,7 +214,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.57 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer default disabled (IO14 safe off), gps UART1(IO17/18) mapped, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.95 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer default disabled (IO14 safe off), gps UART1(IO17/18) mapped, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled, dynamic relay budget enabled, relay swap hysteresis enabled, trusted route-id tracking enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -227,10 +227,14 @@ sdk = Path(sys.argv[1])
 cfg_path = sdk / "build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
 map_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.map"
 elf_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.elf"
+app_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_team_network_app.c"
+proto_source_path = sdk / "third_party/sle_mesh/src/sle_team_node.c"
 
 cfg = cfg_path.read_text(errors="replace")
 map_text = map_path.read_text(errors="replace")
 elf = elf_path.read_bytes()
+app_source = app_source_path.read_text(errors="replace")
+proto_source = proto_source_path.read_text(errors="replace")
 
 required_cfg = [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
@@ -260,19 +264,45 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.57",
+    b"v4.4.95",
+    b"seek stop timeout, fallback connect pending",
+    b"connect request addr:",
+    b"cfg direct",
+    b"runtimeDirectCap",
+    b"runtimeRelayBudget",
+    b"plan=%u",
     b"[display] st7789 ready",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
+    b"relay failover begin",
+    b"relay failover holding relay target",
+    b"relay config notify pending",
+    b"liveness preserved",
+    b"direct cap prune confirmed",
+    b"direct cap prune disconnect",
+    b"TeamDisplayTask",
+    b"relay rebalance demand",
+    b"relay swap observe",
+    b"swap-promote",
+    b"swap-demote",
+    b"v4.4.95 pairing allowlist preserve",
 ]
 for item in required_bytes:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
 
-print("post-build guard passed: team-network app, ST7789 display, version, and serial cfg strings are linked")
+for source_name, source_text, item in [
+    ("sle_team_node.c", proto_source, "Route updates are leader policy hints"),
+    ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
+    ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
+]:
+    if item not in source_text:
+        raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")
+
+print("post-build guard passed: team-network app, ST7789/LVGL display, version strings, and direct-cap source guards are present")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

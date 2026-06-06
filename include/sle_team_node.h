@@ -83,6 +83,8 @@ typedef void (*sle_team_joined_cb)(void *user_ctx, uint8_t member_id);
 typedef void (*sle_team_position_cb)(void *user_ctx, uint8_t member_id, const sle_team_pos_body_t *pos);
 typedef void (*sle_team_alert_cb)(void *user_ctx, uint8_t member_id, uint8_t reason);
 typedef void (*sle_team_relay_offline_cb)(void *user_ctx, uint8_t member_id);
+typedef uint8_t (*sle_team_member_timeout_defer_cb)(void *user_ctx, uint8_t member_id,
+    uint32_t now_s, uint32_t last_seen_s);
 
 typedef struct {
     sle_team_send_fn send;
@@ -93,6 +95,7 @@ typedef struct {
     sle_team_position_cb on_position;
     sle_team_alert_cb on_alert;
     sle_team_relay_offline_cb on_relay_offline;
+    sle_team_member_timeout_defer_cb should_defer_member_timeout;
     void *user_ctx;
 } sle_team_node_ops_t;
 

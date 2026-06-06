@@ -39,6 +39,7 @@ errcode_t sle_uart_client_send_by_conn(uint16_t conn_id, const uint8_t *data, ui
 errcode_t sle_uart_client_send_all(const uint8_t *data, uint16_t len);
 void sle_uart_client_bind_member_conn(uint8_t member_id, uint16_t conn_id);
 uint8_t sle_uart_client_find_conn_by_member(uint8_t member_id, uint16_t *conn_id);
+void sle_uart_client_tick(void);
 
 ssapc_write_param_t *get_g_sle_uart_send_param(void);
 void sle_uart_notification_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data, errcode_t status);

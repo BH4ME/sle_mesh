@@ -31,6 +31,15 @@ static int8_t sle_team_rssi_dbm(const sle_team_node_t *node)
     return node->ops.rssi_dbm(node->ops.user_ctx);
 }
 
+static uint8_t sle_team_should_defer_member_timeout(const sle_team_node_t *node, uint8_t member_id,
+    uint32_t now_s, uint32_t last_seen_s)
+{
+    if (node == NULL || node->ops.should_defer_member_timeout == NULL) {
+        return 0U;
+    }
+    return node->ops.should_defer_member_timeout(node->ops.user_ctx, member_id, now_s, last_seen_s);
+}
+
 static const sle_team_member_record_t *sle_team_find_member_record_const(const sle_team_node_t *node, uint8_t member_id)
 {
     uint8_t i;
@@ -232,6 +241,17 @@ static void sle_team_set_parent_state(sle_team_node_t *node, uint8_t parent_id, 
     }
 }
 
+static uint8_t sle_team_member_has_reselect_target(const sle_team_node_t *node)
+{
+    return (uint8_t)(node != NULL &&
+        node->cfg.role == SLE_TEAM_ROLE_MEMBER &&
+        node->upstream_parent_state == SLE_TEAM_PARENT_RESELECTING &&
+        node->upstream_parent_reselect_pending != 0U &&
+        node->upstream_parent_id != 0U &&
+        node->upstream_parent_id != SLE_TEAM_BROADCAST_ID &&
+        node->upstream_parent_id != node->cfg.leader_id);
+}
+
 static int sle_team_member_recover_link(sle_team_node_t *node, const char *reason)
 {
     if (node == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER) {
@@ -364,16 +384,44 @@ static int sle_team_forward_packet(sle_team_node_t *node, const sle_team_app_pac
     return sle_team_send_encoded_packet(node, forwarded.dst_id, &forwarded);
 }
 
+static uint8_t sle_team_discovery_only_allows(uint8_t app_msg_type)
+{
+    return (uint8_t)(app_msg_type == SLE_TEAM_APP_HELLO ||
+        app_msg_type == SLE_TEAM_APP_ROUTE_UPDATE ||
+        app_msg_type == SLE_TEAM_APP_CONFIG ||
+        app_msg_type == SLE_TEAM_APP_ACK);
+}
+
+static uint8_t sle_team_relay_may_bridge_packet(const sle_team_node_t *node, const sle_team_app_packet_t *app)
+{
+    if (node == NULL || app == NULL || node->cfg.role != SLE_TEAM_ROLE_MEMBER ||
+        node->cfg.relay_allowed == 0U) {
+        return 0U;
+    }
+    if (node->joined != 0U && node->cfg.relay_enabled != 0U) {
+        if (node->cfg.relay_discovery_only != 0U &&
+            sle_team_discovery_only_allows(app->app_msg_type) == 0U) {
+            return 0U;
+        }
+        return 1U;
+    }
+    if (sle_team_discovery_only_allows(app->app_msg_type) == 0U) {
+        return 0U;
+    }
+    if (node->state == SLE_TEAM_NET_IDLE) {
+        return 0U;
+    }
+    return (uint8_t)(node->joined == 0U ||
+        node->upstream_parent_state == SLE_TEAM_PARENT_RESELECTING ||
+        node->upstream_parent_reselect_pending != 0U);
+}
+
 static uint8_t sle_team_should_relay_packet(const sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
     if (node == NULL || app == NULL) {
         return 0U;
     }
-    if (node->cfg.role != SLE_TEAM_ROLE_MEMBER || node->joined == 0U || node->cfg.relay_enabled == 0U) {
-        return 0U;
-    }
-    if (node->cfg.relay_discovery_only != 0U && app->app_msg_type != SLE_TEAM_APP_HELLO &&
-        app->app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE) {
+    if (sle_team_relay_may_bridge_packet(node, app) == 0U) {
         return 0U;
     }
     if (app->src_id == node->cfg.self_id || app->src_id == SLE_TEAM_BROADCAST_ID) {
@@ -418,6 +466,10 @@ static void sle_team_prune_stale_members(sle_team_node_t *node, uint32_t now_s)
             sle_team_alert_body_t alert;
             uint8_t member_id = member->member_id;
 
+            if (sle_team_should_defer_member_timeout(node, member_id, now_s, member->last_seen_s) != 0U) {
+                sle_team_log(node, "member timeout deferred after relay loss");
+                continue;
+            }
             (void)memset(&alert, 0, sizeof(alert));
             alert.lost_member_id = member_id;
             alert.reason = SLE_TEAM_ALERT_TIMEOUT;
@@ -687,7 +739,9 @@ int sle_team_node_pairing_start(sle_team_node_t *node)
 
 int sle_team_node_pairing_stop(sle_team_node_t *node)
 {
+    uint8_t known_ids[SLE_TEAM_MAX_MEMBERS];
     uint8_t pending_ids[SLE_TEAM_MAX_MEMBERS];
+    uint8_t known_count = 0U;
     uint8_t pending_count = 0U;
     uint8_t approve_failed = 0U;
     uint8_t i;
@@ -699,17 +753,34 @@ int sle_team_node_pairing_stop(sle_team_node_t *node)
     }
 
     /*
-     * Keep CLI/WebUI behavior consistent in V2: when pairing closes, pending
-     * members are promoted to approved members by default (without relay grant).
-     * WebUI can still pre-approve with explicit relay policy before stop.
+     * Preserve members that were already connected before the pairing window
+     * opened. Starting pairing enables the leader allowlist filter, and new
+     * members are staged as pending while the allowlist is empty. Existing
+     * online members can keep sending traffic through that temporary allow-all
+     * state; when the window closes they must be sealed into the allowlist too.
      */
     for (i = 0U; i < SLE_TEAM_MAX_MEMBERS; i++) {
+        if (node->members[i].member_id != 0U && node->members[i].member_id != SLE_TEAM_BROADCAST_ID) {
+            known_ids[known_count++] = node->members[i].member_id;
+        }
         if (node->pending_members[i].active == 0U || node->pending_members[i].member_id == 0U ||
             node->pending_members[i].member_id == SLE_TEAM_BROADCAST_ID) {
             continue;
         }
         pending_ids[pending_count++] = node->pending_members[i].member_id;
     }
+    for (i = 0U; i < known_count; i++) {
+        int ret = sle_team_node_add_allowed_member(node, known_ids[i]);
+        if (ret != SLE_TEAM_OK) {
+            approve_failed = 1U;
+            last_err = ret;
+        }
+    }
+    /*
+     * Keep CLI/WebUI behavior consistent in V2: when pairing closes, pending
+     * members are promoted to approved members by default (without relay grant).
+     * WebUI can still pre-approve with explicit relay policy before stop.
+     */
     for (i = 0U; i < pending_count; i++) {
         int ret = sle_team_node_pairing_approve_with_relay(node, pending_ids[i], 0U);
         if (ret != SLE_TEAM_OK) {
@@ -873,6 +944,9 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     int ack_ret;
     int cfg_ret;
     uint8_t had_member;
+    uint8_t refreshed_online = 0U;
+    uint32_t refreshed_last_seen_s = 0U;
+    uint16_t refreshed_last_seq = 0U;
 
     if (node == NULL || app == NULL || app->body_len < sizeof(hello)) {
         return SLE_TEAM_ERR_FORMAT;
@@ -928,16 +1002,26 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
     (void)memcpy(member->mac, hello.mac, sizeof(member->mac));
     member->last_seen_s = sle_team_now(node);
     member->last_seq = app->seq;
+    refreshed_online = member->online;
+    refreshed_last_seen_s = member->last_seen_s;
+    refreshed_last_seq = member->last_seq;
 
     if (node->cfg.role == SLE_TEAM_ROLE_LEADER) {
         cfg_ret = sle_team_node_send_config(node, app->src_id);
         if (cfg_ret != SLE_TEAM_OK) {
             if (had_member != 0U) {
                 *member = member_before;
+                member->online = refreshed_online;
+                member->last_seen_s = refreshed_last_seen_s;
+                member->last_seq = refreshed_last_seq;
+                member->role = hello.role;
+                member->battery_percent = hello.battery_percent;
+                member->mac_ready = hello.mac_ready;
+                (void)memcpy(member->mac, hello.mac, sizeof(member->mac));
             } else {
                 (void)memset(member, 0, sizeof(*member));
             }
-            sle_team_log(node, "config send failed on hello");
+            sle_team_log(node, "config send failed on hello; liveness preserved");
             return cfg_ret;
         }
         ack_ret = sle_team_node_send_ack(node, app->src_id, app->seq, SLE_TEAM_APP_HELLO, 0U);
@@ -947,10 +1031,17 @@ static int sle_team_handle_hello(sle_team_node_t *node, const sle_team_app_packe
         } else {
             if (had_member != 0U) {
                 *member = member_before;
+                member->online = refreshed_online;
+                member->last_seen_s = refreshed_last_seen_s;
+                member->last_seq = refreshed_last_seq;
+                member->role = hello.role;
+                member->battery_percent = hello.battery_percent;
+                member->mac_ready = hello.mac_ready;
+                (void)memcpy(member->mac, hello.mac, sizeof(member->mac));
             } else {
                 (void)memset(member, 0, sizeof(*member));
             }
-            sle_team_log(node, "hello ack send failed");
+            sle_team_log(node, "hello ack send failed; liveness preserved");
             return ack_ret;
         }
     }
@@ -972,6 +1063,11 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
             sle_team_log(node, "hello ack rejected");
             return SLE_TEAM_ERR_UNSUPPORTED;
         }
+        if (app->src_id == node->cfg.leader_id && sle_team_member_has_reselect_target(node) != 0U) {
+            sle_team_note_leader_seen(node);
+            sle_team_log(node, "hello ack deferred until reselect parent");
+            return SLE_TEAM_OK;
+        }
         if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {
             node->upstream_parent_id = app->src_id;
         }
@@ -992,6 +1088,8 @@ static int sle_team_handle_ack(sle_team_node_t *node, const sle_team_app_packet_
 static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_packet_t *app)
 {
     sle_team_config_body_t cfg_body;
+    uint8_t defer_parent_bind;
+    uint32_t now_s;
 
     if (node == NULL || app == NULL || app->body_len < SLE_TEAM_CONFIG_BODY_BASE_SIZE) {
         return SLE_TEAM_ERR_FORMAT;
@@ -1003,6 +1101,8 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
 
     (void)memset(&cfg_body, 0, sizeof(cfg_body));
     (void)memcpy(&cfg_body, app->body, app->body_len < sizeof(cfg_body) ? app->body_len : sizeof(cfg_body));
+    defer_parent_bind = (uint8_t)(app->src_id == node->cfg.leader_id &&
+        sle_team_member_has_reselect_target(node) != 0U);
     node->cfg.report_interval_s = cfg_body.report_interval_s;
     node->cfg.warn_distance_m = cfg_body.warn_distance_m;
     node->cfg.lost_distance_m = cfg_body.lost_distance_m;
@@ -1021,13 +1121,20 @@ static int sle_team_handle_config(sle_team_node_t *node, const sle_team_app_pack
         if (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID) {
             node->upstream_parent_id = app->src_id;
         }
-        sle_team_set_parent_state(node,
-            node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
-            SLE_TEAM_PARENT_CONNECTED, 0U);
+        if (defer_parent_bind == 0U) {
+            sle_team_set_parent_state(node,
+                node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
+                SLE_TEAM_PARENT_CONNECTED, 0U);
+        } else {
+            sle_team_log(node, "config deferred until reselect parent");
+        }
     }
-    node->last_config_s = sle_team_now(node);
+    now_s = sle_team_now(node);
+    node->last_config_s = now_s;
     sle_team_note_leader_seen(node);
-    node->last_parent_seen_s = sle_team_now(node);
+    if (defer_parent_bind == 0U) {
+        node->last_parent_seen_s = now_s;
+    }
     return SLE_TEAM_OK;
 }
 
@@ -1129,18 +1236,28 @@ static int sle_team_handle_route_update(sle_team_node_t *node, const sle_team_ap
     (void)memcpy(&route_update, app->body, sizeof(route_update));
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && app->src_id == node->cfg.leader_id) {
         sle_team_note_leader_seen(node);
-        if (route_update.next_hop_id != 0U && route_update.next_hop_id != SLE_TEAM_BROADCAST_ID) {
-            node->upstream_parent_id = route_update.next_hop_id;
-        } else if (route_update.parent_id != 0U && route_update.parent_id != SLE_TEAM_BROADCAST_ID) {
-            node->upstream_parent_id = route_update.parent_id;
-        } else if (node->upstream_parent_id == 0U && app->src_id != 0U &&
-            app->src_id != SLE_TEAM_BROADCAST_ID) {
-            node->upstream_parent_id = app->src_id;
+        /*
+         * Route updates are leader policy hints. The real upstream parent is
+         * the physical first-hop connection, which the WS63 adapter records
+         * from connection tracking and packet ingress. Blindly copying the
+         * hinted next_hop here makes relayed leaves flap back to "leader".
+         */
+        if (route_update.parent_state == (uint8_t)SLE_TEAM_PARENT_RESELECTING &&
+            route_update.parent_id != 0U && route_update.parent_id != SLE_TEAM_BROADCAST_ID &&
+            route_update.parent_id != node->cfg.leader_id) {
+            sle_team_set_parent_state(node, route_update.parent_id, SLE_TEAM_PARENT_RESELECTING, 1U);
+            node->joined = 0U;
+            node->state = SLE_TEAM_NET_DISCOVERING;
+            node->last_hello_s = 0U;
+            node->last_heartbeat_s = 0U;
+            node->last_config_s = 0U;
+            node->last_parent_seen_s = 0U;
+            sle_team_log(node, "route update requests parent reselect");
+        } else if (node->upstream_parent_id == app->src_id ||
+            (node->upstream_parent_id == 0U && app->src_id != 0U && app->src_id != SLE_TEAM_BROADCAST_ID)) {
+            sle_team_set_parent_state(node, app->src_id, SLE_TEAM_PARENT_CONNECTED, 0U);
+            node->last_parent_seen_s = sle_team_now(node);
         }
-        sle_team_set_parent_state(node,
-            node->upstream_parent_id != 0U ? node->upstream_parent_id : app->src_id,
-            SLE_TEAM_PARENT_CONNECTED, 0U);
-        node->last_parent_seen_s = sle_team_now(node);
         if ((route_update.reserved & SLE_TEAM_ROUTE_UPDATE_FLAG_RELAY_GRANT) != 0U) {
             node->cfg.relay_enabled = node->cfg.relay_allowed != 0U ? 1U : 0U;
         }
@@ -1263,6 +1380,7 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
         return ret;
     }
     if (app_packet.team_id != node->cfg.team_id) {
+        sle_team_log(node, "packet rejected by team id");
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (app_packet.dst_id != node->cfg.self_id) {
@@ -1281,6 +1399,7 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
             }
         }
         if (app_packet.dst_id != SLE_TEAM_BROADCAST_ID) {
+            sle_team_log(node, "relay rejected unicast packet");
             return SLE_TEAM_ERR_UNSUPPORTED;
         }
     }
@@ -1289,8 +1408,8 @@ int sle_team_node_on_packet(sle_team_node_t *node, const uint8_t *buf, size_t bu
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (node->cfg.role == SLE_TEAM_ROLE_MEMBER && node->cfg.relay_discovery_only != 0U &&
-        app_packet.dst_id == SLE_TEAM_BROADCAST_ID && app_packet.app_msg_type != SLE_TEAM_APP_HELLO &&
-        app_packet.app_msg_type != SLE_TEAM_APP_ROUTE_UPDATE) {
+        app_packet.dst_id == SLE_TEAM_BROADCAST_ID &&
+        sle_team_discovery_only_allows(app_packet.app_msg_type) == 0U) {
         sle_team_log(node, "relay discovery-only ignored local broadcast");
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
