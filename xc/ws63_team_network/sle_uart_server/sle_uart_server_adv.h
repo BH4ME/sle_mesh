@@ -10,6 +10,12 @@
 #ifndef SLE_SERVER_ADV_H
 #define SLE_SERVER_ADV_H
 
+#include <stdint.h>
+
+#include "errcode.h"
+#include "sle_common.h"
+#include "sle_device_discovery.h"
+
 typedef struct sle_adv_common_value {
     uint8_t type;
     uint8_t length;
@@ -42,10 +48,15 @@ typedef enum sle_adv_data {
     SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA                   = 0xFF    /* 厂商自定义信息 */
 } sle_adv_data_type;
 
+#define SLE_TEAM_ADV_ROUTE_MAGIC_0 0x53U
+#define SLE_TEAM_ADV_ROUTE_MAGIC_1 0x4CU
+
 errcode_t sle_dev_register_cbks(void);
 void sle_uart_server_adv_set_local_addr(const uint8_t addr[SLE_ADDR_LEN]);
+void sle_uart_server_adv_set_route_id(uint8_t route_id);
 errcode_t sle_uart_server_adv_init(void);
 errcode_t sle_uart_server_adv_restart(void);
+errcode_t sle_uart_announce_seek_merge_cbks(const sle_announce_seek_callbacks_t *cbks);
 
 errcode_t sle_uart_announce_register_cbks(void);
 

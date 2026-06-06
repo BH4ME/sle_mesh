@@ -8,11 +8,11 @@
 
 版本记录放在：
 
-- [versions/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions)
+- [versions/](<repo-root>/versions)
 
 当前版本目录：
 
-- [versions/v1.2.2/](/Users/bh4me_macair/Documents/Codex/sle_intercom/versions/v1.2.2)
+- [versions/v1.2.2/](<repo-root>/versions/v1.2.2)
 
 ## v1.2.2 内容
 

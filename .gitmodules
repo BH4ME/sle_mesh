@@ -1,0 +1,3 @@
+[submodule "xc/ws63_team_network/third_party/lvgl"]
+	path = xc/ws63_team_network/third_party/lvgl
+	url = https://github.com/lvgl/lvgl.git

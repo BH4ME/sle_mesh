@@ -1,8 +1,6 @@
-# WS63 SLE Team Network Sample
+# V4.4.32 WS63 SLE Team Network + ST7789
 
-这是把 `sle_mesh` 协议骨架接到小熊派 `BearPi-Pico H3863 / WS63` 的上板样例。
-
-当前目标很务实：先跑通两块板的最小组网闭环，并让现场只靠手机内置 WebUI 就能完成角色选择和配队。
+这是 v4 上板工程，基于 v3 组网样例改出，目标板主控为 WS63 模块，显示器为 1.14 寸 ST7789。主线仍然是组网：leader 负责配队和汇总 member 状态，member 失联时保留最后一次位置并生成 timeout alert。
 
 ```text
 member --HELLO--> leader
@@ -14,18 +12,48 @@ member --HB/POS--> leader
 ## 当前能力
 
 - 一个统一固件包，所有 WS63 都烧同一份 `.fwpkg`。
-- 开机默认 `unconfigured`，SLE 暂不启动；先启动 SoftAP、HTTP WebUI 和串口 CLI。
+- 开机默认 `unconfigured`，SLE 暂不启动；SoftAP、HTTP WebUI 和串口 CLI 必须默认启动，供板端页面、域名 WebUI 和批量部署读取/写入配置。
 - WebUI 或串口选择角色后，leader 启动 SLE UART client/central，member 启动 SLE UART server/peripheral。
-- WebUI 选择的角色、队伍号、leader MAC 后四位和 channel 会写入 WS63 NV flash；断电/复位后自动恢复。
-- WiFi SSID 和页面自标识使用 WiFi MAC 后四位，适合批量烧录：`SLE-TEAM-WS63-XXXX`、`UXXXX`、`LXXXX`、`MXXXX`。
-- SLE 收到二进制包后进入 `sle_team_node_on_packet`，周期任务调用 `sle_team_node_tick`。
-- leader 可开/关配队窗口、批准 pending member；member 可选择 leader 或退出队伍。
-- 板端 WebUI 用 C 端 SSR 输出完整 HTML，不烧录 Vite 产物，不依赖前端 JS，优先保护 RAM 和手机兼容性。
+- 角色、队伍号、leader MAC 后四位和 channel 会写入 WS63 NV flash；断电/复位后自动恢复。
+- WiFi SSID 和页面标识使用 WiFi MAC 后四位：`SLE-TEAM-V4-XXXX`、`UXXXX`、`LXXXX`、`MXXXX`。
+- ST7789 显示角色、节点数、失联次数和最后失联位置。
+- 普通子节点心跳超时后，leader 会广播 `ALERT_TIMEOUT`，alert 内包含最后一次位置和最后上报时间。
+- 板端 WebUI 用 C 端 SSR 输出完整 HTML，不烧录 Vite 产物，优先保护 RAM 和手机兼容性。
+
+## V4 引脚
+
+| 信号 | WS63 IO | 用途 |
+|------|---------|------|
+| `U0TX` | `IO21` | 串口调试 TX |
+| `U0RX` | `IO22` | 串口调试 RX |
+| `RGB` | `IO0` | WS2812C 数据脚 |
+| `CHRG` | `IO2` | 充电状态，不作为 LED 驱动 |
+| `ADC_CTRL` | `IO5` | 电池采样控制，预留 |
+| `SCL` | `IO6` | ST7789 SPI SCLK |
+| `CS` | `IO7` | ST7789 CS |
+| `SDA` | `IO8` | ST7789 SPI MOSI |
+| `RS` | `IO9` | ST7789 DC/RS |
+| `ADC_VBAT` | `IO12` | 电池 ADC，预留 |
+| `RESET` | `IO13` | ST7789 RESET |
+| `BUZZ` | `IO14` | 蜂鸣器 |
+| `U1TX` | `IO17` | GPS UART TXD1 |
+| `U1RX` | `IO18` | GPS UART RXD1 |
+
+## v4.4+ 确认项
+
+- ST7789：`GPIO6/7/8/9/13`，`240x135`，offset `40,53`，MADCTL `0x60`，soft SPI mode 0。
+- 背光：BLK 由硬件/default-on 处理，固件不要重新加入 GPIO11 控制。
+- GPS：当前只保留 `IO17/IO18` pinmap 和日志，不做完整 GPS/NMEA 数据解析。
+- WS2812：Kconfig 默认 `n`，v4 构建脚本启用 IO0。
+- 蜂鸣器：默认关闭，只做安全拉低/命令控制。
+- SLE 功率：实际 announce 参数和广播声明字段统一为 `18 dBm`。
+
+屏幕问题和解决过程见 [../../versions/v4.4/ST7789_DISPLAY_FIX.md](../../versions/v4.4/ST7789_DISPLAY_FIX.md)。每次改代码、编译和烧录前先读 [../../meta/PROJECT_OPERATION_SOP.md](../../meta/PROJECT_OPERATION_SOP.md)。
 
 ## WiFi 控制台
 
 ```text
-SSID: SLE-TEAM-WS63-XXXX
+SSID: SLE-TEAM-V4-XXXX
 Password: 123456789
 URL: http://192.168.43.1/
 ```
@@ -37,6 +65,13 @@ GET /api/status
 GET /api/nodes
 GET /api/events
 GET /api/pending
+GET /api/location?lat=...&lon=...&dst=255&speed=...&heading=...&battery=...&fix=...&sat=...
+GET /api/config/status
+GET /api/config/leader?team=1&channel=17&now=1
+GET /api/config/member?leader=C7E9&team=1&channel=17&now=1
+GET /api/config/apply
+GET /api/config/clear
+GET /api/config/reboot
 GET /api/pairing?action=start|stop|approve&id=...
 GET /api/member/select?team=...&leader=...&channel=...
 GET /api/member/leave
@@ -48,16 +83,53 @@ GET /api/factory-reset
 - `/`：状态页。未选角色时显示 `unconfigured`。
 - `/nodes`：节点列表。空数组 `[]` 表示当前还没有 member 入队。
 - `/events`：收发事件。空数组 `[]` 表示还没有真实 SLE 包。
-- `/pairing`：角色选择、leader 配队、member 选择 leader。
+- `/pairing`：角色选择、leader 配队、member 选择 leader、手机定位上报。
 - `/api/factory-reset`：清除 WebUI 写入 flash 的配置并重启，恢复到 `UXXXX` 未配置状态。
 
-手机调试注意：
+## 串口配置
 
-- WS63 SoftAP 没有外网，手机可能自动切蜂窝；如果浏览器请求失败，先确认手机仍连在 `SLE-TEAM-WS63-XXXX`。
-- Safari 或微信内置浏览器刷新页面会取消旧 HTTP 连接，串口可能出现 `errno=104`。这通常是客户端断开，不代表板端 HTTP 服务崩溃。
-- `v1.2.7 / ssr=v5` 起，每个 HTTP 连接都有 1.2 秒收发超时，手机半开连接不会长期占住板端 Web 服务。
-- `set leader` / `set member` 后会先返回页面，SLE 初始化在后台主任务执行；页面可能短暂显示 `starting SLE`。
-- 操作类按钮会自动回到 `/pairing`，不会停在 JSON 页面。
+串口波特率：`115200 8N1`
+
+未选角色时也可用：
+
+```text
+wifi
+http
+cfg status
+cfg leader [team channel]
+cfg leader now <team> <channel>
+cfg member <leader_suffix_hex> <team> <channel>
+cfg member now <leader_suffix_hex> <team> <channel>
+cfg apply
+cfg clear
+cfg reboot
+reboot
+reset
+```
+
+批量部署推荐命令：
+
+```text
+cfg leader now 7 33
+cfg member now 9A2F 7 33
+cfg status
+```
+
+Windows 批量串口脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM7 -Mode leader -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode member -LeaderSuffix 9A2F -Team 7 -Channel 33
+powershell -ExecutionPolicy Bypass -File scripts/ws63_serial_cfg.ps1 -Port COM8 -Mode status
+```
+
+串口 `cfg status` 会输出结构化日志：
+
+```text
+[cfg-json] {"ok":true,...}
+```
+
+域名/上位机 WebUI 会解析这个 `[cfg-json]` 并显示在 `Settings -> One-click node config` 的串口日志里。
 
 ## 角色选择逻辑
 
@@ -65,25 +137,21 @@ GET /api/factory-reset
 
 leader：
 
-1. 手机连该板 `SLE-TEAM-WS63-XXXX`。
-2. 打开 `http://192.168.43.1/pairing`。
-3. 点 `set leader`。
-4. 页面标识变为 `LXXXX`，leader 开始 SLE 广播/server。
+1. 手机连该板 `SLE-TEAM-V4-XXXX`，或用 WebSerial 连接串口。
+2. WebUI 调 `/api/config/leader?team=1&channel=17&now=1`，或串口发 `cfg leader now 1 17`。
+3. 配置写入 NV，leader 开始 SLE 扫描/连接 member。
 
 member：
 
-1. 手机连该板 `SLE-TEAM-WS63-YYYY`。
-2. 打开 `http://192.168.43.1/pairing`。
-3. 在 member 表单里填 leader 的后四位 `XXXX`、队伍号和 channel。
-4. 点 `set member`。
-5. 页面标识变为 `MYYYY`，member 启动 SLE client 并向 leader 发送 HELLO。
+1. 获取 leader 的 MAC 后四位，例如 `9A2F`。
+2. WebUI 调 `/api/config/member?leader=9A2F&team=1&channel=17&now=1`，或串口发 `cfg member now 9A2F 1 17`。
+3. 配置写入 NV，member 启动 SLE 广播并等待 leader 连接。
 
 说明：
 
 - MAC 后四位用于现场识别和选择 leader。
 - 完整 MAC 会放进 HELLO，leader 的 pending/member 记录会保存完整 MAC。
-- 1 字节 route ID 仍用于包路由，由 MAC 低字节派生；极端情况下 MAC 低字节可能冲突，后续做大规模队伍时需要升级路由 ID 或加入绑定表。
-- 当前 WebUI 角色配置会持久化到 NV flash；member 点 `leave` 或 WebUI 点 `factory reset` 会清掉该配置。
+- 1 字节 route ID 仍用于包路由，由 MAC 低字节派生；极端情况下 MAC 低字节可能冲突，后续大规模队伍需要升级路由 ID 或加入绑定表。
 - SLE pending 列表、节点在线状态和事件日志仍是运行时状态，不写 flash，重启后重新发现。
 
 ## 编译和烧录
@@ -93,86 +161,19 @@ member：
 ```sh
 UBUNTU_HOST=192.168.6.5 \
 UBUNTU_USER=owen \
-UBUNTU_PASS='67215837' \
+UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 \
-scripts/ws63_build_team_ubuntu.sh unified
+BUILD_JOBS=4 \
+scripts/ws63_build_v4_ubuntu.sh unified
 ```
 
 输出统一固件包：
 
 ```text
-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg
+<repo-root>\output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg
 ```
 
-烧录脚本里的 `leader/member` 只用于选择默认串口和二次确认，实际烧的是同一个统一固件包：
-
-```sh
-scripts/ws63_flash_team.sh leader /dev/tty.usbserial-10
-scripts/ws63_flash_team.sh member /dev/tty.usbserial-110
-```
-
-脚本会在烧录前打印角色、串口和固件路径，并要求输入 `flash leader` 或 `flash member` 才会继续。
-macOS 烧录优先使用 `/dev/tty.usbserial-*`，不要用 `/dev/cu.usbserial-*`。
-看到 `Waiting for device reset...` 后，需要按板子的 `BOOT + RESET` 或按当前烧录器要求复位让它握手。
-
-## LED 诊断
-
-已确认的小熊派 WS63 蓝色用户灯配置：
-
-- 引脚：`GPIO2`
-- 极性：`active-high`
-- 空闲保持灭灯；SLE 配队/扫描和真实协议 TX/RX 使用不同闪烁节奏。
-- pairing window 打开时 leader 会每秒极短闪一下，表示正在开放发现/配队。
-- leader pairing window open 或尚未连上 member 时会每秒极短闪一下，表示正在扫描 member。
-- `[sle-tx-ok]`：本板已把业务包交给 SLE driver，LED 快闪两下。
-- `[sle-tx-fail]`：本板尝试 SLE 发送失败，LED 不闪。
-- `[sle-rx]`：本板真实收到 SLE 业务包，LED 慢闪一下。
-
-串口诊断命令：
-
-```text
-led status
-led on
-led off
-led tx
-led rx
-led active_high
-led active_low
-led pin <0-31>
-```
-
-## 串口命令
-
-串口波特率：`115200 8N1`
-
-未选角色时：
-
-```text
-wifi
-http
-role leader
-role member <leader_mac_suffix>
-led status
-```
-
-选好角色后：
-
-```text
-help
-state
-members
-pairing start
-pairing pending
-pairing approve <id>
-pairing stop
-join <team> <leader_id> <channel>
-leave
-hello [dst]
-hb [dst] [battery] [rssi] [fix]
-pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
-```
-
-`role member` 用 leader MAC 后四位；`join` 是已配置 member 后的低层调试命令，参数仍是内部 1 字节 leader ID。
+COM16 自动烧录流程见 [../../meta/PROJECT_OPERATION_SOP.md](../../meta/PROJECT_OPERATION_SOP.md)，成功记录见 [../../versions/v4.4/AUTO_FLASH_NOTES.md](../../versions/v4.4/AUTO_FLASH_NOTES.md)。
 
 ## 当前不是完整 Mesh
 
@@ -187,8 +188,9 @@ pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
 
 ## 文件说明
 
-- `src/ws63_team_network_app.c`：WS63 上板适配层、WiFi 控制台、运行时角色选择。
-- `Kconfig`：统一固件、串口、WiFi、心跳、LED 参数。
+- `src/ws63_team_network_app.c`：WS63 上板适配层、WiFi 控制台、运行时角色选择、串口 `cfg` 配置。
+- `src/ws63_st7789_display.c`：ST7789 初始化、显示刷新、可选 LVGL 后端和内置文字 fallback。
+- `Kconfig`：统一固件、串口、WiFi、心跳、LED、ST7789 参数。
 - `CMakeLists.txt`：把协议核心和 SLE UART helper 拉进样例。
 
 协议核心来自仓库根目录：
@@ -202,10 +204,7 @@ pos [dst] [lat_e6] [lon_e6] [speed] [heading] [battery] [fix] [sat]
 
 ## 已知限制
 
-- `v1.2.9` 起连接方向改成官方 1vs8 样例方向：leader 扫描并连接多个 member，member 广播等待连接。
-- `v1.2.10` 起 member 不再使用官方样例里的固定 SLE 广播地址，而是按本机 WiFi MAC 派生唯一 SLE 地址，避免两块统一固件 member 被 leader 当成同一个远端设备。
-- 2026-05-04 现场确认：`C7E9` 和 `E7F1` 两块 member 可同时连接 leader，leader 分别收到 `HELLO 233->154` 与 `HELLO 241->154`，并绑定到 `conn_id:0`、`conn_id:1`。
-- 还没有扩到 20 个 member，仍保持当前 `SLE_TEAM_MAX_MEMBERS`。
 - 当前不是完整“扫描附近 leader 并选择”的发现系统，member 需要填写 leader MAC 后四位。
 - 当前配队不是加密认证，`cipher_mac` 仍未用于真实鉴权。
-- 角色和配队配置已写入 flash；factory reset 会清除配置并重启。
+- 当前逻辑成员上限已经对齐到 `30`，但真实 30 节点联调仍需继续依赖板级回归验证。
+- 如果 SDK 没有 LVGL 头文件，固件会自动 fallback 到内置文字渲染器。

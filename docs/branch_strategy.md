@@ -13,8 +13,9 @@ into one mainline.
 | `line/v3-phone-location` | V3 phone geolocation bridge and SLE position distribution. | Branch from a suitable V2 point and evolve independently. |
 | `lab/ws63-st7789-display` | WS63 ST7789 135x240 TFT display experiments. | Lab-only. Do not merge into V1/V2/V3 unless display becomes a product feature. |
 
-Older `codex/...` branches may remain as historical development branches. The
-`line/...` and `lab/...` names are the canonical working branches going forward.
+Older temporary development branches may remain only as local history. The
+`line/...`, `release/...` and `lab/...` names are the canonical working branches
+going forward.
 
 ## Release Markers
 

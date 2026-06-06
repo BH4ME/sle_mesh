@@ -16,7 +16,7 @@
 
 ```text
 root/root
-codex/codex
+builder/builder
 ```
 
 只建议用于本机开发 VM，并且 QEMU 端口转发应绑定到 `127.0.0.1`。
@@ -76,13 +76,13 @@ qemu-system-x86_64 \
 SSH 登录：
 
 ```sh
-ssh -p 2222 codex@127.0.0.1
+ssh -p 2222 builder@127.0.0.1
 ```
 
 默认密码：
 
 ```text
-codex
+builder
 ```
 
 ## WS63 编译依赖

@@ -93,6 +93,38 @@ static void sle_team_cli_print_send_result(sle_team_cli_t *cli, const char *type
     }
 }
 
+static void sle_team_cli_format_member_label(const sle_team_member_record_t *member, char *out, size_t out_size)
+{
+    if (out == NULL || out_size == 0U) {
+        return;
+    }
+    if (member != NULL && member->mac_ready != 0U) {
+        (void)snprintf(out, out_size, "M%02X%02X", member->mac[4], member->mac[5]);
+        return;
+    }
+    if (member != NULL) {
+        (void)snprintf(out, out_size, "M%u", member->member_id);
+        return;
+    }
+    (void)snprintf(out, out_size, "M--");
+}
+
+static void sle_team_cli_format_pending_label(const sle_team_pending_member_t *pending, char *out, size_t out_size)
+{
+    if (out == NULL || out_size == 0U) {
+        return;
+    }
+    if (pending != NULL && pending->mac_ready != 0U) {
+        (void)snprintf(out, out_size, "M%02X%02X", pending->mac[4], pending->mac[5]);
+        return;
+    }
+    if (pending != NULL) {
+        (void)snprintf(out, out_size, "M%u", pending->member_id);
+        return;
+    }
+    (void)snprintf(out, out_size, "M--");
+}
+
 void sle_team_cli_init(sle_team_cli_t *cli, sle_team_node_t *node, sle_team_cli_print_fn print, void *user_ctx)
 {
     if (cli == NULL) {
@@ -115,10 +147,13 @@ void sle_team_cli_print_help(sle_team_cli_t *cli)
     sle_team_cli_puts(cli, "  ack [dst] [ack_seq] [acked_type] [status]");
     sle_team_cli_puts(cli, "  members");
     sle_team_cli_puts(cli, "  allow [all|only <id...>|add <id>|del <id>]");
-    sle_team_cli_puts(cli, "  pairing [start|stop|approve <id>|pending]");
+    sle_team_cli_puts(cli, "  pairing [start|stop|approve <id> [relay|norelay]|pending]");
     sle_team_cli_puts(cli, "  join <team> <leader> <channel>");
     sle_team_cli_puts(cli, "  leave");
     sle_team_cli_puts(cli, "  led help");
+    sle_team_cli_puts(cli, "  rgb help");
+    sle_team_cli_puts(cli, "  buzz help");
+    sle_team_cli_puts(cli, "  disp help");
     sle_team_cli_puts(cli, "  state");
 }
 
@@ -256,12 +291,17 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
     }
 
     if (strcmp(argv[0], "members") == 0) {
-        for (i = 1; i <= (int)SLE_TEAM_MAX_MEMBERS; i++) {
-            member = sle_team_node_find_member(cli->node, (uint8_t)i);
-            if (member != NULL) {
-                sle_team_cli_printf(cli, "member=%u role=%u online=%u battery=%u fix=%u rssi=%d last_seq=%u last_seen=%lu",
-                    member->member_id, member->role, member->online, member->battery_percent,
-                    member->fix_status, member->last_rssi_dbm, member->last_seq, (unsigned long)member->last_seen_s);
+        for (i = 0; i < (int)SLE_TEAM_MAX_MEMBERS; i++) {
+            char member_label[8];
+            member = &cli->node->members[i];
+            if (member->online != 0U) {
+                sle_team_cli_format_member_label(member, member_label, sizeof(member_label));
+                sle_team_cli_printf(cli,
+                    "member=%u label=%s role=%u online=%u battery=%u fix=%u rssi=%d mac=%02X%02X ready=%u relay=%u tier=%u max_down=%u last_seq=%u last_seen=%lu",
+                    member->member_id, member_label, member->role, member->online, member->battery_percent,
+                    member->fix_status, member->last_rssi_dbm, member->mac[4], member->mac[5], member->mac_ready,
+                    member->relay_allowed, member->relay_tier, member->max_downstream, member->last_seq,
+                    (unsigned long)member->last_seen_s);
             }
         }
         return;
@@ -331,10 +371,13 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
             for (i = 0; i < (int)SLE_TEAM_MAX_MEMBERS; i++) {
                 const sle_team_pending_member_t *pending = &cli->node->pending_members[i];
                 if (pending->active != 0U) {
-                    sle_team_cli_printf(cli, "pending member=%u role=%u battery=%u mac=%02X%02X ready=%u last_seen=%lu",
+                    char pending_label[8];
+
+                    sle_team_cli_format_pending_label(pending, pending_label, sizeof(pending_label));
+                    sle_team_cli_printf(cli, "pending member=%u role=%u battery=%u mac=%02X%02X ready=%u last_seen=%lu label=%s",
                         pending->member_id, pending->role, pending->battery_percent,
                         pending->mac[4], pending->mac[5], pending->mac_ready,
-                        (unsigned long)pending->last_seen_s);
+                        (unsigned long)pending->last_seen_s, pending_label);
                 }
             }
             return;
@@ -350,15 +393,28 @@ void sle_team_cli_handle_line(sle_team_cli_t *cli, const char *line)
             return;
         }
         if (strcmp(argv[1], "approve") == 0) {
+            uint8_t relay_allowed = 0U;
+
             if (argc < 3 || parse_u32(argv[2], 1U, 254U, &v[0]) != 0) {
-                sle_team_cli_puts(cli, "usage: pairing approve <id>");
+                sle_team_cli_puts(cli, "usage: pairing approve <id> [relay|norelay]");
                 return;
             }
-            ret = sle_team_node_pairing_approve(cli->node, (uint8_t)v[0]);
-            sle_team_cli_printf(cli, "pairing approve member=%u ret=%d", (uint8_t)v[0], ret);
+            if (argc >= 4) {
+                if (strcmp(argv[3], "relay") == 0) {
+                    relay_allowed = 1U;
+                } else if (strcmp(argv[3], "norelay") == 0) {
+                    relay_allowed = 0U;
+                } else {
+                    sle_team_cli_puts(cli, "usage: pairing approve <id> [relay|norelay]");
+                    return;
+                }
+            }
+            ret = sle_team_node_pairing_approve_with_relay(cli->node, (uint8_t)v[0], relay_allowed);
+            sle_team_cli_printf(cli, "pairing approve member=%u relay=%u ret=%d",
+                (uint8_t)v[0], relay_allowed, ret);
             return;
         }
-        sle_team_cli_puts(cli, "usage: pairing [start|stop|approve <id>|pending]");
+        sle_team_cli_puts(cli, "usage: pairing [start|stop|approve <id> [relay|norelay]|pending]");
         return;
     }
 

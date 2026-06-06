@@ -14,10 +14,10 @@ BearPi SDK before building, then copies the resulting .fwpkg back to the Mac.
 Environment:
   UBUNTU_HOST=192.168.1.50
   UBUNTU_PORT=22
-  UBUNTU_USER=codex
-  UBUNTU_PASS=codex              optional; omit when SSH key login works
-  UBUNTU_SDK=/home/codex/workspace/bearpi-pico_h3863_fresh
-  OUT_ROOT=/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm
+  UBUNTU_USER=builder
+  UBUNTU_PASS=builder              optional; omit when SSH key login works
+  UBUNTU_SDK=/home/builder/workspace/bearpi-pico_h3863_fresh
+  OUT_ROOT=/path/to/output_from_vm
   BUILD_JOBS=4
 
 Expected remote SDK layout:
@@ -47,10 +47,10 @@ esac
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UBUNTU_HOST="${UBUNTU_HOST:-}"
 UBUNTU_PORT="${UBUNTU_PORT:-22}"
-UBUNTU_USER="${UBUNTU_USER:-codex}"
+UBUNTU_USER="${UBUNTU_USER:-builder}"
 UBUNTU_PASS="${UBUNTU_PASS:-}"
-UBUNTU_SDK="${UBUNTU_SDK:-/home/codex/workspace/bearpi-pico_h3863_fresh}"
-OUT_ROOT="${OUT_ROOT:-/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm}"
+UBUNTU_SDK="${UBUNTU_SDK:-/home/builder/workspace/bearpi-pico_h3863_fresh}"
+OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 
 if [[ -z "$UBUNTU_HOST" ]]; then

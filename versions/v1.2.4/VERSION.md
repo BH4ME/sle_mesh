@@ -28,9 +28,9 @@
 固件记录：
 
 - leader:
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader_unified_sle/ws63-liteos-app_leader_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_leader_unified_sle/ws63-liteos-app_leader_all.fwpkg`
 - member:
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_member_unified_sle/ws63-liteos-app_member_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_member_unified_sle/ws63-liteos-app_member_all.fwpkg`
 
 已知限制：
 

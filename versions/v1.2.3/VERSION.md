@@ -31,4 +31,4 @@
 固件记录：
 
 - 最新 leader 测试包：
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_leader_wifi_console_ssr_v3/ws63-liteos-app_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_leader_wifi_console_ssr_v3/ws63-liteos-app_all.fwpkg`

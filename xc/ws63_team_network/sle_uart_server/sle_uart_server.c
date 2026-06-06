@@ -108,6 +108,11 @@ static sle_uart_server_conn_t *sle_uart_server_find_conn(uint16_t conn_id)
     return NULL;
 }
 
+uint8_t sle_uart_server_has_conn(uint16_t conn_id)
+{
+    return sle_uart_server_find_conn(conn_id) != NULL ? 1U : 0U;
+}
+
 static sle_uart_server_conn_t *sle_uart_server_alloc_conn(uint16_t conn_id)
 {
     sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
@@ -483,7 +488,7 @@ errcode_t sle_uart_server_send_report_by_handle(const uint8_t *data, uint16_t le
     return ERRCODE_SLE_SUCCESS;
 }
 
-static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
+void sle_uart_server_handle_connect_state_changed(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason)
 {
     uint8_t sle_connect_state[] = "sle_dis_connect";
@@ -505,7 +510,7 @@ static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
         }
         g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : 0U;
         (void)sle_read_remote_device_rssi(conn_id);
-        (void)sle_uart_server_adv_restart();
+        sample_at_log_print("%s keep announce stable after connect\r\n", SLE_UART_SERVER_LOG);
         sample_at_log_print("%s connected count:%u\r\n", SLE_UART_SERVER_LOG, g_sle_conn_count);
     } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
         sle_uart_server_remove_conn(conn_id);
@@ -518,16 +523,17 @@ static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
     }
 }
 
-static void sle_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
+void sle_uart_server_handle_read_rssi(uint16_t conn_id, int8_t rssi, errcode_t status)
 {
     sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
     if (status == ERRCODE_SLE_SUCCESS && conn != NULL) {
         conn->rssi = rssi;
         sample_at_log_print("%s rssi conn_id:%d rssi:%d\r\n", SLE_UART_SERVER_LOG, conn_id, rssi);
     }
 }
 
-static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
+void sle_uart_server_handle_pair_complete(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
 {
     sample_at_log_print("%s pair complete conn_id:%02x, status:%x\r\n", SLE_UART_SERVER_LOG,
         conn_id, status);
@@ -540,30 +546,70 @@ static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errc
     }
     g_sle_pair_hdl = (g_sle_conn_count > 0U) ? (get_connect_id() + 1U) : (conn_id + 1U);
     ssap_exchange_info_t parameter = { 0 };
+    errcode_t ret;
     parameter.mtu_size = 520;
     parameter.version = 1;
-    ssaps_set_info(g_server_id, &parameter);
+    ret = ssaps_set_info(g_server_id, &parameter);
+    sample_at_log_print("%s ssaps_set_info ret:%x mtu:%u version:%u\r\n",
+        SLE_UART_SERVER_LOG, ret, parameter.mtu_size, parameter.version);
 }
 
-static errcode_t sle_conn_register_cbks(void)
+uint16_t sle_uart_server_connected_count(void)
 {
-    errcode_t ret;
-    sle_connection_callbacks_t conn_cbks = {0};
-    conn_cbks.connect_state_changed_cb = sle_connect_state_changed_cbk;
-    conn_cbks.pair_complete_cb = sle_pair_complete_cbk;
-    conn_cbks.read_rssi_cb = sle_read_rssi_cbk;
-    ret = sle_connection_register_callbacks(&conn_cbks);
-    if (ret != ERRCODE_SLE_SUCCESS) {
-        sample_at_log_print("%s sle_conn_register_cbks,sle_connection_register_callbacks fail :%x\r\n",
-        SLE_UART_SERVER_LOG, ret);
-        return ret;
-    }
-    return ERRCODE_SLE_SUCCESS;
+    return g_sle_conn_count;
 }
 
 uint16_t sle_uart_client_is_connected(void)
 {
-    return g_sle_conn_count;
+    return sle_uart_server_connected_count();
+}
+
+uint8_t sle_uart_server_get_active_conns(uint16_t *conn_ids, uint8_t max_conns)
+{
+    uint8_t count = 0U;
+
+    if (conn_ids == NULL || max_conns == 0U) {
+        return 0U;
+    }
+    for (uint8_t i = 0U; i < SLE_UART_SERVER_MAX_CONNECTIONS && count < max_conns; i++) {
+        if (g_sle_conns[i].active == 0U) {
+            continue;
+        }
+        conn_ids[count++] = g_sle_conns[i].conn_id;
+    }
+    return count;
+}
+
+uint8_t sle_uart_server_get_conn_member(uint16_t conn_id, uint8_t *member_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL || member_id == NULL) {
+        return 0U;
+    }
+    *member_id = conn->member_id;
+    return 1U;
+}
+
+uint8_t sle_uart_server_get_conn_rssi(uint16_t conn_id, int8_t *rssi)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL || rssi == NULL) {
+        return 0U;
+    }
+    *rssi = conn->rssi;
+    return 1U;
+}
+
+errcode_t sle_uart_server_disconnect_conn(uint16_t conn_id)
+{
+    sle_uart_server_conn_t *conn = sle_uart_server_find_conn(conn_id);
+
+    if (conn == NULL) {
+        return ERRCODE_SLE_FAIL;
+    }
+    return sle_disconnect_remote_device(&conn->addr);
 }
 
 errcode_t sle_uart_server_disconnect_current(void)
@@ -598,11 +644,6 @@ errcode_t sle_uart_server_init(ssaps_read_request_callback ssaps_read_callback, 
     if (ret != ERRCODE_SLE_SUCCESS) {
         sample_at_log_print("%s sle_uart_server_init,sle_uart_announce_register_cbks fail :%x\r\n",
         SLE_UART_SERVER_LOG, ret);
-        return ret;
-    }
-    ret = sle_conn_register_cbks();
-    if (ret != ERRCODE_SLE_SUCCESS) {
-        sample_at_log_print("%s sle_uart_server_init,sle_conn_register_cbks fail :%x\r\n", SLE_UART_SERVER_LOG, ret);
         return ret;
     }
     ret = sle_ssaps_register_cbks(ssaps_read_callback, ssaps_write_callback);

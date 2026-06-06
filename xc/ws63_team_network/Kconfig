@@ -27,17 +27,18 @@ config SLE_TEAM_UART_BUS
 
 config SLE_TEAM_UART_TXD_PIN
     int "UART TXD pin"
-    default 17
+    default 21
 
 config SLE_TEAM_UART_RXD_PIN
     int "UART RXD pin"
-    default 18
+    default 22
 
 config SLE_TEAM_LED_PIN
     int "SLE activity LED GPIO"
-    default 2
+    default 255
     help
-        BearPi-Pico H3863 onboard user LED is normally GPIO_2.
+        Set to 255 to disable the legacy single-color activity LED.
+        On the v4 schematic, IO2 is CHRG and must not be driven as an LED.
 
 config SLE_TEAM_LED_ACTIVE_LOW
     bool "SLE activity LED is active low"
@@ -45,9 +46,149 @@ config SLE_TEAM_LED_ACTIVE_LOW
     help
         The tested BearPi WS63 blue user LED turns on when GPIO_2 is driven high.
 
+config SLE_TEAM_WS2812_ENABLE
+    bool "Enable v4 WS2812 RGB status LED"
+    default n
+    help
+        Enable the v4 single WS2812C RGB LED connected to RGB/IO0.
+
+config SLE_TEAM_WS2812_PIN
+    int "WS2812 RGB data GPIO"
+    default 0
+    depends on SLE_TEAM_WS2812_ENABLE
+    help
+        On the v4 schematic, RGB is routed to WS63 IO0.
+
+config SLE_TEAM_BUZZER_ENABLE
+    bool "Enable v4 buzzer output"
+    default n
+    help
+        Enable BUZZ output on the v4 board.
+
+config SLE_TEAM_BUZZER_PIN
+    int "Buzzer GPIO"
+    default 14
+    depends on SLE_TEAM_BUZZER_ENABLE
+    help
+        On the v4 schematic, BUZZ is routed to WS63 IO14.
+
+config SLE_TEAM_BUZZER_ACTIVE_HIGH
+    bool "Buzzer active high"
+    default y
+    depends on SLE_TEAM_BUZZER_ENABLE
+    help
+        Set to y when BUZZER turns on at high level.
+
+config SLE_TEAM_GPS_ENABLE
+    bool "Enable v4 GPS UART pinmap"
+    default n
+    help
+        Keep this off when GPS module is not soldered. This option currently
+        records/logs UART pin mapping only; NMEA parsing is not enabled yet.
+
+config SLE_TEAM_GPS_UART_BUS
+    int "GPS UART bus"
+    default 1
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, GPS uses UART1.
+
+config SLE_TEAM_GPS_UART_TXD_PIN
+    int "GPS UART TXD pin"
+    default 17
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, U1TX is routed to WS63 IO17.
+
+config SLE_TEAM_GPS_UART_RXD_PIN
+    int "GPS UART RXD pin"
+    default 18
+    depends on SLE_TEAM_GPS_ENABLE
+    help
+        On the v4 schematic, U1RX is routed to WS63 IO18.
+
+config SLE_TEAM_ST7789_ENABLE
+    bool "Enable v4 ST7789 display"
+    default y
+    select SPI_SUPPORT_MASTER
+
+config SLE_TEAM_DISPLAY_USE_LVGL
+    bool "Use LVGL UI backend for ST7789 display"
+    default y
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Enable LVGL-based status/alert rendering on ST7789. Keep this off
+        unless your SDK image provides LVGL headers and sources.
+
+config SLE_TEAM_LVGL_DRAW_BUF_LINES
+    int "LVGL draw buffer lines for ST7789"
+    default 8
+    range 8 120
+    depends on SLE_TEAM_ST7789_ENABLE && SLE_TEAM_DISPLAY_USE_LVGL
+    help
+        Number of scanlines used by LVGL partial rendering buffer.
+        Higher value improves refresh throughput while increasing RAM usage.
+        Keep the default low so SLE central discovery has enough heap.
+
+config SLE_TEAM_ST7789_SPI_BUS
+    int "ST7789 SPI bus"
+    default 0
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_SCLK_PIN
+    int "ST7789 SCL/SCLK pin"
+    default 6
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_MOSI_PIN
+    int "ST7789 SDA/MOSI pin"
+    default 8
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_CS_PIN
+    int "ST7789 CS pin"
+    default 7
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_DC_PIN
+    int "ST7789 RS/DC pin"
+    default 9
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_RESET_PIN
+    int "ST7789 RESET pin"
+    default 13
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_X_OFFSET
+    int "ST7789 column offset"
+    default 40
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Confirmed v4.4+ landscape 1.14 inch ST7789 module starts at column 40.
+        Keep this paired with WIDTH=240, HEIGHT=135, Y_OFFSET=53, MADCTL=0x60.
+
+config SLE_TEAM_ST7789_Y_OFFSET
+    int "ST7789 row offset"
+    default 53
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Confirmed v4.4+ landscape 1.14 inch ST7789 module starts at row 53.
+        Keep this paired with WIDTH=240, HEIGHT=135, X_OFFSET=40, MADCTL=0x60.
+
+config SLE_TEAM_ST7789_WIDTH
+    int "ST7789 visible width"
+    default 240
+    depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_HEIGHT
+    int "ST7789 visible height"
+    default 135
+    depends on SLE_TEAM_ST7789_ENABLE
+
 config SLE_TEAM_HEARTBEAT_INTERVAL_S
     int "Heartbeat interval in seconds"
-    default 3
+    default 1
     range 1 60
 
 config SLE_TEAM_REPORT_INTERVAL_S
@@ -67,20 +208,27 @@ config SLE_TEAM_LOST_DISTANCE_M
 
 config SLE_TEAM_HEARTBEAT_TIMEOUT_S
     int "Heartbeat timeout in seconds"
-    default 10
+    default 4
     range 1 300
 
 config SLE_TEAM_WIFI_AP_ENABLE
     bool "Enable WiFi SoftAP coexistence smoke test"
-    default n
+    default y
     help
-        Start a local WiFi SoftAP while the SLE team network is running.
-        This is only the coexistence smoke test; HTTP/WebUI comes after
-        SLE traffic is verified to keep working.
+        Start the local WiFi SoftAP and HTTP WebUI used for runtime role
+        selection while the SLE team network is running.
+
+config SLE_TEAM_WIFI_AP_AUTO_START
+    bool "Auto-start WiFi SoftAP and HTTP WebUI"
+    default y
+    depends on SLE_TEAM_WIFI_AP_ENABLE
+    help
+        Keep enabled for v4 unified firmware. The hosted/domain WebUI still
+        needs the board HTTP API to be reachable for one-click deployment.
 
 config SLE_TEAM_WIFI_AP_SSID
     string "WiFi SoftAP SSID"
-    default "SLE-TEAM-WS63"
+    default "SLE-TEAM-V4"
     depends on SLE_TEAM_WIFI_AP_ENABLE
 
 config SLE_TEAM_WIFI_AP_PSK

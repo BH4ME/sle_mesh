@@ -1,11 +1,37 @@
-import type { AllowMembersCommand, SendCommand, TeamEvent, TeamNode, TeamStatus } from "../protocol/types";
+import type {
+  AllowMembersCommand,
+  DeviceConfigCommand,
+  DeviceConfigResult,
+  DeviceConfigStatus,
+  MemberSelectCommand,
+  PairingCommand,
+  PendingMember,
+  RoleCommand,
+  SendCommand,
+  TeamEvent,
+  TeamNode,
+  TeamStatus,
+  UnconfiguredStatus,
+} from "../protocol/types";
+import { fetchAction, fetchJson } from "./http";
 
 export interface TeamApi {
-  getStatus(): Promise<TeamStatus>;
+  getStatus(): Promise<TeamStatus | UnconfiguredStatus>;
   getNodes(): Promise<TeamNode[]>;
   getEvents(): Promise<TeamEvent[]>;
+  getPending(): Promise<PendingMember[]>;
+  configureRole(command: RoleCommand): Promise<void>;
+  configurePairing(command: PairingCommand): Promise<void>;
+  selectMemberLeader(command: MemberSelectCommand): Promise<void>;
+  leaveMember(): Promise<void>;
+  factoryReset(): Promise<void>;
   send(command: SendCommand): Promise<TeamEvent>;
   configureAllow(command: AllowMembersCommand): Promise<TeamEvent>;
+  getDeviceConfig(): Promise<DeviceConfigStatus>;
+  configureDevice(command: DeviceConfigCommand): Promise<DeviceConfigResult>;
+  applyDeviceConfig(): Promise<DeviceConfigResult>;
+  clearDeviceConfig(): Promise<DeviceConfigResult>;
+  rebootDevice(): Promise<DeviceConfigResult>;
 }
 
 export type ConnectionMode = "wifi" | "serial";
@@ -49,21 +75,25 @@ export function saveConnectionConfig(config: ConnectionConfig): void {
   window.localStorage.setItem(configKey, JSON.stringify(config));
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: { "content-type": "application/json" },
-    ...init,
-  });
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+function qs(params: Record<string, string | number | boolean>): string {
+  const out = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    out.set(key, String(value));
   }
-  return response.json() as Promise<T>;
+  return out.toString();
 }
 
 export class HttpTeamApi implements TeamApi {
   constructor(private readonly baseUrl = "") {}
 
-  getStatus(): Promise<TeamStatus> {
+  private async configureDeviceNow(command: DeviceConfigCommand): Promise<void> {
+    const result = await this.configureDevice(command);
+    if (!result.ok) {
+      throw new Error(`config ${result.action} failed ret=${result.ret}`);
+    }
+  }
+
+  getStatus(): Promise<TeamStatus | UnconfiguredStatus> {
     return fetchJson(`${this.baseUrl}/api/status`);
   }
 
@@ -73,6 +103,45 @@ export class HttpTeamApi implements TeamApi {
 
   getEvents(): Promise<TeamEvent[]> {
     return fetchJson(`${this.baseUrl}/api/events`);
+  }
+
+  getPending(): Promise<PendingMember[]> {
+    return fetchJson(`${this.baseUrl}/api/pending`);
+  }
+
+  configureRole(command: RoleCommand): Promise<void> {
+    return this.configureDeviceNow({ ...command, applyNow: true });
+  }
+
+  configurePairing(command: PairingCommand): Promise<void> {
+    if (command.action === "approve") {
+      return fetchAction(
+        `${this.baseUrl}/api/pairing?${qs({
+          action: "approve",
+          id: command.id,
+          relay: command.relay ? 1 : 0,
+        })}`,
+      );
+    }
+    return fetchAction(`${this.baseUrl}/api/pairing?action=${command.action}`);
+  }
+
+  selectMemberLeader(command: MemberSelectCommand): Promise<void> {
+    return fetchAction(
+      `${this.baseUrl}/api/member/select?${qs({
+        team: command.teamId,
+        leader: command.leaderSuffix,
+        channel: command.channel,
+      })}`,
+    );
+  }
+
+  leaveMember(): Promise<void> {
+    return fetchAction(`${this.baseUrl}/api/member/leave`);
+  }
+
+  factoryReset(): Promise<void> {
+    return fetchAction(`${this.baseUrl}/api/factory-reset`);
   }
 
   send(command: SendCommand): Promise<TeamEvent> {
@@ -85,6 +154,42 @@ export class HttpTeamApi implements TeamApi {
   configureAllow(_command: AllowMembersCommand): Promise<TeamEvent> {
     return Promise.reject(new Error("WiFi HTTP 暂未提供配置写入接口，请切到串口模式执行成员准入配置"));
   }
+
+  getDeviceConfig(): Promise<DeviceConfigStatus> {
+    return fetchJson(`${this.baseUrl}/api/config/status`);
+  }
+
+  configureDevice(command: DeviceConfigCommand): Promise<DeviceConfigResult> {
+    if (command.role === "leader") {
+      return fetchJson(
+        `${this.baseUrl}/api/config/leader?${qs({
+          team: command.teamId,
+          channel: command.channel,
+          now: command.applyNow ? 1 : 0,
+        })}`,
+      );
+    }
+    return fetchJson(
+      `${this.baseUrl}/api/config/member?${qs({
+        leader: command.leaderSuffix,
+        team: command.teamId,
+        channel: command.channel,
+        now: command.applyNow ? 1 : 0,
+      })}`,
+    );
+  }
+
+  applyDeviceConfig(): Promise<DeviceConfigResult> {
+    return fetchJson(`${this.baseUrl}/api/config/apply`);
+  }
+
+  clearDeviceConfig(): Promise<DeviceConfigResult> {
+    return fetchJson(`${this.baseUrl}/api/config/clear`);
+  }
+
+  rebootDevice(): Promise<DeviceConfigResult> {
+    return fetchJson(`${this.baseUrl}/api/config/reboot`);
+  }
 }
 
 type SerialPortLike = {
@@ -93,14 +198,134 @@ type SerialPortLike = {
   open(options: { baudRate: number }): Promise<void>;
 };
 
+export interface SerialDebugState {
+  connected: boolean;
+  lines: string[];
+}
+
 type SerialNavigator = Navigator & {
   serial?: {
     requestPort(options?: unknown): Promise<SerialPortLike>;
   };
 };
 
+type SerialLogEntry = {
+  seq: number;
+  line: string;
+};
+
 let selectedSerialPort: SerialPortLike | undefined;
 let serialQueue: Promise<unknown> = Promise.resolve();
+let serialReaderPort: SerialPortLike | undefined;
+let serialReaderTask: Promise<void> | undefined;
+let serialReadRemainder = "";
+let serialLineSeq = 0;
+const serialLines: SerialLogEntry[] = [];
+
+function rememberSerialLines(lines: string[]): void {
+  if (lines.length === 0) return;
+  for (const line of lines) {
+    serialLineSeq += 1;
+    serialLines.push({ seq: serialLineSeq, line });
+  }
+  if (serialLines.length > 400) {
+    serialLines.splice(0, serialLines.length - 400);
+  }
+}
+
+function clearSerialLines(): void {
+  serialLines.splice(0, serialLines.length);
+  serialReadRemainder = "";
+  serialLineSeq = 0;
+}
+
+function serialLinesSince(seq: number): string[] {
+  return serialLines.filter((entry) => entry.seq > seq).map((entry) => entry.line);
+}
+
+function serialTextToLines(text: string): string[] {
+  if (text.length === 0) return [];
+  serialReadRemainder += text;
+  const parts = serialReadRemainder.split(/\r?\n/);
+  serialReadRemainder = parts.pop() ?? "";
+  return parts.map((line) => line.trim()).filter(Boolean);
+}
+
+function flushSerialRemainder(): string[] {
+  const line = serialReadRemainder.trim();
+  serialReadRemainder = "";
+  return line.length > 0 ? [line] : [];
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function serialCommandComplete(command: string, lines: string[]): boolean {
+  const hasCfgJson = lines.some((line) => line.includes("[cfg-json]"));
+  const hasCfgRet = lines.some((line) => line.startsWith("[cfg]") && /\bret=-?\d+/.test(line));
+  if (command === "cfg status") return hasCfgJson;
+  if (command.startsWith("cfg ")) return hasCfgJson && hasCfgRet;
+  if (command === "state") return lines.some((line) => /team=\d+\s+self=\d+/.test(line)) || hasCfgJson;
+  if (command === "members") return lines.some((line) => /\b(member|node)=\d+/.test(line));
+  if (command === "allow") return lines.some((line) => /\ballow\b/.test(line));
+  if (command.startsWith("pairing ")) return lines.some((line) => /\b(pairing|pending)\b/.test(line));
+  return false;
+}
+
+async function waitForSerialLinesSince(seq: number, waitMs: number, command: string): Promise<string[]> {
+  const deadline = Date.now() + waitMs;
+
+  while (Date.now() < deadline) {
+    await delay(Math.min(50, Math.max(0, deadline - Date.now())));
+    const lines = serialLinesSince(seq).filter((line) => line !== `[cli-tx] ${command}`);
+    if (serialCommandComplete(command, lines)) {
+      break;
+    }
+  }
+
+  return serialLinesSince(seq);
+}
+
+async function readSerialLoop(port: SerialPortLike): Promise<void> {
+  if (!port.readable) return;
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
+  try {
+    while (serialReaderPort === port) {
+      const result = await reader.read();
+      if (result.done) break;
+      rememberSerialLines(serialTextToLines(decoder.decode(result.value, { stream: true })));
+    }
+    rememberSerialLines(serialTextToLines(decoder.decode()));
+    rememberSerialLines(flushSerialRemainder());
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function startSerialReader(port: SerialPortLike): void {
+  if (serialReaderPort === port && serialReaderTask) return;
+  serialReaderPort = port;
+  serialReaderTask = readSerialLoop(port)
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      rememberSerialLines([`[cli-rx] serial reader stopped: ${message}`]);
+    })
+    .finally(() => {
+      if (serialReaderPort === port) {
+        serialReaderPort = undefined;
+        serialReaderTask = undefined;
+      }
+    });
+}
+
+export function getSerialDebugState(): SerialDebugState {
+  return {
+    connected: selectedSerialPort?.readable != null && selectedSerialPort?.writable != null,
+    lines: serialLines.map((entry) => entry.line),
+  };
+}
 
 export async function requestSerialPort(baudRate: number): Promise<void> {
   const serialNavigator = navigator as SerialNavigator;
@@ -109,6 +334,8 @@ export async function requestSerialPort(baudRate: number): Promise<void> {
   }
   selectedSerialPort = await serialNavigator.serial.requestPort();
   await selectedSerialPort.open({ baudRate });
+  clearSerialLines();
+  startSerialReader(selectedSerialPort);
 }
 
 function cliStateToStatus(line: string): TeamStatus | undefined {
@@ -120,6 +347,7 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
   const pairingMatch = line.match(/pairing=(\d+)/);
   const allowMatch = line.match(/allow=(all|only)\s+allow_count=(\d+)/);
   return {
+    configured: true,
     teamId: Number(match[1]),
     selfId: Number(match[2]),
     leaderId: Number(match[3]),
@@ -138,9 +366,16 @@ function cliStateToStatus(line: string): TeamStatus | undefined {
 
 function cliMemberToNode(line: string): TeamNode | undefined {
   const match = line.match(
-    /member=(\d+)\s+role=(\d+)\s+online=(\d+)\s+battery=(\d+)\s+fix=(\d+)\s+rssi=(-?\d+)\s+last_seq=(\d+)\s+last_seen=(\d+)/,
+    /member=(\d+).*?\brole=(\d+).*?\bonline=(\d+).*?\bbattery=(\d+).*?\bfix=(\d+).*?\brssi=(-?\d+).*?\blast_seq=(\d+).*?\blast_seen=(\d+)/,
   );
   if (!match) return undefined;
+  const labelMatch = line.match(/\blabel=(M[0-9A-Fa-f]{4})\b/);
+  const macMatch = line.match(/\bmac=([0-9A-Fa-f]{4})\s+ready=(\d+)/);
+  const relayMatch = line.match(/\brelay=(\d+)/);
+  const tierMatch = line.match(/\btier=(\d+)/);
+  const maxDownMatch = line.match(/\bmax_down=(\d+)/);
+  const macReady = macMatch ? Number(macMatch[2]) !== 0 : undefined;
+  const labelSuffix = labelMatch ? labelMatch[1].replace(/^M/, "").toUpperCase() : undefined;
   return {
     id: Number(match[1]),
     role: Number(match[2]) === 1 ? "leader" : "member",
@@ -148,9 +383,193 @@ function cliMemberToNode(line: string): TeamNode | undefined {
     batteryPercent: Number(match[4]),
     fixStatus: Number(match[5]),
     lastRssiDbm: Number(match[6]) === 127 ? null : Number(match[6]),
+    macReady,
+    macSuffix: macReady ? macMatch?.[1].toUpperCase() : labelSuffix,
+    relayAllowed: relayMatch ? Number(relayMatch[1]) !== 0 : undefined,
+    relayTier: tierMatch ? Number(tierMatch[1]) : undefined,
+    maxDownstream: maxDownMatch ? Number(maxDownMatch[1]) : undefined,
     lastSeq: Number(match[7]),
     lastSeenS: Number(match[8]),
   };
+}
+
+function cliPendingToMember(line: string): PendingMember | undefined {
+  const match = line.match(/pending member=(\d+)\s+role=(\d+)\s+battery=(\d+)\s+mac=([0-9A-Fa-f]{4})\s+ready=(\d+)\s+last_seen=(\d+)/);
+  if (!match) return undefined;
+  return {
+    id: Number(match[1]),
+    role: Number(match[2]) === 1 ? "leader" : "member",
+    batteryPercent: Number(match[3]),
+    macReady: Number(match[5]) !== 0,
+    macSuffix: match[4].toUpperCase(),
+    lastSeenS: Number(match[6]),
+  };
+}
+
+function defaultConfigStatus(): DeviceConfigStatus {
+  return {
+    ok: false,
+    selfSuffix: "0000",
+    routeId: 0,
+    nvValid: false,
+    nvRole: "none",
+    nvRoleValue: 255,
+    nvTeam: 0,
+    nvChannel: 0,
+    nvLeaderSuffix: "0000",
+    runtimeConfigured: false,
+    runtimeRole: "none",
+    runtimeRoleValue: 255,
+    runtimeTeam: 0,
+    runtimeChannel: 0,
+    runtimeLeader: 0,
+    runtimeSelf: 0,
+    runtimeDirectCap: 0,
+    runtimeRelayBudget: 0,
+    roleRequestPending: false,
+    roleRequestRole: "none",
+    roleRequestTeam: 0,
+    roleRequestChannel: 0,
+    roleRequestLeader: 0,
+    roleRequestLeaderSuffix: "0000",
+    roleRequestLastRet: 0,
+  };
+}
+
+function isConfigRole(value: unknown): value is DeviceConfigStatus["nvRole"] {
+  return value === "leader" || value === "member" || value === "none";
+}
+
+function normalizeSuffix(value: unknown): string {
+  const suffix = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return /^[0-9A-F]{4}$/.test(suffix) ? suffix : "0000";
+}
+
+function normalizeConfigStatus(value: unknown): DeviceConfigStatus {
+  const input = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const fallback = defaultConfigStatus();
+  const numberField = (key: keyof DeviceConfigStatus): number => {
+    const raw = input[key];
+    return typeof raw === "number" && Number.isFinite(raw) ? raw : (fallback[key] as number);
+  };
+  const booleanField = (key: keyof DeviceConfigStatus): boolean => {
+    const raw = input[key];
+    return typeof raw === "boolean" ? raw : (fallback[key] as boolean);
+  };
+  const roleField = (key: keyof DeviceConfigStatus): DeviceConfigStatus["nvRole"] => {
+    const raw = input[key];
+    return isConfigRole(raw) ? raw : "none";
+  };
+  return {
+    ok: booleanField("ok"),
+    fw: typeof input.fw === "string" ? input.fw : undefined,
+    selfSuffix: normalizeSuffix(input.selfSuffix),
+    routeId: numberField("routeId"),
+    nvValid: booleanField("nvValid"),
+    nvRole: roleField("nvRole"),
+    nvRoleValue: numberField("nvRoleValue"),
+    nvTeam: numberField("nvTeam"),
+    nvChannel: numberField("nvChannel"),
+    nvLeaderSuffix: normalizeSuffix(input.nvLeaderSuffix),
+    runtimeConfigured: booleanField("runtimeConfigured"),
+    runtimeRole: roleField("runtimeRole"),
+    runtimeRoleValue: numberField("runtimeRoleValue"),
+    runtimeTeam: numberField("runtimeTeam"),
+    runtimeChannel: numberField("runtimeChannel"),
+    runtimeLeader: numberField("runtimeLeader"),
+    runtimeSelf: numberField("runtimeSelf"),
+    runtimeDirectCap: numberField("runtimeDirectCap"),
+    runtimeRelayBudget: numberField("runtimeRelayBudget"),
+    roleRequestPending: booleanField("roleRequestPending"),
+    roleRequestRole: roleField("roleRequestRole"),
+    roleRequestTeam: numberField("roleRequestTeam"),
+    roleRequestChannel: numberField("roleRequestChannel"),
+    roleRequestLeader: numberField("roleRequestLeader"),
+    roleRequestLeaderSuffix: normalizeSuffix(input.roleRequestLeaderSuffix),
+    roleRequestLastRet: numberField("roleRequestLastRet"),
+  };
+}
+
+function parseConfigStatusLine(line: string): DeviceConfigStatus | undefined {
+  const prefix = "[cfg-json]";
+  if (!line.startsWith(prefix)) return undefined;
+  try {
+    return normalizeConfigStatus(JSON.parse(line.slice(prefix.length).trim()));
+  } catch {
+    return undefined;
+  }
+}
+
+function latestConfigStatus(lines: string[]): DeviceConfigStatus | undefined {
+  for (const line of [...lines].reverse()) {
+    const parsed = parseConfigStatusLine(line);
+    if (parsed) return parsed;
+  }
+  return undefined;
+}
+
+function latestCfgRet(lines: string[]): number | undefined {
+  for (const line of [...lines].reverse()) {
+    if (!line.startsWith("[cfg]")) continue;
+    const match = line.match(/\bret=(-?\d+)/);
+    if (match) return Number(match[1]);
+  }
+  return undefined;
+}
+
+function configResultRet(lines: string[], fallback: number): number {
+  return latestCfgRet(lines) ?? fallback;
+}
+
+function configCommandToCli(command: DeviceConfigCommand): string {
+  const now = command.applyNow ? " now" : "";
+  if (command.role === "leader") {
+    return `cfg leader${now} ${command.teamId} ${command.channel}`;
+  }
+  return `cfg member${now} ${command.leaderSuffix} ${command.teamId} ${command.channel}`;
+}
+
+function configStatusToUnconfiguredStatus(config: DeviceConfigStatus): UnconfiguredStatus {
+  return {
+    configured: false,
+    selfLabel: `WS63-${config.selfSuffix}`,
+    routeId: config.routeId,
+    macReady: config.selfSuffix !== "0000",
+    macSuffix: config.selfSuffix,
+    ssid: "serial",
+    transport: "serial",
+  };
+}
+
+function configStatusToRuntimeStatus(config: DeviceConfigStatus): TeamStatus | UnconfiguredStatus {
+  if (!config.runtimeConfigured || (config.runtimeRole !== "leader" && config.runtimeRole !== "member")) {
+    return configStatusToUnconfiguredStatus(config);
+  }
+  return {
+    configured: true,
+    selfLabel: `WS63-${config.selfSuffix}`,
+    routeId: config.routeId,
+    macSuffix: config.selfSuffix,
+    teamId: config.runtimeTeam,
+    selfId: config.runtimeSelf,
+    leaderId: config.runtimeLeader,
+    role: config.runtimeRole,
+    state: config.roleRequestPending ? "joining" : "idle",
+    joined: config.runtimeRole === "leader",
+    maxDownstream: config.runtimeDirectCap,
+    nextSeq: 0,
+    uptimeS: 0,
+    transport: "serial",
+  };
+}
+
+function routeIdFromSuffix(suffix: string): number {
+  const value = Number.parseInt(suffix, 16) & 0xffff;
+  let routeId = value & 0xff;
+  if (routeId === 0 || routeId === 0xff) {
+    routeId = ((value >> 8) % 254) + 1;
+  }
+  return routeId;
 }
 
 function sendCommandToCli(command: SendCommand): string {
@@ -235,6 +654,13 @@ export class SerialTeamApi implements TeamApi {
 
   constructor(private readonly baudRate = 115200) {}
 
+  private async configureDeviceNow(command: DeviceConfigCommand): Promise<void> {
+    const result = await this.configureDevice(command);
+    if (!result.ok) {
+      throw new Error(`config ${result.action} failed ret=${result.ret}`);
+    }
+  }
+
   private async ensurePort(): Promise<SerialPortLike> {
     if (!selectedSerialPort) {
       await requestSerialPort(this.baudRate);
@@ -242,40 +668,24 @@ export class SerialTeamApi implements TeamApi {
     if (!selectedSerialPort?.readable || !selectedSerialPort.writable) {
       throw new Error("串口未打开");
     }
+    startSerialReader(selectedSerialPort);
     return selectedSerialPort;
   }
 
   private async runCliUnlocked(command: string, waitMs = 450): Promise<string[]> {
     const port = await this.ensurePort();
+    const startSeq = serialLineSeq;
+    const txLine = `[cli-tx] ${command}`;
     const writer = port.writable!.getWriter();
     try {
-      this.lastLines = [...this.lastLines, `[cli-tx] ${command}`].slice(-80);
+      this.lastLines = [...this.lastLines, txLine].slice(-80);
+      rememberSerialLines([txLine]);
       await writer.write(new TextEncoder().encode(`${command}\r\n`));
     } finally {
       writer.releaseLock();
     }
 
-    const reader = port.readable!.getReader();
-    const lines: string[] = [];
-    const deadline = Date.now() + waitMs;
-    let text = "";
-    try {
-      while (Date.now() < deadline) {
-        const timeout = new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
-          window.setTimeout(() => resolve({ done: true, value: undefined }), 80);
-        });
-        const result = await Promise.race([reader.read(), timeout]);
-        if (result.done) continue;
-        text += new TextDecoder().decode(result.value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .forEach((line) => lines.push(line));
+    const lines = (await waitForSerialLinesSince(startSeq, waitMs, command)).filter((line) => line !== txLine);
     this.lastLines = [...this.lastLines, ...lines].slice(-80);
     return lines;
   }
@@ -286,10 +696,12 @@ export class SerialTeamApi implements TeamApi {
     return task;
   }
 
-  async getStatus(): Promise<TeamStatus> {
+  async getStatus(): Promise<TeamStatus | UnconfiguredStatus> {
     const lines = await this.runCli("state");
     const status = lines.map(cliStateToStatus).find(Boolean);
-    if (!status) throw new Error("串口没有返回 state，确认板子串口 CLI 已启动");
+    if (!status) {
+      return configStatusToRuntimeStatus(await this.getDeviceConfig());
+    }
     if (status.memberFilterEnabled) {
       const allowLines = await this.runCli("allow");
       status.allowedMembers = allowLines
@@ -313,6 +725,35 @@ export class SerialTeamApi implements TeamApi {
       .map((line, index) => serialLineToEvent(line, index));
   }
 
+  async getPending(): Promise<PendingMember[]> {
+    const lines = await this.runCli("pairing pending");
+    return lines.map(cliPendingToMember).filter((member): member is PendingMember => member !== undefined);
+  }
+
+  async configureRole(command: RoleCommand): Promise<void> {
+    await this.configureDeviceNow({ ...command, applyNow: true });
+  }
+
+  async configurePairing(command: PairingCommand): Promise<void> {
+    if (command.action === "approve") {
+      await this.runCli(`pairing approve ${command.id} ${command.relay ? "relay" : "norelay"}`, 800);
+      return;
+    }
+    await this.runCli(`pairing ${command.action}`, 800);
+  }
+
+  async selectMemberLeader(command: MemberSelectCommand): Promise<void> {
+    await this.runCli(`join ${command.teamId} ${routeIdFromSuffix(command.leaderSuffix)} ${command.channel}`, 800);
+  }
+
+  async leaveMember(): Promise<void> {
+    await this.runCli("leave", 800);
+  }
+
+  async factoryReset(): Promise<void> {
+    return Promise.reject(new Error("串口模式暂无 factory reset CLI；请用 WiFi HTTP /api/factory-reset 或串口 leave 后重新配置"));
+  }
+
   async send(command: SendCommand): Promise<TeamEvent> {
     const cli = sendCommandToCli(command);
     await this.runCli(cli, 700);
@@ -325,6 +766,43 @@ export class SerialTeamApi implements TeamApi {
     await this.runCli(cli, 500);
     const latest = [...this.lastLines].reverse().find((line) => line.includes("allow ")) ?? `[cli-tx] ${cli}`;
     return serialLineToEvent(latest, Date.now());
+  }
+
+  async getDeviceConfig(): Promise<DeviceConfigStatus> {
+    const lines = await this.runCli("cfg status", 800);
+    const parsed = latestConfigStatus(lines);
+    if (!parsed) {
+      throw new Error("serial cfg status did not return [cfg-json]");
+    }
+    return parsed;
+  }
+
+  async configureDevice(command: DeviceConfigCommand): Promise<DeviceConfigResult> {
+    const cli = configCommandToCli(command);
+    const lines = await this.runCli(cli, command.applyNow ? 1400 : 800);
+    const config = latestConfigStatus(lines) ?? (await this.getDeviceConfig());
+    const ret = configResultRet(lines, -1);
+    return { ok: ret === 0, action: command.applyNow ? `${command.role}-now` : command.role, ret, config };
+  }
+
+  async applyDeviceConfig(): Promise<DeviceConfigResult> {
+    const lines = await this.runCli("cfg apply", 1400);
+    const config = latestConfigStatus(lines) ?? (await this.getDeviceConfig());
+    const ret = configResultRet(lines, -1);
+    return { ok: ret === 0, action: "apply", ret, config };
+  }
+
+  async clearDeviceConfig(): Promise<DeviceConfigResult> {
+    const lines = await this.runCli("cfg clear", 800);
+    const config = latestConfigStatus(lines) ?? (await this.getDeviceConfig());
+    const ret = latestCfgRet(lines) ?? (config.nvValid ? -4 : 0);
+    return { ok: ret === 0 && !config.nvValid, action: "clear", ret, config };
+  }
+
+  async rebootDevice(): Promise<DeviceConfigResult> {
+    await this.runCli("cfg reboot", 300);
+    const config = latestConfigStatus(this.lastLines) ?? defaultConfigStatus();
+    return { ok: true, action: "reboot", ret: 0, config };
   }
 }
 

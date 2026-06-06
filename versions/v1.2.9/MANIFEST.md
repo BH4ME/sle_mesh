@@ -29,7 +29,7 @@
 验证：
 
 ```sh
-UBUNTU_HOST=192.168.6.5 UBUNTU_USER=owen UBUNTU_PASS='67215837' \
+UBUNTU_HOST=192.168.6.5 UBUNTU_USER=owen UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 BUILD_JOBS=4 \
 scripts/ws63_build_team_ubuntu.sh unified
 ```
@@ -38,7 +38,7 @@ scripts/ws63_build_team_ubuntu.sh unified
 
 - Ubuntu 编译通过。
 - 产物：
-  `/Users/bh4me_macair/Documents/Codex/bearpi-pico_h3863/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
+  `<sdk-root>/output_from_vm/team_network_unified_runtime_role/ws63-liteos-app_unified_all.fwpkg`
 - 烧录 leader 与 member 成功。
 - 串口测试确认并修复：
   - 首个 SLE 连接可为 `conn_id=0`，旧逻辑会把它当成“未找到连接”。

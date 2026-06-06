@@ -335,6 +335,24 @@ h2 {
   padding: 16px;
 }
 
+.bulk-config-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.role-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(90px, 0.35fr) minmax(110px, 0.35fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+}
+
+.control-actions {
+  padding: 16px 16px 0;
+}
+
 .connection-form.compact {
   grid-template-columns: 260px minmax(0, 1fr) auto;
   align-items: end;
@@ -395,6 +413,12 @@ h2 {
   gap: 12px;
 }
 
+.bulk-config-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .connection-actions {
   display: flex;
   flex-wrap: wrap;
@@ -429,6 +453,17 @@ textarea {
   background: #fbfcfa;
   border: 1px solid #d9dfd7;
   border-radius: 6px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.check-row input {
+  width: auto;
+  min-height: auto;
 }
 
 .form-grid {
@@ -553,7 +588,30 @@ pre {
   padding: 16px 16px 0;
 }
 
-.allow-summary div {
+.config-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+
+.board-summary,
+.route-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+
+.route-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding-bottom: 16px;
+}
+
+.allow-summary div,
+.config-summary div,
+.board-summary div,
+.route-grid div {
   display: grid;
   gap: 4px;
   min-height: 58px;
@@ -563,13 +621,76 @@ pre {
   border-radius: 8px;
 }
 
-.allow-summary span {
+.allow-summary span,
+.config-summary span,
+.board-summary span,
+.route-grid span {
   color: #637269;
   font-size: 12px;
 }
 
-.allow-summary strong {
+.allow-summary strong,
+.config-summary strong,
+.board-summary strong,
+.route-grid strong {
   overflow-wrap: anywhere;
+}
+
+.serial-log {
+  margin: 0 16px 8px;
+  overflow: hidden;
+  border: 1px solid #e4eae2;
+  border-radius: 8px;
+}
+
+.serial-log pre {
+  max-height: 260px;
+  overflow: auto;
+  padding: 14px;
+  color: #dbeee4;
+  background: #13251f;
+}
+
+.small-head {
+  min-height: 42px;
+  background: #f7faf6;
+}
+
+.pending-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: #f7faf6;
+  border: 1px solid #e4eae2;
+  border-radius: 8px;
+}
+
+.pending-row strong,
+.pending-row span {
+  display: block;
+}
+
+.pending-row span {
+  margin-top: 4px;
+  color: #637269;
+  font-size: 13px;
+}
+
+.empty-state {
+  min-height: 42px;
+  padding: 12px;
+  color: #637269;
+  background: #f7faf6;
+  border: 1px dashed #d9dfd7;
+  border-radius: 8px;
 }
 
 .deploy-grid div {
@@ -615,12 +736,22 @@ code {
     position: static;
   }
 
-  .summary-grid,
-  .two-column,
-  .deploy-grid,
-  .allow-summary,
-  .connection-form.compact {
-    grid-template-columns: 1fr;
+	  .summary-grid,
+	  .two-column,
+	  .deploy-grid,
+	  .allow-summary,
+	  .config-summary,
+	  .board-summary,
+	  .route-grid,
+	  .role-form,
+	  .bulk-config-fields,
+	  .connection-form.compact {
+	    grid-template-columns: 1fr;
+	  }
+
+  .pending-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

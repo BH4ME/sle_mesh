@@ -1,26 +1,41 @@
 import {
   Battery,
   CircleDot,
-  Compass,
   Cpu,
+  GitBranch,
   Plug,
   Radio,
   RefreshCw,
   Send,
+  Settings2,
   TerminalSquare,
   Wifi,
+  Wrench,
   createElement,
   type IconNode,
 } from "lucide";
 import {
   createTeamApi,
+  getSerialDebugState,
   loadConnectionConfig,
   requestSerialPort,
   saveConnectionConfig,
   type ConnectionConfig,
 } from "./api/client";
 import { decodePacketHex, formatCoordinate } from "./protocol/codec";
-import type { AllowMembersCommand, SendCommand, TeamEvent, TeamNode, TeamStatus } from "./protocol/types";
+import type {
+  AllowMembersCommand,
+  DeviceConfigCommand,
+  DeviceConfigResult,
+  DeviceConfigStatus,
+  PendingMember,
+  SendCommand,
+  TeamEvent,
+  TeamNode,
+  TeamStatus,
+  UnconfiguredStatus,
+} from "./protocol/types";
+import { formatEventTime } from "./time";
 import consolePages from "../shared/console-pages.json";
 import "./styles/app.css";
 
@@ -30,9 +45,11 @@ const defaultDeviceApiUrl = consolePages.defaultDeviceApiUrl;
 let api = createTeamApi();
 
 interface AppState {
-  status?: TeamStatus;
+  status?: TeamStatus | UnconfiguredStatus;
   nodes: TeamNode[];
+  pending: PendingMember[];
   events: TeamEvent[];
+  deviceConfig?: DeviceConfigStatus;
   selectedTab: "overview" | "packets" | "settings";
   busy: boolean;
   error?: string;
@@ -42,6 +59,7 @@ interface AppState {
 
 const state: AppState = {
   nodes: [],
+  pending: [],
   events: [],
   selectedTab: "overview",
   busy: false,
@@ -66,6 +84,19 @@ function icon(node: IconNode, size = 18): string {
 
 function roleLabel(role?: string): string {
   return role === "leader" ? "Leader" : "Member";
+}
+
+function isConfiguredStatus(status?: TeamStatus | UnconfiguredStatus): status is TeamStatus {
+  return status !== undefined && status.configured !== false && "teamId" in status;
+}
+
+function statusTeam(status?: TeamStatus | UnconfiguredStatus): string | number {
+  return isConfiguredStatus(status) ? status.teamId : "--";
+}
+
+function statusSelf(status?: TeamStatus | UnconfiguredStatus): string | number {
+  if (isConfiguredStatus(status)) return status.selfId;
+  return status?.selfLabel || "--";
 }
 
 function stateLabel(value?: string): string {
@@ -102,23 +133,23 @@ function renderShell(): void {
         <nav class="nav" aria-label="Primary">
           ${navButton("overview", "总览", CircleDot)}
           ${navButton("packets", "数据包", TerminalSquare)}
-          ${navButton("settings", "连接/设置", Compass)}
+          ${navButton("settings", "连接/设置", Wrench)}
         </nav>
         <section class="side-status">
           <div class="label">Transport</div>
           <div class="transport">${icon(state.connection.mode === "serial" ? Plug : Wifi, 16)}${connectionLabel()}</div>
           <div class="mini-grid">
-            <span>Team</span><strong>${status?.teamId ?? "--"}</strong>
-            <span>Self</span><strong>${status?.selfId ?? "--"}</strong>
-            <span>State</span><strong>${stateLabel(status?.state)}</strong>
+            <span>Team</span><strong>${statusTeam(status)}</strong>
+            <span>Self</span><strong>${statusSelf(status)}</strong>
+            <span>State</span><strong>${isConfiguredStatus(status) ? stateLabel(status.state) : status ? "Unconfigured" : "--"}</strong>
           </div>
         </section>
       </aside>
       <section class="workspace">
         <header class="topbar">
           <div>
-            <h1>${status ? `Team ${status.teamId} ${roleLabel(status.role)}` : "Team Console"}</h1>
-            <p>${status ? `self=${status.selfId} leader=${status.leaderId} seq=${status.nextSeq}` : connectionHint()}</p>
+            <h1>${isConfiguredStatus(status) ? `Team ${status.teamId} ${roleLabel(status.role)}` : "Team Console"}</h1>
+            <p>${isConfiguredStatus(status) ? statusSubtitle(status) : status ? `device=${status.selfLabel} route=${status.routeId} ssid=${status.ssid}` : connectionHint()}</p>
           </div>
           <button class="icon-button" data-action="refresh" title="刷新">
             ${icon(RefreshCw, 18)}
@@ -150,15 +181,40 @@ function connectionHint(): string {
   return "通过浏览器 WebSerial 连接板子串口";
 }
 
+function statusSubtitle(status: TeamStatus): string {
+  const mac = status.macSuffix ? ` mac=${status.macSuffix}` : "";
+  const relay = status.relayEnabled ? " relay=on" : status.relayAllowed ? " relay=allowed" : "";
+  return `self=${status.selfId} leader=${status.leaderId} seq=${status.nextSeq}${mac}${relay}`;
+}
+
+function configSummary(config?: DeviceConfigStatus): string {
+  if (!config) return "not read";
+  if (!config.nvValid) return `empty, self=${config.selfSuffix}`;
+  if (config.nvRole === "leader") return `leader team=${config.nvTeam} channel=${config.nvChannel} self=${config.selfSuffix}`;
+  return `member team=${config.nvTeam} channel=${config.nvChannel} leader=${config.nvLeaderSuffix}`;
+}
+
+function configNumberValue(primary: number | undefined, secondary: number | undefined, fallback: number): number {
+  return primary ?? secondary ?? fallback;
+}
+
+function assertConfigResultOk(result: DeviceConfigResult): void {
+  if (!result.ok) {
+    throw new Error(`config ${result.action} failed ret=${result.ret}`);
+  }
+}
+
 function renderOverview(): string {
   return `
     ${renderConnectionPanel("compact")}
+    ${renderControlPanel()}
     <section class="summary-grid">
       ${metric("节点", String(state.nodes.length), Cpu)}
       ${metric("在线", String(state.nodes.filter((node) => node.online).length), Wifi)}
       ${metric("消息", String(state.events.length), TerminalSquare)}
-      ${metric("入网", state.status?.joined ? "Yes" : "No", CircleDot)}
+      ${metric("入网", isConfiguredStatus(state.status) && state.status.joined ? "Yes" : "No", CircleDot)}
     </section>
+    ${renderRouteMetrics()}
     <section class="two-column">
       <div class="panel">
         <div class="panel-head">
@@ -208,8 +264,11 @@ function renderNode(node: TeamNode): string {
         </div>
       </div>
       <div class="node-stats">
+        ${node.macSuffix ? `<span>MAC ${escapeHtml(node.macSuffix)}</span>` : ""}
         <span>${icon(Battery, 15)}${percent(node.batteryPercent)}</span>
         <span>${rssiText}</span>
+        ${node.relayAllowed ? `<span>relay tier ${node.relayTier ?? 0}</span>` : ""}
+        ${node.maxDownstream !== undefined ? `<span>down ${node.maxDownstream}</span>` : ""}
         <span>seq ${node.lastSeq}</span>
         <span class="${node.online ? "online" : "offline"}">${node.online ? "online" : "offline"}</span>
       </div>
@@ -217,7 +276,142 @@ function renderNode(node: TeamNode): string {
   `;
 }
 
+function renderControlPanel(): string {
+  const status = state.status;
+  const factoryResetDisabled = state.connection.mode === "serial";
+  const factoryResetHint = factoryResetDisabled
+    ? `<div class="note">串口模式暂不支持 factory reset，请切换到 WiFi API 模式调用 /api/factory-reset。</div>`
+    : "";
+  if (!status) return "";
+  if (!isConfiguredStatus(status)) {
+    return `
+      <section class="panel settings-panel">
+        <div class="panel-head">
+          <h2>角色配置</h2>
+          <span class="mode-badge">${escapeHtml(status.selfLabel || "unconfigured")}</span>
+        </div>
+        <div class="board-summary">
+          <div><span>Route</span><strong>${status.routeId}</strong></div>
+          <div><span>MAC</span><strong>${escapeHtml(status.macSuffix || "--")}</strong></div>
+          <div><span>SSID</span><strong>${escapeHtml(status.ssid || "--")}</strong></div>
+        </div>
+        <form class="role-form" data-form="role-leader">
+          <label>Team<input name="teamId" type="number" min="1" max="254" value="1" /></label>
+          <label>Channel<input name="channel" type="number" min="0" max="255" value="17" /></label>
+          <button class="primary-button" type="submit">${icon(Settings2, 17)}设为 Leader</button>
+        </form>
+        <form class="role-form" data-form="role-member">
+          <label>Leader MAC 后四位<input name="leaderSuffix" maxlength="4" placeholder="例如 C7E9" /></label>
+          <label>Team<input name="teamId" type="number" min="1" max="254" value="1" /></label>
+          <label>Channel<input name="channel" type="number" min="0" max="255" value="17" /></label>
+          <button class="primary-button" type="submit">${icon(GitBranch, 17)}设为 Member</button>
+        </form>
+      </section>
+    `;
+  }
+  if (status.role === "leader") {
+    return `
+      <section class="panel settings-panel">
+        <div class="panel-head">
+          <h2>Leader 配队</h2>
+          <span class="mode-badge">${status.pairingEnabled ? "pairing open" : "pairing closed"}</span>
+        </div>
+        <div class="connection-actions control-actions">
+          <button class="primary-button" type="button" data-action="pairing-start">${icon(Radio, 17)}开始配队</button>
+          <button class="text-button" type="button" data-action="pairing-stop">停止并自动批准</button>
+          <button class="text-button" type="button" data-action="factory-reset" ${factoryResetDisabled ? "disabled" : ""}>Factory reset</button>
+        </div>
+        ${factoryResetHint}
+        <div class="pending-list">
+          ${state.pending.length === 0 ? `<div class="empty-state">暂无 pending member</div>` : state.pending.map(renderPendingMember).join("")}
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="panel settings-panel">
+      <div class="panel-head">
+        <h2>Member 连接</h2>
+        <span class="mode-badge">${status.joined ? "joined" : "not joined"}</span>
+      </div>
+      <div class="board-summary">
+        <div><span>Parent</span><strong>${status.upstreamParentId ?? 0}</strong></div>
+        <div><span>Parent State</span><strong>${status.upstreamParentState ?? "--"}</strong></div>
+        <div><span>Relay</span><strong>${status.relayEnabled ? "enabled" : status.relayAllowed ? "allowed" : "off"}</strong></div>
+      </div>
+      <form class="role-form" data-form="member-select">
+        <label>Leader MAC 后四位<input name="leaderSuffix" maxlength="4" placeholder="例如 C7E9" /></label>
+        <label>Team<input name="teamId" type="number" min="1" max="254" value="${status.teamId}" /></label>
+        <label>Channel<input name="channel" type="number" min="0" max="255" value="17" /></label>
+        <button class="primary-button" type="submit">${icon(GitBranch, 17)}选择 Leader</button>
+        <button class="text-button" type="button" data-action="member-leave">Leave</button>
+        <button class="text-button" type="button" data-action="factory-reset" ${factoryResetDisabled ? "disabled" : ""}>Factory reset</button>
+      </form>
+      ${factoryResetHint}
+    </section>
+  `;
+}
+
+function renderPendingMember(member: PendingMember): string {
+  return `
+    <article class="pending-row">
+      <div>
+        <strong>#${member.id} ${escapeHtml(member.macSuffix || "")}</strong>
+        <span>${roleLabel(member.role)} battery=${member.batteryPercent}% seen=${member.lastSeenS}s</span>
+      </div>
+      <div class="connection-actions">
+        <button class="text-button" type="button" data-action="pending-approve-relay" data-id="${member.id}">approve relay</button>
+        <button class="text-button" type="button" data-action="pending-approve-norelay" data-id="${member.id}">approve no-relay</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderRouteMetrics(): string {
+  const status = state.status;
+  if (!isConfiguredStatus(status)) return "";
+  const metrics = status.routeMetrics;
+  return `
+    <section class="panel route-panel">
+      <div class="panel-head">
+        <h2>路由/中继</h2>
+        <span class="mode-badge">${metrics ? (metrics.converged ? "converged" : "changing") : "member view"}</span>
+      </div>
+      <div class="route-grid">
+        <div><span>Relay</span><strong>${status.relayEnabled ? "enabled" : status.relayAllowed ? "allowed" : "off"}</strong></div>
+        <div><span>Tier</span><strong>${status.relayTier ?? 0}</strong></div>
+        <div><span>Max Downstream</span><strong>${status.maxDownstream ?? 0}</strong></div>
+        <div><span>Parent</span><strong>${status.upstreamParentId ?? 0}</strong></div>
+        <div><span>Parent State</span><strong>${status.upstreamParentState ?? "--"}</strong></div>
+        <div><span>Reselect</span><strong>${status.upstreamParentReselectPending ? "yes" : "no"}</strong></div>
+        ${
+          metrics
+            ? `
+          <div><span>Active</span><strong>${metrics.active}</strong></div>
+          <div><span>Direct</span><strong>${metrics.direct}</strong></div>
+          <div><span>Relayed</span><strong>${metrics.relayed}</strong></div>
+          <div><span>Unreachable</span><strong>${metrics.unreachable}</strong></div>
+          <div><span>Stale</span><strong>${metrics.stale}</strong></div>
+          <div><span>Relay Online</span><strong>${metrics.relayOnline}/${metrics.relayTarget}</strong></div>
+          <div><span>Relay Budget</span><strong>${metrics.relayBudget}</strong></div>
+          <div><span>Route Update RX</span><strong>${metrics.routeUpdateRxTotal}</strong></div>
+          <div><span>Reparent</span><strong>${metrics.routeReparentTotal}</strong></div>
+        `
+            : ""
+        }
+      </div>
+    </section>
+  `;
+}
+
 function renderSendForm(): string {
+  if (state.connection.mode === "wifi") {
+    return `
+      <div class="send-form">
+        <div class="note">WiFi 模式暂不提供 /api/send；请切到串口模式发送测试包。</div>
+      </div>
+    `;
+  }
   return `
     <form class="send-form" data-form="send">
       <label>类型
@@ -259,7 +453,7 @@ function renderEvent(event: TeamEvent): string {
         <strong>${event.type}</strong>
         <span>${escapeHtml(event.summary)}</span>
       </div>
-      <time>${new Date(event.time).toLocaleTimeString()}</time>
+      <time>${formatEventTime(event.time)}</time>
     </article>
   `;
 }
@@ -293,6 +487,7 @@ function renderPackets(): string {
 function renderSettings(): string {
   return `
     ${renderConnectionPanel("full")}
+    ${renderBulkConfigPanel()}
     ${renderAllowPanel()}
     <section class="panel settings-panel">
       <div class="panel-head">
@@ -301,12 +496,12 @@ function renderSettings(): string {
       <div class="deploy-grid">
         <div>
           <strong>WS63 板端</strong>
-          <span>把 dist 静态文件烧进资源分区或文件系统，由板端 HTTP 服务提供。</span>
-          <code>/api/status /api/nodes /api/events /api/send</code>
+          <span>当前烧录固件使用 C 端 SSR 页面，不烧 Vite dist；板端 HTTP 服务直接输出轻量 HTML。</span>
+          <code>/ /nodes /events /pairing /api/status</code>
         </div>
         <div>
           <strong>域名上位机</strong>
-          <span>部署在 sleweb.mecho.top，串口连接可直接使用；WiFi API 直连私网设备时需要浏览器允许 HTTPS 页面访问本地 HTTP 地址。</span>
+          <span>部署在 sleweb.mecho.top，串口连接可直接使用；WiFi API 直连私网设备时受浏览器跨域与私网访问策略影响。</span>
           <code>${hostedConsoleUrl}/?api=${defaultDeviceApiUrl}</code>
         </div>
       </div>
@@ -318,25 +513,31 @@ function renderSettings(): string {
       <pre class="api-spec">GET  /api/status
 GET  /api/nodes
 GET  /api/events
-POST /api/send  (下一步接入)
-{
-  "type": "position",
-  "dstId": 1,
-  "latitudeE6": 39908456,
-  "longitudeE6": 116397128,
-  "batteryPercent": 88
-}</pre>
+GET  /api/pending
+GET  /api/config/status
+GET  /api/config/leader?team=1&channel=17&now=1
+GET  /api/config/member?leader=C7E9&team=1&channel=17&now=1
+GET  /api/config/apply
+GET  /api/config/clear
+GET  /api/config/reboot
+GET  /api/role?role=leader
+GET  /api/role?role=member&leader=C7E9&team=1&channel=17
+GET  /api/pairing?action=start|stop|approve&id=2&relay=1
+GET  /api/member/select?team=1&leader=C7E9&channel=17
+GET  /api/member/leave
+GET  /api/factory-reset</pre>
     </section>
   `;
 }
 
 function renderAllowPanel(): string {
   const status = state.status;
-  const allowMode = status?.memberFilterEnabled ? "only" : "all";
-  const allowMembers = status?.allowedMembers?.length
-    ? status.allowedMembers.join(" ")
-    : status?.allowedMemberCount
-      ? `${status.allowedMemberCount} 个成员，串口刷新可展开 ID`
+  const configured = isConfiguredStatus(status) ? status : undefined;
+  const allowMode = configured?.memberFilterEnabled ? "only" : "all";
+  const allowMembers = configured?.allowedMembers?.length
+    ? configured.allowedMembers.join(" ")
+    : configured?.allowedMemberCount
+      ? `${configured.allowedMemberCount} 个成员，串口刷新可展开 ID`
       : "";
   const serialOnly = state.connection.mode === "serial" ? "" : `<div class="note">成员准入写入目前走板子串口 CLI；WiFi HTTP 页面先做状态查看。</div>`;
   return `
@@ -346,9 +547,9 @@ function renderAllowPanel(): string {
         <span class="mode-badge">${allowMode === "all" ? "allow all" : "allow only"}</span>
       </div>
       <div class="allow-summary">
-        <div><span>Team</span><strong>${status?.teamId ?? "--"}</strong></div>
-        <div><span>Leader</span><strong>${status?.leaderId ?? "--"}</strong></div>
-        <div><span>Self</span><strong>${status?.selfId ?? "--"}</strong></div>
+        <div><span>Team</span><strong>${configured?.teamId ?? "--"}</strong></div>
+        <div><span>Leader</span><strong>${configured?.leaderId ?? "--"}</strong></div>
+        <div><span>Self</span><strong>${configured?.selfId ?? "--"}</strong></div>
         <div><span>Allowed</span><strong>${escapeHtml(allowMembers || "all")}</strong></div>
       </div>
       <form class="allow-form" data-form="allow">
@@ -357,7 +558,7 @@ function renderAllowPanel(): string {
           <label class="segment"><input type="radio" name="allowMode" value="only" ${allowMode === "only" ? "checked" : ""} /><span>只允许列表</span></label>
         </div>
         <label>Member ID 列表
-          <input name="memberIds" type="text" inputmode="numeric" placeholder="例如 2 或 2 3 4" value="${escapeHtml(status?.allowedMembers?.join(" ") ?? "")}" />
+          <input name="memberIds" type="text" inputmode="numeric" placeholder="例如 2 或 2 3 4" value="${escapeHtml(configured?.allowedMembers?.join(" ") ?? "")}" />
         </label>
         <div class="connection-actions">
           <button class="primary-button" type="submit">${icon(Plug, 17)}应用准入</button>
@@ -366,6 +567,59 @@ function renderAllowPanel(): string {
         </div>
         ${serialOnly}
       </form>
+    </section>
+  `;
+}
+
+function renderBulkConfigPanel(): string {
+  const config = state.deviceConfig;
+  const serial = getSerialDebugState();
+  return `
+    <section class="panel settings-panel bulk-config-panel">
+      <div class="panel-head">
+        <h2>One-click node config</h2>
+        <span class="mode-badge">${escapeHtml(configSummary(config))}</span>
+      </div>
+      <div class="config-summary">
+        <div><span>NV Role</span><strong>${config?.nvValid ? config.nvRole : "empty"}</strong></div>
+        <div><span>NV Team</span><strong>${config?.nvValid ? config.nvTeam : "--"}</strong></div>
+        <div><span>NV Channel</span><strong>${config?.nvValid ? config.nvChannel : "--"}</strong></div>
+        <div><span>Leader Suffix</span><strong>${config?.nvValid ? config.nvLeaderSuffix : "--"}</strong></div>
+        <div><span>Runtime</span><strong>${config?.runtimeConfigured ? config.runtimeRole : "unconfigured"}</strong></div>
+        <div><span>Self Suffix</span><strong>${config?.selfSuffix ?? "--"}</strong></div>
+      </div>
+      <form class="bulk-config-form" data-form="bulk-config">
+        <div class="segmented" role="tablist" aria-label="Bulk node role">
+          <label class="segment"><input type="radio" name="role" value="leader" checked /><span>Leader</span></label>
+          <label class="segment"><input type="radio" name="role" value="member" /><span>Member</span></label>
+        </div>
+        <div class="bulk-config-fields">
+          <label>Team ID<input name="teamId" type="number" min="1" max="254" value="${configNumberValue(config?.nvTeam, config?.runtimeTeam, 1)}" /></label>
+          <label>Channel<input name="channel" type="number" min="0" max="255" value="${configNumberValue(config?.nvChannel, config?.runtimeChannel, 17)}" /></label>
+          <label>Leader suffix<input name="leaderSuffix" maxlength="4" placeholder="C7E9" value="${config?.nvRole === "member" ? config.nvLeaderSuffix : ""}" /></label>
+        </div>
+        <label class="check-row">
+          <input name="applyNow" type="checkbox" checked />
+          <span>Apply immediately after saving. If unchecked, save to flash and use Apply/Reboot later.</span>
+        </label>
+        <div class="connection-actions">
+          <button class="primary-button" type="submit">${icon(Settings2, 17)}Write config</button>
+          <button class="text-button" type="button" data-action="config-read">Read back</button>
+          <button class="text-button" type="button" data-action="config-apply">Apply saved</button>
+          <button class="text-button" type="button" data-action="config-clear">Clear saved</button>
+          <button class="text-button" type="button" data-action="config-reboot">Reboot board</button>
+        </div>
+        <div class="note">
+          Serial mode uses <code>cfg status</code>, <code>cfg leader/member</code>, <code>cfg apply</code>, <code>cfg clear</code> and shows returned logs below.
+        </div>
+      </form>
+      <div class="serial-log">
+        <div class="panel-head small-head">
+          <h2>Serial log</h2>
+          <span class="mode-badge">${serial.connected ? "connected" : "not connected"}</span>
+        </div>
+        <pre>${escapeHtml(serial.lines.slice(-36).join("\n") || "No serial lines yet. Click Select serial, then Read back.")}</pre>
+      </div>
     </section>
   `;
 }
@@ -414,6 +668,10 @@ function readNumber(form: FormData, key: string): number | undefined {
   return Number(value);
 }
 
+function readChecked(form: FormData, key: string): boolean {
+  return form.get(key) !== null;
+}
+
 function readMemberIds(raw: string): number[] {
   return raw
     .split(/[\s,，]+/)
@@ -421,6 +679,25 @@ function readMemberIds(raw: string): number[] {
     .filter(Boolean)
     .map(Number)
     .filter((value) => Number.isInteger(value) && value >= 1 && value <= 254);
+}
+
+function readLeaderSuffix(form: FormData): string {
+  const suffix = String(form.get("leaderSuffix") ?? "").trim().toUpperCase();
+  if (!/^[0-9A-F]{4}$/.test(suffix)) {
+    throw new Error("Leader MAC 后四位需要 4 位十六进制，例如 C7E9");
+  }
+  return suffix;
+}
+
+async function runAction(action: () => Promise<void>, failure = "operation failed"): Promise<void> {
+  try {
+    await action();
+    state.error = undefined;
+    await refresh();
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : failure;
+    renderShell();
+  }
 }
 
 async function applyAllow(command: AllowMembersCommand): Promise<void> {
@@ -435,6 +712,21 @@ async function applyAllow(command: AllowMembersCommand): Promise<void> {
   }
 }
 
+async function readDeviceConfig(): Promise<void> {
+  state.deviceConfig = await api.getDeviceConfig();
+}
+
+async function runConfigAction(action: () => Promise<void>, failure = "config operation failed"): Promise<void> {
+  try {
+    await action();
+    state.error = undefined;
+    await refresh();
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : failure;
+    renderShell();
+  }
+}
+
 async function refresh(): Promise<void> {
   if (state.busy) {
     return;
@@ -442,6 +734,7 @@ async function refresh(): Promise<void> {
   if (state.connection.mode === "wifi" && state.connection.apiBase === "") {
     state.status = undefined;
     state.nodes = [];
+    state.pending = [];
     state.events = [];
     state.error = undefined;
     renderShell();
@@ -451,15 +744,22 @@ async function refresh(): Promise<void> {
   state.error = undefined;
   renderShell();
   try {
-    if (state.connection.mode === "serial") {
-      state.status = await api.getStatus();
-      state.nodes = await api.getNodes();
-      state.events = await api.getEvents();
+    state.status = await api.getStatus();
+    state.nodes = await api.getNodes();
+    state.events = await api.getEvents();
+    try {
+      await readDeviceConfig();
+    } catch {
+      state.deviceConfig = undefined;
+    }
+    if (isConfiguredStatus(state.status) && state.status.role === "leader") {
+      try {
+        state.pending = await api.getPending();
+      } catch {
+        state.pending = [];
+      }
     } else {
-      const [status, nodes, events] = await Promise.all([api.getStatus(), api.getNodes(), api.getEvents()]);
-      state.status = status;
-      state.nodes = nodes;
-      state.events = events;
+      state.pending = [];
     }
   } catch (error) {
     state.error = error instanceof Error ? error.message : "refresh failed";
@@ -510,6 +810,81 @@ function bindEvents(): void {
         renderShell();
       });
   });
+  document.querySelector<HTMLFormElement>("[data-form='role-leader']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    void runAction(
+      () =>
+        api.configureRole({
+          role: "leader",
+          teamId: readNumber(form, "teamId") ?? 1,
+          channel: readNumber(form, "channel") ?? 17,
+        }),
+      "set leader failed",
+    );
+  });
+  document.querySelector<HTMLFormElement>("[data-form='role-member']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    void runAction(
+      () =>
+        api.configureRole({
+          role: "member",
+          leaderSuffix: readLeaderSuffix(form),
+          teamId: readNumber(form, "teamId") ?? 1,
+          channel: readNumber(form, "channel") ?? 17,
+        }),
+      "set member failed",
+    );
+  });
+  document.querySelector<HTMLFormElement>("[data-form='member-select']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    void runAction(
+      () =>
+        api.selectMemberLeader({
+          leaderSuffix: readLeaderSuffix(form),
+          teamId: readNumber(form, "teamId") ?? 1,
+          channel: readNumber(form, "channel") ?? 17,
+        }),
+      "select leader failed",
+    );
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='pairing-start']")?.addEventListener("click", () => {
+    void runAction(() => api.configurePairing({ action: "start" }), "pairing start failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='pairing-stop']")?.addEventListener("click", () => {
+    void runAction(() => api.configurePairing({ action: "stop" }), "pairing stop failed");
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-action='pending-approve-relay'], [data-action='pending-approve-norelay']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = Number(button.dataset.id);
+      if (!Number.isInteger(id)) return;
+      void runAction(
+        () =>
+          api.configurePairing({
+            action: "approve",
+            id,
+            relay: button.dataset.action === "pending-approve-relay",
+          }),
+        "approve pending failed",
+      );
+    });
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='member-leave']")?.addEventListener("click", () => {
+    void runAction(() => api.leaveMember(), "leave failed");
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-action='factory-reset']").forEach((button) => {
+    button.addEventListener("click", () => {
+      void runAction(() => api.factoryReset(), "factory reset failed");
+    });
+  });
   document.querySelector<HTMLFormElement>("[data-form='connection']")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -549,6 +924,51 @@ function bindEvents(): void {
     const input = document.querySelector<HTMLInputElement>("input[name='memberIds']");
     const memberIds = readMemberIds(input?.value ?? "");
     void applyAllow({ mode: "del", memberIds: memberIds.slice(0, 1) });
+  });
+  document.querySelector<HTMLFormElement>("[data-form='bulk-config']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!(formElement instanceof HTMLFormElement)) return;
+    const form = new FormData(formElement);
+    const role = String(form.get("role")) === "member" ? "member" : "leader";
+    const base = {
+      teamId: readNumber(form, "teamId") ?? 1,
+      channel: readNumber(form, "channel") ?? 17,
+      applyNow: readChecked(form, "applyNow"),
+    };
+    const command: DeviceConfigCommand =
+      role === "leader" ? { role, ...base } : { role, leaderSuffix: readLeaderSuffix(form), ...base };
+    void runConfigAction(async () => {
+      const result = await api.configureDevice(command);
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "write config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-read']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      await readDeviceConfig();
+    }, "read config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-apply']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.applyDeviceConfig();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "apply config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-clear']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.clearDeviceConfig();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "clear config failed");
+  });
+  document.querySelector<HTMLButtonElement>("[data-action='config-reboot']")?.addEventListener("click", () => {
+    void runConfigAction(async () => {
+      const result = await api.rebootDevice();
+      assertConfigResultOk(result);
+      state.deviceConfig = result.config;
+    }, "reboot failed");
   });
   document.querySelector<HTMLButtonElement>("[data-action='serial-connect']")?.addEventListener("click", () => {
     void connectSerialPlaceholder();

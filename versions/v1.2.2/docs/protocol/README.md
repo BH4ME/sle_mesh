@@ -29,7 +29,7 @@ Mesh Packet
 
 ## 文档结构
 
-- [packet-structure.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/packet-structure.md)
-- [messages.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/messages.md)
-- [terminal-cli.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/terminal-cli.md)
-- [versioning.md](/Users/bh4me_macair/Documents/Codex/sle_intercom/docs/protocol/versioning.md)
+- [packet-structure.md](<repo-root>/docs/protocol/packet-structure.md)
+- [messages.md](<repo-root>/docs/protocol/messages.md)
+- [terminal-cli.md](<repo-root>/docs/protocol/terminal-cli.md)
+- [versioning.md](<repo-root>/docs/protocol/versioning.md)

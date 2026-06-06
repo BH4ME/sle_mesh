@@ -21,7 +21,7 @@
 验证：
 
 ```sh
-UBUNTU_HOST=192.168.6.130 UBUNTU_USER=owen UBUNTU_PASS='67215837' \
+UBUNTU_HOST=192.168.6.130 UBUNTU_USER=owen UBUNTU_PASS='<set locally, do not commit secrets>' \
 UBUNTU_SDK=/home/owen/workspace/bearpi-pico_h3863 BUILD_JOBS=4 \
 scripts/ws63_build_team_ubuntu.sh unified
 ```
