@@ -18,8 +18,8 @@
 | `hardware/` | PCB、原理图、3D 打印外壳等硬件资料。 |
 | `versions/` | 仓库/固件/硬件发布记录和验证记录。 |
 | `docs/` | 阶段文档和维护说明。 |
-| `meta/` | 项目操作 SOP 和内部维护记录。 |
+| `meta/` | 项目操作 SOP 和维护规则。生成型审查输出不提交。 |
 
 ## 本地草稿
 
-`.planning/`、`models/`、`3D/`、`_schem_review/`、`v3.pdf` 等本地草稿已加入 `.gitignore`。确认要公开的硬件资料应整理进 `hardware/` 后再提交。
+`.planning/`、`models/`、`3D/`、`_schem_review/`、`v3.pdf`、`vm-preseed/`、`meta/review_feedback.md` 等本地草稿或生成输出已加入 `.gitignore`。确认要公开的硬件资料应整理进 `hardware/` 后再提交。

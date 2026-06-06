@@ -5,8 +5,9 @@
 ## 当前主线
 
 - 当前固件版本：`v4.4.95`
-- 最新仓库整理记录：`v4.4.96`
+- 最新仓库整理记录：`v4.4.97`
 - 固件工程：[../../xc/ws63_team_network/](../../xc/ws63_team_network/)
+- 硬件原理图：[../../hardware/schematics/sle-main-board/v0.1/](../../hardware/schematics/sle-main-board/v0.1/)
 - 远程构建脚本：[../../scripts/build/ws63_build_v4_ubuntu.sh](../../scripts/build/ws63_build_v4_ubuntu.sh)
 - 烧录脚本：[../../scripts/flash/](../../scripts/flash/)
 - 仿真脚本：[../../scripts/sim/](../../scripts/sim/)
@@ -35,8 +36,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/flash/ws63_flash_mul
 
 ## 历史记录
 
-- [task_plan.md](task_plan.md)
-- [findings.md](findings.md)
-- [progress.md](progress.md)
-
-这些文件保留阶段内的历史工作记录；最新仓库结构以 [../repository_layout.md](../repository_layout.md) 和根目录 [../../README.md](../../README.md) 为准。
+详细发布历史见 [../../versions/README.md](../../versions/README.md)。当前仓库结构以 [../repository_layout.md](../repository_layout.md) 和根目录 [../../README.md](../../README.md) 为准。

@@ -26,7 +26,7 @@
 scripts/review/run_review_with_service.sh --dry-run
 ```
 
-审查输出固定写入 `meta/review_feedback.md`。
+审查输出固定写入本地 `meta/review_feedback.md`，该文件已加入 `.gitignore`，不提交到 GitHub。
 
 ## 修改后检查
 

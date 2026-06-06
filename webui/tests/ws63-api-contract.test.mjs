@@ -115,13 +115,14 @@ test("current firmware makes ST7789 member events readable and panel-styled", ()
   assert.match(firmwareSource, /team_display_event_name/);
   assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
   assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
-  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.96`/);
+  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.97`/);
   assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.95`/);
   assert.match(rootReadmeSource, /docs\/version_management\.md/);
   assert.match(rootReadmeSource, /hardware\/enclosures\/sle-pcb-enclosure\/v1\.1\.4/);
   assert.match(rootReadmeSource, /scripts\/build\/ws63_build_v4_ubuntu\.sh/);
   assert.match(rootReadmeSource, /scripts\/flash\/ws63_flash_multi\.ps1/);
   assert.match(rootReadmeSource, /versions\/v4\.4\.95\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.97\]\(\.\/v4\.4\.97\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.96\]\(\.\/v4\.4\.96\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.95\]\(\.\/v4\.4\.95\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.94\]\(\.\/v4\.4\.94\/VERSION\.md\)/);

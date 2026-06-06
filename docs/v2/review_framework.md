@@ -3,7 +3,7 @@
 > ⚠️ 本文档是给 自动化审查服务执行用的操作手册，不是给开发者看的。
 >
 > **每次执行代码审查前**，先读本文档，严格按各 Stage 执行。
-> **审查完成后**，将结果写入`meta/review_feedback.md`，开发者只看那个文件。
+> **审查完成后**，将结果写入本地 `meta/review_feedback.md`。该文件是生成输出，不提交到 GitHub。
 
 ---
 
@@ -57,7 +57,7 @@
 
 步骤：
 
-1. 读取`meta/review_feedback.md` 的 **汇总** 或 **历史反馈追踪** 章节。
+1. 如本地存在 `meta/review_feedback.md`，读取其中的 **汇总** 或 **历史反馈追踪** 章节；不存在时跳过历史反馈追踪。
 2. 逐条验证：
    - 标记为 "Resolved" 的：确认代码是否仍保持修复状态。
    - 标记为 "Open / Warning" 的：重新验证是否已修复。
@@ -147,12 +147,12 @@
 
 ## 3. 反馈文件格式
 
-每次审查结果统一写入`meta/review_feedback.md`，格式：
+每次审查结果统一写入本地 `meta/review_feedback.md`，格式：
 
 ```markdown
 # Code Review Feedback
 
-**Reviewer:** Review Service (configured-provider)
+**Reviewer:** Review Service
 **Date:** YYYY-MM-DD
 **Version:** vX.Y.Z
 **Branch:** <branch-name>
@@ -183,8 +183,8 @@
 
 写入规则：
 
-- 每次审查**覆盖写入**`meta/review_feedback.md`，只保留本次结果。
-- 旧审查结果通过 git history 追溯，不保留在文件中。
+- 每次审查**覆盖写入**本地 `meta/review_feedback.md`，只保留本次结果。
+- `meta/review_feedback.md` 是生成输出，已加入 `.gitignore`，不作为公开仓库文件保存。
 
 ---
 

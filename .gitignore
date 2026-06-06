@@ -7,10 +7,12 @@
 logs/
 $logPath
 .planning/
+meta/review_feedback.md
 3D/
 _schem_review/
 models/
 v3.pdf
+vm-preseed/
 .DS_Store
 .cxresume_sessions*
 *冲突副本*

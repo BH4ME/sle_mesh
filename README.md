@@ -6,9 +6,9 @@
 
 ## 当前版本
 
-- 最新仓库记录：`v4.4.96`
+- 最新仓库记录：`v4.4.97`
 - 当前固件版本：`v4.4.95`
-- 最新仓库记录说明：[versions/v4.4.96/VERSION.md](versions/v4.4.96/VERSION.md)
+- 最新仓库记录说明：[versions/v4.4.97/VERSION.md](versions/v4.4.97/VERSION.md)
 - 当前固件记录说明：[versions/v4.4.95/VERSION.md](versions/v4.4.95/VERSION.md)
 - 版本索引：[versions/README.md](versions/README.md)
 
@@ -172,6 +172,7 @@ cc -Wall -Wextra -Werror -Iinclude -DSLE_TEAM_PACKET_TEST \
 
 - 硬件入口：[hardware/README.md](hardware/README.md)
 - 当前 3D 打印外壳：[hardware/enclosures/sle-pcb-enclosure/v1.1.4/](hardware/enclosures/sle-pcb-enclosure/v1.1.4/)
+- 当前原理图参考：[hardware/schematics/sle-main-board/v0.1/](hardware/schematics/sle-main-board/v0.1/)
 - 以后上传 PCB、Gerber、BOM、原理图时，放入 `hardware/boards/` 或 `hardware/schematics/` 的对应版本目录。
 
 ## 版本管理
