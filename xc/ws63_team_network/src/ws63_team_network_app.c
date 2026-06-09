@@ -277,33 +277,33 @@
 #define SLE_TEAM_WS2812_FORCE_CLEAR_COUNT 8U
 #define SLE_TEAM_WS2812_FORCE_CLEAR_DELAY_MS 10U
 #define SLE_TEAM_WS2812_BOOT_R 0U
-#define SLE_TEAM_WS2812_BOOT_G 6U
-#define SLE_TEAM_WS2812_BOOT_B 16U
-#define SLE_TEAM_WS2812_IDLE_R 16U
-#define SLE_TEAM_WS2812_IDLE_G 16U
-#define SLE_TEAM_WS2812_IDLE_B 16U
+#define SLE_TEAM_WS2812_BOOT_G 3U
+#define SLE_TEAM_WS2812_BOOT_B 8U
+#define SLE_TEAM_WS2812_IDLE_R 8U
+#define SLE_TEAM_WS2812_IDLE_G 8U
+#define SLE_TEAM_WS2812_IDLE_B 8U
 #define SLE_TEAM_WS2812_LEADER_R 0U
-#define SLE_TEAM_WS2812_LEADER_G 16U
+#define SLE_TEAM_WS2812_LEADER_G 8U
 #define SLE_TEAM_WS2812_LEADER_B 0U
 #define SLE_TEAM_WS2812_MEMBER_R 0U
 #define SLE_TEAM_WS2812_MEMBER_G 0U
-#define SLE_TEAM_WS2812_MEMBER_B 16U
-#define SLE_TEAM_WS2812_SEEK_R 16U
-#define SLE_TEAM_WS2812_SEEK_G 12U
+#define SLE_TEAM_WS2812_MEMBER_B 8U
+#define SLE_TEAM_WS2812_SEEK_R 8U
+#define SLE_TEAM_WS2812_SEEK_G 6U
 #define SLE_TEAM_WS2812_SEEK_B 0U
-#define SLE_TEAM_WS2812_TX_R 16U
+#define SLE_TEAM_WS2812_TX_R 8U
 #define SLE_TEAM_WS2812_TX_G 0U
-#define SLE_TEAM_WS2812_TX_B 12U
+#define SLE_TEAM_WS2812_TX_B 6U
 #define SLE_TEAM_WS2812_RX_R 0U
 #define SLE_TEAM_WS2812_RX_G 0U
-#define SLE_TEAM_WS2812_RX_B 16U
-#define SLE_TEAM_WS2812_WARN_R 16U
-#define SLE_TEAM_WS2812_WARN_G 6U
+#define SLE_TEAM_WS2812_RX_B 8U
+#define SLE_TEAM_WS2812_WARN_R 8U
+#define SLE_TEAM_WS2812_WARN_G 3U
 #define SLE_TEAM_WS2812_WARN_B 0U
-#define SLE_TEAM_WS2812_ERROR_R 16U
+#define SLE_TEAM_WS2812_ERROR_R 8U
 #define SLE_TEAM_WS2812_ERROR_G 0U
 #define SLE_TEAM_WS2812_ERROR_B 0U
-#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 6U
+#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U
 #define SLE_TEAM_WS2812_BREATHE_MAX_SCALE 64U
 #define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U
 #define SLE_TEAM_WS2812_ANIM_STEP_MS 32U
@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.126"
+#define SLE_TEAM_FW_VERSION "v4.4.127"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -1598,7 +1598,8 @@ static void team_rgb_state_color(team_rgb_state_t state, uint8_t *red, uint8_t *
 
 static uint8_t team_rgb_state_is_breathing(team_rgb_state_t state)
 {
-    return state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_ERROR ? 1U : 0U;
+    return state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER ||
+        state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR ? 1U : 0U;
 }
 
 static uint8_t team_ws2812_scale_component(uint8_t value, uint8_t scale)
@@ -1811,11 +1812,11 @@ static void team_ws2812_test_pattern(void)
         osal_printk("[diag] ws2812 not ready; test pattern ignored\r\n");
         return;
     }
-    (void)team_ws2812_set_rgb(16U, 0U, 0U);
+    (void)team_ws2812_set_rgb(8U, 0U, 0U);
     osal_msleep(180U);
-    (void)team_ws2812_set_rgb(0U, 16U, 0U);
+    (void)team_ws2812_set_rgb(0U, 8U, 0U);
     osal_msleep(180U);
-    (void)team_ws2812_set_rgb(0U, 0U, 16U);
+    (void)team_ws2812_set_rgb(0U, 0U, 8U);
     osal_msleep(180U);
     team_ws2812_show_boot_marker();
 #else
@@ -2302,9 +2303,9 @@ static int team_ws2812_cli_handle(const char *line)
     }
     if (strcmp(line, "rgb red") == 0 || strcmp(line, "rgb green") == 0 ||
         strcmp(line, "rgb blue") == 0 || strcmp(line, "rgb white") == 0) {
-        team_ws2812_cli_set_rgb(line[4] == 'r' ? 16U : (line[4] == 'w' ? 10U : 0U),
-            line[4] == 'g' ? 16U : (line[4] == 'w' ? 10U : 0U),
-            line[4] == 'b' ? 16U : (line[4] == 'w' ? 10U : 0U), line + 4);
+        team_ws2812_cli_set_rgb(line[4] == 'r' ? 8U : (line[4] == 'w' ? 5U : 0U),
+            line[4] == 'g' ? 8U : (line[4] == 'w' ? 5U : 0U),
+            line[4] == 'b' ? 8U : (line[4] == 'w' ? 5U : 0U), line + 4);
         return 1;
     }
     if (strcmp(line, "rgb test") == 0) {

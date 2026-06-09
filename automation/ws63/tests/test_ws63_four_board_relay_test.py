@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.126"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.127"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -151,14 +151,15 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("TEAM_RGB_STATE_LEADER", app_source)
         self.assertIn("TEAM_RGB_STATE_MEMBER", app_source)
         self.assertIn("TEAM_RGB_STATE_ERROR", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_R 16U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_G 16U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_B 16U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_LEADER_G 16U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_R 8U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_G 8U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_B 8U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_LEADER_G 8U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_MEMBER_G 0U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_B 16U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_ERROR_R 16U", app_source)
-        self.assertIn("team_ws2812_cli_set_rgb(line[4] == 'r' ? 16U : (line[4] == 'w' ? 10U : 0U)", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_B 8U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_ERROR_R 8U", app_source)
+        self.assertIn("team_ws2812_cli_set_rgb(line[4] == 'r' ? 8U : (line[4] == 'w' ? 5U : 0U)", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_FLASH_PULSES 4U", app_source)
         self.assertIn(
@@ -174,7 +175,8 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("return TEAM_RGB_STATE_MEMBER;", rgb_base)
         self.assertIn("return TEAM_RGB_STATE_ERROR;", rgb_base)
         rgb_breathe = self._extract_c_function(app_source, "static uint8_t team_rgb_state_is_breathing")
-        self.assertIn("state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_ERROR", rgb_breathe)
+        self.assertIn("state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER", rgb_breathe)
+        self.assertIn("state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR", rgb_breathe)
         rgb_event = self._extract_c_function(app_source, "static void team_ws2812_show_display_event")
         self.assertIn("team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)", rgb_event)
         self.assertIn("team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)", rgb_event)
@@ -313,7 +315,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.126")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.127")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
 
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):
