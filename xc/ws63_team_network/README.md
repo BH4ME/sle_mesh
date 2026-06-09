@@ -4,9 +4,9 @@
 
 ## 当前版本
 
-- 固件版本：`v4.4.122`
-- 仓库整理记录：`v4.4.122`
-- 版本说明：[../../versions/v4.4.122/VERSION.md](../../versions/v4.4.122/VERSION.md)
+- 固件版本：`v4.4.123`
+- 仓库整理记录：`v4.4.123`
+- 版本说明：[../../versions/v4.4.123/VERSION.md](../../versions/v4.4.123/VERSION.md)
 - 仓库结构说明：[../../docs/repository_layout.md](../../docs/repository_layout.md)
 
 ## 功能

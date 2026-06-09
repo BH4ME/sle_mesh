@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.122"
+#define SLE_TEAM_FW_VERSION "v4.4.123"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -6288,13 +6288,11 @@ static int team_http_query_u8(const char *path, const char *key, uint8_t min_val
     uint8_t *out)
 {
     int64_t value;
-    int ret;
 
     if (out == NULL) {
         return -1;
     }
-    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 255UL, 0UL, &value);
-    if (ret != 0) {
+    if (team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 255UL, 0UL, &value) != 0) {
         return -1;
     }
     *out = (uint8_t)value;
@@ -6305,13 +6303,11 @@ static int team_http_query_u16(const char *path, const char *key, uint16_t min_v
     uint16_t *out)
 {
     int64_t value;
-    int ret;
 
     if (out == NULL) {
         return -1;
     }
-    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 65535UL, 0UL, &value);
-    if (ret != 0) {
+    if (team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 65535UL, 0UL, &value) != 0) {
         return -1;
     }
     *out = (uint16_t)value;
@@ -6322,14 +6318,12 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
     int32_t *out)
 {
     int64_t value;
-    int ret;
 
     if (out == NULL) {
         return -1;
     }
-    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value,
-        2147483647UL, 2147483648UL, &value);
-    if (ret != 0) {
+    if (team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value,
+        2147483647UL, 2147483648UL, &value) != 0) {
         return -1;
     }
     *out = (int32_t)value;
