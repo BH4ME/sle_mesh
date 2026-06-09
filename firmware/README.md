@@ -15,6 +15,6 @@
 
 ## 版本边界
 
-- 当前固件版本：`v4.4.125`，定义在 `xc/ws63_team_network/src/ws63_team_network_app.c`。
-- 当前仓库整理记录：`v4.4.125`，见 [../versions/v4.4.125/VERSION.md](../versions/v4.4.125/VERSION.md)。
+- 当前固件版本：`v4.4.126`，定义在 `xc/ws63_team_network/src/ws63_team_network_app.c`。
+- 当前仓库整理记录：`v4.4.126`，见 [../versions/v4.4.126/VERSION.md](../versions/v4.4.126/VERSION.md)。
 - 构建产物不提交到 Git；远程构建输出默认写入 `output_from_vm/`。

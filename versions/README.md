@@ -4,8 +4,8 @@
 
 ## 当前版本
 
-- 最新仓库记录：[v4.4.125](./v4.4.125/VERSION.md)
-- 当前固件版本：[v4.4.125](./v4.4.125/VERSION.md)
+- 最新仓库记录：[v4.4.126](./v4.4.126/VERSION.md)
+- 当前固件版本：[v4.4.126](./v4.4.126/VERSION.md)
 - 当前外壳版本：[hardware/enclosures/sle-pcb-enclosure/v1.1.4](../hardware/enclosures/sle-pcb-enclosure/v1.1.4/)
 
 ## 版本规则
@@ -18,6 +18,7 @@
 
 ## v4.4
 
+- [v4.4.126](./v4.4.126/VERSION.md)
 - [v4.4.125](./v4.4.125/VERSION.md)
 - [v4.4.124](./v4.4.124/VERSION.md)
 - [v4.4.123](./v4.4.123/VERSION.md)
