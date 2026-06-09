@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.119"
+VERSION = "v4.4.120"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -191,7 +191,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.119 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
+print("configured v4.4.120 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -261,7 +261,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.119",
+    b"v4.4.120",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -335,12 +335,13 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_RELAY_SWAP_STABLE_S"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_cli_set_rgb"),
     ("ws63_team_network_app.c", app_source,
-     'strcmp(line, "buzz beep") == 0 || strcmp(line, "buzz test") == 0 ||'),
-    ("ws63_team_network_app.c", app_source, 'strcmp(line, "led tx") == 0 || strcmp(line, "led rx") == 0'),
+     'team_cli_match2(line, "buzz beep", "buzz test")'),
+    ("ws63_team_network_app.c", app_source, 'team_cli_match2(line, "led tx", "led rx")'),
     ("ws63_team_network_app.c", app_source,
-     'strcmp(line, "led active_low") == 0 || strcmp(line, "led active_high") == 0'),
-    ("ws63_team_network_app.c", app_source, 'strcmp(line, "led on") == 0 || strcmp(line, "led off") == 0'),
+     'team_cli_match2(line, "led active_low", "led active_high")'),
+    ("ws63_team_network_app.c", app_source, 'team_cli_match2(line, "led on", "led off")'),
     ("ws63_team_network_app.c", app_source, "static const team_cli_handler_t cli_handlers[]"),
+    ("ws63_team_network_app.c", app_source, "team_cli_match2"),
     ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_done"),
     ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_save_leader"),
     ("ws63_team_network_app.c", app_source,

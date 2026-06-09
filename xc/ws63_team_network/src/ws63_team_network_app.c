@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.119"
+#define SLE_TEAM_FW_VERSION "v4.4.120"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -2044,19 +2044,24 @@ static void team_battery_cli_status(void)
         (long)g_team_rt.battery_sample_last_ret);
 }
 
+static uint8_t team_cli_match2(const char *line, const char *first, const char *second)
+{
+    return (strcmp(line, first) == 0 || strcmp(line, second) == 0) ? 1U : 0U;
+}
+
 static int team_battery_cli_handle(const char *line)
 {
-    if (strcmp(line, "bat") == 0 || strcmp(line, "bat status") == 0 ||
-        strcmp(line, "adc") == 0 || strcmp(line, "adc status") == 0) {
+    if (team_cli_match2(line, "bat", "bat status") != 0U ||
+        team_cli_match2(line, "adc", "adc status") != 0U) {
         team_battery_cli_status();
         return 1;
     }
-    if (strcmp(line, "bat sample") == 0 || strcmp(line, "adc sample") == 0) {
+    if (team_cli_match2(line, "bat sample", "adc sample") != 0U) {
         (void)team_battery_sample_once(1U);
         team_battery_cli_status();
         return 1;
     }
-    if (strcmp(line, "bat help") == 0 || strcmp(line, "adc help") == 0) {
+    if (team_cli_match2(line, "bat help", "adc help") != 0U) {
         osal_printk("[cli] bat commands: status|sample; adc aliases: adc status|adc sample\r\n");
         return 1;
     }
@@ -2283,7 +2288,7 @@ static int team_ws2812_cli_handle(const char *line)
     unsigned int g;
     unsigned int b;
 
-    if (strcmp(line, "rgb") == 0 || strcmp(line, "rgb status") == 0) {
+    if (team_cli_match2(line, "rgb", "rgb status") != 0U) {
         osal_printk("[cli] rgb status %s (fw=%s) ready=%u pin=%u state=%s flash=%s color=%u,%u,%u\r\n",
             SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.ws2812_ready, g_team_rt.ws2812_pin,
             team_rgb_state_name((team_rgb_state_t)g_team_rt.ws2812_state),
@@ -2324,9 +2329,9 @@ static int team_buzzer_cli_handle(const char *line)
     unsigned int ms;
 
 #if !CONFIG_SLE_TEAM_BUZZER_ENABLE
-    if (strcmp(line, "buzz") == 0 || strcmp(line, "buzz status") == 0 ||
-        strcmp(line, "buzz on") == 0 || strcmp(line, "buzz off") == 0 ||
-        strcmp(line, "buzz beep") == 0 || strcmp(line, "buzz test") == 0 ||
+    if (team_cli_match2(line, "buzz", "buzz status") != 0U ||
+        team_cli_match2(line, "buzz on", "buzz off") != 0U ||
+        team_cli_match2(line, "buzz beep", "buzz test") != 0U ||
         strcmp(line, "buzz help") == 0 ||
         (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U)) {
         osal_printk("[cli] buzz disabled by Kconfig (fw=%s)\r\n", SLE_TEAM_FW_VERSION);
@@ -2334,7 +2339,7 @@ static int team_buzzer_cli_handle(const char *line)
     }
     return 0;
 #else
-    if (strcmp(line, "buzz") == 0 || strcmp(line, "buzz status") == 0) {
+    if (team_cli_match2(line, "buzz", "buzz status") != 0U) {
         osal_printk("[cli] buzz fw=%s ready=%u pin=%u active_high=%u muted=%u auto_toggle=%u level_on=%u\r\n",
             SLE_TEAM_FW_VERSION, g_team_rt.buzzer_ready, g_team_rt.buzzer_pin, g_team_rt.buzzer_active_high,
             (uint8_t)CONFIG_SLE_TEAM_BUZZER_MUTED, (uint8_t)CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE,
@@ -2342,8 +2347,8 @@ static int team_buzzer_cli_handle(const char *line)
         return 1;
     }
 #if CONFIG_SLE_TEAM_BUZZER_MUTED
-    if (strcmp(line, "buzz off") == 0 || strcmp(line, "buzz on") == 0 || strcmp(line, "buzz beep") == 0 ||
-        strcmp(line, "buzz test") == 0 ||
+    if (team_cli_match2(line, "buzz off", "buzz on") != 0U ||
+        team_cli_match2(line, "buzz beep", "buzz test") != 0U ||
         (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U)) {
         uint8_t is_off = strcmp(line, "buzz off") == 0 ? 1U : 0U;
         team_buzzer_set(0U);
@@ -2357,14 +2362,14 @@ static int team_buzzer_cli_handle(const char *line)
     }
     return 0;
 #else
-    if (strcmp(line, "buzz on") == 0 || strcmp(line, "buzz off") == 0) {
+    if (team_cli_match2(line, "buzz on", "buzz off") != 0U) {
         uint8_t is_on = strcmp(line, "buzz on") == 0 ? 1U : 0U;
         team_buzzer_set(is_on);
         osal_printk(is_on != 0U ? "[cli] buzz set on pin=%u level_on=%u\r\n" :
             "[cli] buzz set off pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
         return 1;
     }
-    if (strcmp(line, "buzz beep") == 0 || strcmp(line, "buzz test") == 0 ||
+    if (team_cli_match2(line, "buzz beep", "buzz test") != 0U ||
         (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U)) {
         team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
         osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
@@ -2382,7 +2387,7 @@ static int team_buzzer_cli_handle(const char *line)
 
 static int team_display_cli_handle(const char *line)
 {
-    if (strcmp(line, "disp") == 0 || strcmp(line, "disp status") == 0) {
+    if (team_cli_match2(line, "disp", "disp status") != 0U) {
         osal_printk("[cli] disp ready=%u spi=%u sclk=%u sda=%u cs=%u cs_low=%u rs=%u rst=%u size=%ux%u off=%u,%u\r\n",
             g_team_rt.display_ready,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_SPI_BUS,
@@ -2420,17 +2425,17 @@ static int team_led_cli_handle(const char *line)
     uint8_t is_tx;
     uint8_t is_active_low;
 
-    if (strcmp(line, "led") == 0 || strcmp(line, "led status") == 0) {
+    if (team_cli_match2(line, "led", "led status") != 0U) {
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led on") == 0 || strcmp(line, "led off") == 0) {
+    if (team_cli_match2(line, "led on", "led off") != 0U) {
         is_on = strcmp(line, "led on") == 0 ? 1U : 0U;
         team_led_set(is_on);
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led tx") == 0 || strcmp(line, "led rx") == 0) {
+    if (team_cli_match2(line, "led tx", "led rx") != 0U) {
         is_tx = strcmp(line, "led tx") == 0 ? 1U : 0U;
         team_led_blink(is_tx != 0U ? SLE_TEAM_LED_TX_PULSES : SLE_TEAM_LED_RX_PULSES,
             is_tx != 0U ? SLE_TEAM_LED_TX_ON_MS : SLE_TEAM_LED_RX_ON_MS,
@@ -2438,7 +2443,7 @@ static int team_led_cli_handle(const char *line)
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led active_low") == 0 || strcmp(line, "led active_high") == 0) {
+    if (team_cli_match2(line, "led active_low", "led active_high") != 0U) {
         is_active_low = strcmp(line, "led active_low") == 0 ? 1U : 0U;
         team_led_configure(g_team_rt.led_pin, is_active_low);
         return 1;
@@ -2729,7 +2734,7 @@ static int team_serial_cfg_cli_handle(const char *line)
     uint8_t save_channel;
     int ret;
 
-    if (strcmp(line, "cfg") == 0 || strcmp(line, "cfg status") == 0) {
+    if (team_cli_match2(line, "cfg", "cfg status") != 0U) {
         sle_team_web_config_nv_t cfg;
         if (team_nv_config_load(&cfg) == SLE_TEAM_OK) {
             osal_printk("[cfg] nv role=%u team=%u channel=%u leader_suffix=%04X\r\n",

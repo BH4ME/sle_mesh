@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.119"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.120"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -121,6 +121,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("ops.battery_percent = team_battery_percent_cb;", app_source)
         self.assertIn("bat commands: status|sample", app_source)
         self.assertNotIn("sample=0", app_source)
+        self.assertIn("team_cli_match2", app_source)
         self.assertIn("typedef uint8_t (*sle_team_battery_percent_fn)(void *user_ctx);", node_header)
         self.assertIn("sle_team_battery_percent_fn battery_percent;", node_header)
         self.assertIn("hb.battery_percent = sle_team_battery_percent(node);", node_source)

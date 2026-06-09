@@ -1,8 +1,8 @@
 # sle_mesh
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Repository](https://img.shields.io/badge/repository-v4.4.119-16a34a.svg)](versions/v4.4.119/VERSION.md)
-[![Firmware](https://img.shields.io/badge/firmware-v4.4.119-2563eb.svg)](versions/v4.4.119/VERSION.md)
+[![Repository](https://img.shields.io/badge/repository-v4.4.120-16a34a.svg)](versions/v4.4.120/VERSION.md)
+[![Firmware](https://img.shields.io/badge/firmware-v4.4.120-2563eb.svg)](versions/v4.4.120/VERSION.md)
 [![Platform](https://img.shields.io/badge/platform-WS63%20SLE-0f766e.svg)](xc/ws63_team_network/)
 [![WebUI](https://img.shields.io/badge/webui-board%20%2B%20browser-7c3aed.svg)](webui/)
 
@@ -12,10 +12,10 @@
 
 ## 当前版本
 
-- 最新仓库记录：`v4.4.119`
-- 当前固件版本：`v4.4.119`
-- 最新仓库记录说明：[versions/v4.4.119/VERSION.md](versions/v4.4.119/VERSION.md)
-- 当前固件记录说明：[versions/v4.4.119/VERSION.md](versions/v4.4.119/VERSION.md)
+- 最新仓库记录：`v4.4.120`
+- 当前固件版本：`v4.4.120`
+- 最新仓库记录说明：[versions/v4.4.120/VERSION.md](versions/v4.4.120/VERSION.md)
+- 当前固件记录说明：[versions/v4.4.120/VERSION.md](versions/v4.4.120/VERSION.md)
 - 版本索引：[versions/README.md](versions/README.md)
 
 ## 项目能力
@@ -123,7 +123,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/flash/ws63_flash_mul
   -Ports COM16,COM13,COM17,COM18 `
   -Parallel `
   -Firmware output_from_vm\team_network_v4_unified_runtime_role\ws63-liteos-app_v4_unified_all.fwpkg `
-  -ExpectedVersion v4.4.119
+  -ExpectedVersion v4.4.120
 ```
 
 自动烧录工具：
