@@ -652,7 +652,7 @@ class Ws63AutoBurnTest(unittest.TestCase):
 
         args = parser.parse_args(["-p", "/dev/null", "--software-reset-only", "firmware.fwpkg"])
 
-        self.assertEqual(args.expected_version, "v4.4.120")
+        self.assertEqual(args.expected_version, "v4.4.121")
 
     def test_main_show_mode_does_not_apply_version_guard(self):
         class FakeFwpkg:

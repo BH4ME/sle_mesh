@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.120"
+#define SLE_TEAM_FW_VERSION "v4.4.121"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -2670,38 +2670,38 @@ static int team_serial_cfg_cli_done(void)
     return 1;
 }
 
-static int team_cfg_save_leader(uint8_t team, uint8_t channel, uint8_t apply_now)
+static int team_cfg_apply_role(sle_team_node_role_t role, uint8_t team, uint8_t channel, uint16_t leader_suffix)
 {
     sle_team_web_config_nv_t cfg;
+
+    (void)memset_s(&cfg, sizeof(cfg), 0, sizeof(cfg));
+    cfg.role = (uint8_t)role;
+    cfg.team_id = team;
+    cfg.channel_hash = channel;
+    cfg.leader_suffix = leader_suffix;
+    return team_serial_cfg_apply_loaded(&cfg);
+}
+
+static int team_cfg_save_leader(uint8_t team, uint8_t channel, uint8_t apply_now)
+{
     int ret;
 
     ret = team_nv_config_save(SLE_TEAM_ROLE_LEADER, team, team_self_mac_suffix(), channel);
     if (ret != SLE_TEAM_OK || apply_now == 0U) {
         return ret;
     }
-    (void)memset_s(&cfg, sizeof(cfg), 0, sizeof(cfg));
-    cfg.role = (uint8_t)SLE_TEAM_ROLE_LEADER;
-    cfg.team_id = team;
-    cfg.channel_hash = channel;
-    cfg.leader_suffix = team_self_mac_suffix();
-    return team_serial_cfg_apply_loaded(&cfg);
+    return team_cfg_apply_role(SLE_TEAM_ROLE_LEADER, team, channel, team_self_mac_suffix());
 }
 
 static int team_cfg_save_member(uint16_t leader_suffix, uint8_t team, uint8_t channel, uint8_t apply_now)
 {
-    sle_team_web_config_nv_t cfg;
     int ret;
 
     ret = team_nv_config_save(SLE_TEAM_ROLE_MEMBER, team, leader_suffix, channel);
     if (ret != SLE_TEAM_OK || apply_now == 0U) {
         return ret;
     }
-    (void)memset_s(&cfg, sizeof(cfg), 0, sizeof(cfg));
-    cfg.role = (uint8_t)SLE_TEAM_ROLE_MEMBER;
-    cfg.team_id = team;
-    cfg.channel_hash = channel;
-    cfg.leader_suffix = leader_suffix;
-    return team_serial_cfg_apply_loaded(&cfg);
+    return team_cfg_apply_role(SLE_TEAM_ROLE_MEMBER, team, channel, leader_suffix);
 }
 
 static int team_serial_cfg_cli_save_leader(uint8_t team, uint8_t channel, uint8_t apply_now)
