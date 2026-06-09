@@ -300,6 +300,20 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("scope=config+allowlist", cli_handle)
         self.assertIn("team_cfg_clear_all_saved()", http_handle)
 
+    def test_build_scripts_archive_firmware_outputs_without_overwriting(self):
+        remote_build = (self.REPO_ROOT / "automation/ws63/tools/ws63_remote_build_v4.py").read_text(encoding="utf-8")
+        local_wsl = (self.REPO_ROOT / "scripts/build/ws63_build_v4_local_wsl.sh").read_text(encoding="utf-8")
+        ubuntu = (self.REPO_ROOT / "scripts/build/ws63_build_v4_ubuntu.sh").read_text(encoding="utf-8")
+
+        self.assertIn("def versioned_output_path", remote_build)
+        self.assertIn("def reserve_unique_path", remote_build)
+        self.assertIn("archive_output = reserve_unique_path(versioned_output_path(local_output, VERSION))", remote_build)
+        self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
+        for script in (local_wsl, ubuntu):
+            self.assertIn("next_archive_path()", script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.124")"', script)
+            self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
+
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):
         tool_source = (self.REPO_ROOT / "automation/ws63/tools/ws63_four_board_relay_test.py").read_text(
             encoding="utf-8"

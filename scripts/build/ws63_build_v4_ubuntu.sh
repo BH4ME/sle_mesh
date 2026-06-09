@@ -46,6 +46,19 @@ UBUNTU_SDK="${UBUNTU_SDK:-/home/builder/workspace/bearpi-pico_h3863_fresh}"
 OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 
+next_archive_path() {
+  local latest="$1"
+  local version="$2"
+  local base="${latest%.fwpkg}_${version}"
+  local candidate="${base}.fwpkg"
+  local index=1
+  while [[ -e "$candidate" ]]; do
+    candidate="${base}.${index}.fwpkg"
+    index=$((index + 1))
+  done
+  printf '%s\n' "$candidate"
+}
+
 if [[ -z "$UBUNTU_HOST" ]]; then
   echo "UBUNTU_HOST is required, for example: UBUNTU_HOST=192.168.1.50 $0 $role" >&2
   exit 2
@@ -56,6 +69,7 @@ REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fw
 REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
 REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.124")"
 LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
 ssh_opts=(
@@ -79,7 +93,8 @@ echo "profile:    v4.4.124 unified runtime role (v3.2 schematic pinmap + ADC bat
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
-echo "local out:  $LOCAL_OUT"
+echo "archive:    $ARCHIVE_OUT"
+echo "latest:     $LOCAL_OUT"
 echo
 
 "${ssh_cmd[@]}" "test -f '$CONFIG_PATH' && mkdir -p '$REMOTE_PROTO' '$REMOTE_APP'"
@@ -352,5 +367,6 @@ print("post-build guard passed: team-network app, ST7789/LVGL display, version s
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"
-rsync -az -e "${rsync_ssh[*]}" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PKG" "$LOCAL_OUT"
-ls -lh "$LOCAL_OUT"
+rsync -az -e "${rsync_ssh[*]}" "$UBUNTU_USER@$UBUNTU_HOST:$REMOTE_PKG" "$ARCHIVE_OUT"
+cp "$ARCHIVE_OUT" "$LOCAL_OUT"
+ls -lh "$ARCHIVE_OUT" "$LOCAL_OUT"

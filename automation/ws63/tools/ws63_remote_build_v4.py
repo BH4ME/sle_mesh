@@ -91,6 +91,20 @@ def download_file(sftp: paramiko.SFTPClient, remote: str, local: Path) -> None:
     sftp.get(remote, str(local))
 
 
+def versioned_output_path(latest_output: Path, version: str) -> Path:
+    return latest_output.with_name(f"{latest_output.stem}_{version}{latest_output.suffix}")
+
+
+def reserve_unique_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for index in range(1, 1000):
+        candidate = path.with_name(f"{path.stem}.{index}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"could not reserve unique firmware output path near {path}")
+
+
 def build_config_script() -> str:
     return r'''
 from pathlib import Path
@@ -389,12 +403,14 @@ def main(argv: list[str] | None = None) -> int:
     remote_pkg = posixpath.join(sdk, REMOTE_PKG_REL)
     config_path = posixpath.join(sdk, CONFIG_REL)
     local_output = Path(args.output)
+    archive_output = reserve_unique_path(versioned_output_path(local_output, VERSION))
 
     log("WS63 Ubuntu Paramiko build")
     log(f"profile:    {VERSION} unified runtime role (relay swap hysteresis)")
     log(f"host:       {args.user}@{args.host}:{args.port}")
     log(f"sdk:        {sdk}")
-    log(f"local out:  {local_output}")
+    log(f"archive:    {archive_output}")
+    log(f"latest:     {local_output}")
 
     with tempfile.TemporaryDirectory(prefix="ws63_remote_build_") as tmp_name:
         tmp = Path(tmp_name)
@@ -470,11 +486,14 @@ def main(argv: list[str] | None = None) -> int:
             run_remote(client, f"cd {quote(sdk)} && python3 build.py -c ws63-liteos-app -j{quote(str(args.jobs))}", "build firmware", timeout=3600)
             run_remote(client, f"python3 {quote(guard_py)} {quote(sdk)}", "post-build guard")
 
-            download_file(sftp, remote_pkg, local_output)
-            pkg_bytes = local_output.read_bytes()
+            download_file(sftp, remote_pkg, archive_output)
+            pkg_bytes = archive_output.read_bytes()
             if VERSION.encode("ascii") not in pkg_bytes:
-                raise RuntimeError(f"downloaded package does not contain {VERSION}: {local_output}")
-            log(f"[done] package size={local_output.stat().st_size} contains_{VERSION}=True")
+                raise RuntimeError(f"downloaded package does not contain {VERSION}: {archive_output}")
+            if archive_output != local_output:
+                shutil.copy2(archive_output, local_output)
+                log(f"[latest] updated {local_output}")
+            log(f"[done] package size={archive_output.stat().st_size} contains_{VERSION}=True archive={archive_output}")
             run_remote(client, f"rm -rf {quote(remote_tmp)}", "cleanup")
         finally:
             client.close()

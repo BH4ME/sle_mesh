@@ -39,18 +39,33 @@ WSL_SDK="${WSL_SDK:-/mnt/d/bearpi-pico_h3863-master}"
 OUT_ROOT="${OUT_ROOT:-$ROOT_DIR/output_from_vm}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 
+next_archive_path() {
+  local latest="$1"
+  local version="$2"
+  local base="${latest%.fwpkg}_${version}"
+  local candidate="${base}.fwpkg"
+  local index=1
+  while [[ -e "$candidate" ]]; do
+    candidate="${base}.${index}.fwpkg"
+    index=$((index + 1))
+  done
+  printf '%s\n' "$candidate"
+}
+
 CONFIG_PATH="$WSL_SDK/build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
 REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
 REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
 REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.124")"
 
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
 echo "profile:    v4.4.124 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "sdk:        $WSL_SDK"
-echo "local out:  $LOCAL_OUT"
+echo "archive:    $ARCHIVE_OUT"
+echo "latest:     $LOCAL_OUT"
 echo
 
 command -v cmake >/dev/null || { echo "cmake not found in PATH=$PATH" >&2; exit 2; }
@@ -265,5 +280,6 @@ print("post-build guard passed: local WSL v4.4.124")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"
-cp "$REMOTE_PKG" "$LOCAL_OUT"
-ls -lh "$LOCAL_OUT"
+cp "$REMOTE_PKG" "$ARCHIVE_OUT"
+cp "$ARCHIVE_OUT" "$LOCAL_OUT"
+ls -lh "$ARCHIVE_OUT" "$LOCAL_OUT"
