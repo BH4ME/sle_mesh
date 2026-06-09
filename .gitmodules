@@ -1,3 +1,6 @@
 [submodule "xc/ws63_team_network/third_party/lvgl"]
 	path = xc/ws63_team_network/third_party/lvgl
 	url = https://github.com/lvgl/lvgl.git
+[submodule "tools/xf_burn_tools"]
+	path = tools/xf_burn_tools
+	url = https://github.com/geekheart/xf_burn_tools.git

@@ -48,7 +48,7 @@ LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.95 unified runtime role (relay swap hysteresis)"
+echo "profile:    v4.4.118 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "sdk:        $WSL_SDK"
 echo "local out:  $LOCAL_OUT"
 echo
@@ -126,20 +126,32 @@ s = unset_kconfig_bool(s, "CONFIG_DYNAMIC_UART_ID_BINDDING")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LED_PIN", "255")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_PIN", "0")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_PIN", "14")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_MUTED", "y")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE")
 s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_GPS_ENABLE")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_BUS", "1")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_TXD_PIN", "17")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_RXD_PIN", "18")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_PIN", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_PIN", "12")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS", "50")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S", "30")
+s = set_kconfig_value(s, "CONFIG_ADC_SUPPORT_AUTO_SCAN", "y")
+s = set_kconfig_value(s, "CONFIG_ADC_USING_V154", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SPI_BUS", "0")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "6")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "8")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "7")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "9")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "7")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "9")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "8")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "10")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_X_OFFSET", "40")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_Y_OFFSET", "53")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_WIDTH", "240")
@@ -155,7 +167,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.95 local WSL pinmap and team-network sample")
+print("configured v4.4.118 local WSL pinmap, ADC battery sampling, and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -175,7 +187,28 @@ elf = elf_path.read_bytes()
 
 for item in [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
+    "CONFIG_SLE_TEAM_WS2812_ENABLE=y",
+    "CONFIG_SLE_TEAM_WS2812_PIN=0",
+    "CONFIG_SLE_TEAM_BUZZER_ENABLE=y",
+    "CONFIG_SLE_TEAM_BUZZER_PIN=14",
+    "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH=y",
+    "CONFIG_SLE_TEAM_BUZZER_MUTED=y",
+    "# CONFIG_SLE_TEAM_GPS_ENABLE is not set",
+    "CONFIG_SLE_TEAM_ADC_ENABLE=y",
+    "CONFIG_SLE_TEAM_ADC_CTRL_PIN=5",
+    "CONFIG_SLE_TEAM_ADC_VBAT_PIN=12",
+    "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL=5",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS=50",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S=30",
+    "CONFIG_ADC_SUPPORT_AUTO_SCAN=y",
+    "CONFIG_ADC_USING_V154=y",
     "CONFIG_SLE_TEAM_ST7789_ENABLE=y",
+    "CONFIG_SLE_TEAM_ST7789_SCLK_PIN=7",
+    "CONFIG_SLE_TEAM_ST7789_MOSI_PIN=9",
+    "CONFIG_SLE_TEAM_ST7789_CS_PIN=8",
+    "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW=y",
+    "CONFIG_SLE_TEAM_ST7789_DC_PIN=13",
+    "CONFIG_SLE_TEAM_ST7789_RESET_PIN=10",
     "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL=y",
 ]:
     if item not in cfg:
@@ -196,7 +229,7 @@ for item in [
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.95",
+    b"v4.4.118",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -204,8 +237,18 @@ for item in [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"phase=ready",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
+    b"[hw] init summary fw=%s",
+    b"[hw] gps configured=%u present=0 ready=%u",
+    b"[hw] adc present=%u ready=%u",
+    b"[battery] sample valid=%u",
+    b"bat commands: status|sample",
+    b"vbat_mv=%u",
+    b"[state] rgb state=%s",
+    b"state=%s flash=%s",
+    b"buzz muted by firmware",
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
@@ -214,11 +257,11 @@ for item in [
     b"relay swap observe",
     b"swap-promote",
     b"swap-demote",
-    b"v4.4.95 pairing allowlist preserve",
+    b"v3.2 schematic pinmap, muted buzzer",
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.95")
+print("post-build guard passed: local WSL v4.4.118")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

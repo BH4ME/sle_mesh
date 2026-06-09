@@ -4,8 +4,8 @@
 
 ## 当前版本
 
-- 最新仓库记录：[v4.4.98](./v4.4.98/VERSION.md)
-- 当前固件版本：[v4.4.95](./v4.4.95/VERSION.md)
+- 最新仓库记录：[v4.4.118](./v4.4.118/VERSION.md)
+- 当前固件版本：[v4.4.118](./v4.4.118/VERSION.md)
 - 当前外壳版本：[hardware/enclosures/sle-pcb-enclosure/v1.1.4](../hardware/enclosures/sle-pcb-enclosure/v1.1.4/)
 
 ## 版本规则
@@ -18,6 +18,26 @@
 
 ## v4.4
 
+- [v4.4.118](./v4.4.118/VERSION.md)
+- [v4.4.117](./v4.4.117/VERSION.md)
+- [v4.4.116](./v4.4.116/VERSION.md)
+- [v4.4.115](./v4.4.115/VERSION.md)
+- [v4.4.114](./v4.4.114/VERSION.md)
+- [v4.4.113](./v4.4.113/VERSION.md)
+- [v4.4.112](./v4.4.112/VERSION.md)
+- [v4.4.111](./v4.4.111/VERSION.md)
+- [v4.4.110](./v4.4.110/VERSION.md)
+- [v4.4.109](./v4.4.109/VERSION.md)
+- [v4.4.108](./v4.4.108/VERSION.md)
+- [v4.4.107](./v4.4.107/VERSION.md)
+- [v4.4.106](./v4.4.106/VERSION.md)
+- [v4.4.105](./v4.4.105/VERSION.md)
+- [v4.4.104](./v4.4.104/VERSION.md)
+- [v4.4.103](./v4.4.103/VERSION.md)
+- [v4.4.102](./v4.4.102/VERSION.md)
+- [v4.4.101](./v4.4.101/VERSION.md)
+- [v4.4.100](./v4.4.100/VERSION.md)
+- [v4.4.99](./v4.4.99/VERSION.md)
 - [v4.4.98](./v4.4.98/VERSION.md)
 - [v4.4.97](./v4.4.97/VERSION.md)
 - [v4.4.96](./v4.4.96/VERSION.md)

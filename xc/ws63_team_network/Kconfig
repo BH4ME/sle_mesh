@@ -47,30 +47,31 @@ config SLE_TEAM_LED_ACTIVE_LOW
         The tested BearPi WS63 blue user LED turns on when GPIO_2 is driven high.
 
 config SLE_TEAM_WS2812_ENABLE
-    bool "Enable v4 WS2812 RGB status LED"
-    default n
+    bool "Enable v3.2 WS2812 RGB status LED"
+    default y
     help
-        Enable the v4 single WS2812C RGB LED connected to RGB/IO0.
+        Enable the v3.2 single WS2812C RGB LED connected to RGB/IO0.
 
 config SLE_TEAM_WS2812_PIN
     int "WS2812 RGB data GPIO"
     default 0
     depends on SLE_TEAM_WS2812_ENABLE
     help
-        On the v4 schematic, RGB is routed to WS63 IO0.
+        On SCH_Schematic1_2 v3.2, RGB is routed to WS63 IO0.
 
 config SLE_TEAM_BUZZER_ENABLE
-    bool "Enable v4 buzzer output"
-    default n
+    bool "Enable v3.2 buzzer output"
+    default y
     help
-        Enable BUZZ output on the v4 board.
+        Enable BUZZ output on the v3.2 board. The default runtime policy keeps
+        the buzzer muted until SLE_TEAM_BUZZER_MUTED is disabled.
 
 config SLE_TEAM_BUZZER_PIN
     int "Buzzer GPIO"
     default 14
     depends on SLE_TEAM_BUZZER_ENABLE
     help
-        On the v4 schematic, BUZZ is routed to WS63 IO14.
+        On SCH_Schematic1_2 v3.2, BUZZ is routed to WS63 IO14.
 
 config SLE_TEAM_BUZZER_ACTIVE_HIGH
     bool "Buzzer active high"
@@ -79,36 +80,107 @@ config SLE_TEAM_BUZZER_ACTIVE_HIGH
     help
         Set to y when BUZZER turns on at high level.
 
+config SLE_TEAM_BUZZER_MUTED
+    bool "Keep buzzer muted"
+    default y
+    depends on SLE_TEAM_BUZZER_ENABLE
+    help
+        Keep BUZZ initialized as an output but forced off. This is the safe
+        default while the hardware bring-up is focused on pin validation.
+
+config SLE_TEAM_BUZZER_AUTO_TOGGLE
+    bool "Auto toggle buzzer for diagnostics"
+    default n
+    depends on SLE_TEAM_BUZZER_ENABLE && !SLE_TEAM_BUZZER_MUTED
+    help
+        Diagnostic only. Leave disabled for normal firmware so the buzzer does
+        not sound by itself.
+
 config SLE_TEAM_GPS_ENABLE
-    bool "Enable v4 GPS UART pinmap"
+    bool "Enable v3.2 GPS UART pinmap"
     default n
     help
-        Keep this off when GPS module is not soldered. This option currently
-        records/logs UART pin mapping only; NMEA parsing is not enabled yet.
+        Enable the optional v3.2 GPS UART pinmap. The current product boards
+        are not populated with GPS modules, so leave this disabled by default.
+        UART pinmap configuration is not hardware presence detection; GPS
+        presence requires received NMEA data, and parsing is not enabled yet.
 
 config SLE_TEAM_GPS_UART_BUS
     int "GPS UART bus"
     default 1
     depends on SLE_TEAM_GPS_ENABLE
     help
-        On the v4 schematic, GPS uses UART1.
+        On SCH_Schematic1_2 v3.2, GPS uses UART1.
 
 config SLE_TEAM_GPS_UART_TXD_PIN
     int "GPS UART TXD pin"
     default 17
     depends on SLE_TEAM_GPS_ENABLE
     help
-        On the v4 schematic, U1TX is routed to WS63 IO17.
+        On SCH_Schematic1_2 v3.2, WS63 U1TX is routed to GPS RXD1.
 
 config SLE_TEAM_GPS_UART_RXD_PIN
     int "GPS UART RXD pin"
     default 18
     depends on SLE_TEAM_GPS_ENABLE
     help
-        On the v4 schematic, U1RX is routed to WS63 IO18.
+        On SCH_Schematic1_2 v3.2, WS63 U1RX is routed to GPS TXD1.
+
+config SLE_TEAM_ADC_ENABLE
+    bool "Enable v3.2 battery ADC pinmap"
+    default y
+    help
+        Initialize ADC_CTRL, sample ADC_VBAT through the WS63 ADC driver, and
+        publish the calculated battery percentage in hello/heartbeat packets.
+
+config SLE_TEAM_ADC_CTRL_PIN
+    int "Battery ADC divider control GPIO"
+    default 5
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        On SCH_Schematic1_2 v3.2, ADC_CTRL is routed to WS63 IO05.
+
+config SLE_TEAM_ADC_VBAT_PIN
+    int "Battery ADC sense GPIO"
+    default 12
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        On SCH_Schematic1_2 v3.2, ADC_VBAT is routed to WS63 IO12.
+
+config SLE_TEAM_ADC_VBAT_CHANNEL
+    int "Battery ADC sense channel"
+    default 5
+    range 0 5
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        WS63 ADC channel map uses ADC_CHANNEL_5 for GPIO12/IO12.
+
+config SLE_TEAM_ADC_CTRL_ACTIVE_HIGH
+    bool "ADC divider control active high"
+    default y
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        The v3.2 schematic uses ADC_CTRL to enable the VBAT divider through
+        the MOS switch. Default boot state keeps the divider off.
+
+config SLE_TEAM_ADC_SAMPLE_SETTLE_MS
+    int "Battery ADC divider settle time in ms"
+    default 50
+    range 1 1000
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        Wait after enabling ADC_CTRL before sampling ADC_VBAT.
+
+config SLE_TEAM_ADC_SAMPLE_INTERVAL_S
+    int "Battery ADC sample interval in seconds"
+    default 30
+    range 1 3600
+    depends on SLE_TEAM_ADC_ENABLE
+    help
+        Periodic VBAT sampling interval while the team network is running.
 
 config SLE_TEAM_ST7789_ENABLE
-    bool "Enable v4 ST7789 display"
+    bool "Enable v3.2 ST7789 display"
     default y
     select SPI_SUPPORT_MASTER
 
@@ -137,27 +209,35 @@ config SLE_TEAM_ST7789_SPI_BUS
 
 config SLE_TEAM_ST7789_SCLK_PIN
     int "ST7789 SCL/SCLK pin"
-    default 6
+    default 7
     depends on SLE_TEAM_ST7789_ENABLE
 
 config SLE_TEAM_ST7789_MOSI_PIN
     int "ST7789 SDA/MOSI pin"
-    default 8
+    default 9
     depends on SLE_TEAM_ST7789_ENABLE
 
 config SLE_TEAM_ST7789_CS_PIN
     int "ST7789 CS pin"
-    default 7
+    default 8
     depends on SLE_TEAM_ST7789_ENABLE
+
+config SLE_TEAM_ST7789_CS_ALWAYS_LOW
+    bool "Keep ST7789 CS output low"
+    default y
+    depends on SLE_TEAM_ST7789_ENABLE
+    help
+        Use this when the ST7789 CS input is tied to ground or the board
+        must never drive the CS net high.
 
 config SLE_TEAM_ST7789_DC_PIN
     int "ST7789 RS/DC pin"
-    default 9
+    default 13
     depends on SLE_TEAM_ST7789_ENABLE
 
 config SLE_TEAM_ST7789_RESET_PIN
     int "ST7789 RESET pin"
-    default 13
+    default 10
     depends on SLE_TEAM_ST7789_ENABLE
 
 config SLE_TEAM_ST7789_X_OFFSET

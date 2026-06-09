@@ -12,6 +12,8 @@
 
 #include "app_init.h"
 #include "common_def.h"
+#include "adc.h"
+#include "adc_porting.h"
 #include "errcode.h"
 #include "gpio.h"
 #include "pinctrl.h"
@@ -90,7 +92,7 @@
 #endif
 
 #ifndef CONFIG_SLE_TEAM_WS2812_ENABLE
-#define CONFIG_SLE_TEAM_WS2812_ENABLE 0
+#define CONFIG_SLE_TEAM_WS2812_ENABLE 1
 #endif
 
 #ifndef CONFIG_SLE_TEAM_WS2812_PIN
@@ -98,7 +100,7 @@
 #endif
 
 #ifndef CONFIG_SLE_TEAM_BUZZER_ENABLE
-#define CONFIG_SLE_TEAM_BUZZER_ENABLE 0
+#define CONFIG_SLE_TEAM_BUZZER_ENABLE 1
 #endif
 
 #ifndef CONFIG_SLE_TEAM_BUZZER_PIN
@@ -107,6 +109,14 @@
 
 #ifndef CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH
 #define CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_BUZZER_MUTED
+#define CONFIG_SLE_TEAM_BUZZER_MUTED 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE
+#define CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE 0
 #endif
 
 #ifndef CONFIG_SLE_TEAM_GPS_ENABLE
@@ -125,28 +135,60 @@
 #define CONFIG_SLE_TEAM_GPS_UART_RXD_PIN 18
 #endif
 
+#ifndef CONFIG_SLE_TEAM_ADC_ENABLE
+#define CONFIG_SLE_TEAM_ADC_ENABLE 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_CTRL_PIN
+#define CONFIG_SLE_TEAM_ADC_CTRL_PIN 5
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_VBAT_PIN
+#define CONFIG_SLE_TEAM_ADC_VBAT_PIN 12
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH
+#define CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL
+#define CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL 5
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS
+#define CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS 50
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S
+#define CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S 30
+#endif
+
 #ifndef CONFIG_SLE_TEAM_ST7789_SPI_BUS
 #define CONFIG_SLE_TEAM_ST7789_SPI_BUS 0
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_SCLK_PIN
-#define CONFIG_SLE_TEAM_ST7789_SCLK_PIN 6
+#define CONFIG_SLE_TEAM_ST7789_SCLK_PIN 7
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_MOSI_PIN
-#define CONFIG_SLE_TEAM_ST7789_MOSI_PIN 8
+#define CONFIG_SLE_TEAM_ST7789_MOSI_PIN 9
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_CS_PIN
-#define CONFIG_SLE_TEAM_ST7789_CS_PIN 7
+#define CONFIG_SLE_TEAM_ST7789_CS_PIN 8
+#endif
+
+#ifndef CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW
+#define CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW 1
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_DC_PIN
-#define CONFIG_SLE_TEAM_ST7789_DC_PIN 9
+#define CONFIG_SLE_TEAM_ST7789_DC_PIN 13
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_RESET_PIN
-#define CONFIG_SLE_TEAM_ST7789_RESET_PIN 13
+#define CONFIG_SLE_TEAM_ST7789_RESET_PIN 10
 #endif
 
 #ifndef CONFIG_SLE_TEAM_ST7789_X_OFFSET
@@ -237,6 +279,37 @@
 #define SLE_TEAM_WS2812_BOOT_R 0U
 #define SLE_TEAM_WS2812_BOOT_G 24U
 #define SLE_TEAM_WS2812_BOOT_B 64U
+#define SLE_TEAM_WS2812_IDLE_R 64U
+#define SLE_TEAM_WS2812_IDLE_G 64U
+#define SLE_TEAM_WS2812_IDLE_B 64U
+#define SLE_TEAM_WS2812_LEADER_R 0U
+#define SLE_TEAM_WS2812_LEADER_G 64U
+#define SLE_TEAM_WS2812_LEADER_B 0U
+#define SLE_TEAM_WS2812_MEMBER_R 0U
+#define SLE_TEAM_WS2812_MEMBER_G 0U
+#define SLE_TEAM_WS2812_MEMBER_B 64U
+#define SLE_TEAM_WS2812_SEEK_R 64U
+#define SLE_TEAM_WS2812_SEEK_G 48U
+#define SLE_TEAM_WS2812_SEEK_B 0U
+#define SLE_TEAM_WS2812_TX_R 64U
+#define SLE_TEAM_WS2812_TX_G 0U
+#define SLE_TEAM_WS2812_TX_B 48U
+#define SLE_TEAM_WS2812_RX_R 0U
+#define SLE_TEAM_WS2812_RX_G 0U
+#define SLE_TEAM_WS2812_RX_B 64U
+#define SLE_TEAM_WS2812_WARN_R 64U
+#define SLE_TEAM_WS2812_WARN_G 24U
+#define SLE_TEAM_WS2812_WARN_B 0U
+#define SLE_TEAM_WS2812_ERROR_R 64U
+#define SLE_TEAM_WS2812_ERROR_G 0U
+#define SLE_TEAM_WS2812_ERROR_B 0U
+#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 6U
+#define SLE_TEAM_WS2812_BREATHE_MAX_SCALE 64U
+#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U
+#define SLE_TEAM_WS2812_ANIM_STEP_MS 32U
+#define SLE_TEAM_WS2812_FLASH_ON_MS 80U
+#define SLE_TEAM_WS2812_FLASH_OFF_MS 80U
+#define SLE_TEAM_WS2812_FLASH_PULSES 4U
 #define SLE_TEAM_BUZZER_FORCE_OFF_LEVEL GPIO_LEVEL_LOW
 #define SLE_TEAM_BUZZER_FORCE_ON_LEVEL GPIO_LEVEL_HIGH
 #define SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS 3000U
@@ -301,9 +374,13 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.95"
-#define SLE_TEAM_HW_CONSTRAINTS "v4.4.95 pairing allowlist preserve"
+#define SLE_TEAM_FW_VERSION "v4.4.118"
+#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
+#define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
+#define SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM 100U
+#define SLE_TEAM_BATTERY_EMPTY_MV 3300U
+#define SLE_TEAM_BATTERY_FULL_MV 4200U
 
 #if defined(__GNUC__)
 #define SLE_TEAM_UNUSED_FUNC __attribute__((unused))
@@ -320,6 +397,19 @@ typedef enum {
     SLE_TEAM_LED_EVENT_RX = 2,
     SLE_TEAM_LED_EVENT_SEEK = 3,
 } sle_team_led_event_t;
+
+typedef enum {
+    TEAM_RGB_STATE_OFF = 0,
+    TEAM_RGB_STATE_BOOT,
+    TEAM_RGB_STATE_IDLE,
+    TEAM_RGB_STATE_LEADER,
+    TEAM_RGB_STATE_MEMBER,
+    TEAM_RGB_STATE_SEEK,
+    TEAM_RGB_STATE_TX,
+    TEAM_RGB_STATE_RX,
+    TEAM_RGB_STATE_WARN,
+    TEAM_RGB_STATE_ERROR,
+} team_rgb_state_t;
 
 typedef enum {
     TEAM_CONN_DIR_UNKNOWN = 0U,
@@ -407,11 +497,33 @@ typedef struct {
     uint8_t ws2812_r;
     uint8_t ws2812_g;
     uint8_t ws2812_b;
+    uint8_t ws2812_state;
+    uint32_t ws2812_state_last_ms;
+    uint8_t ws2812_flash_state;
+    uint8_t ws2812_flash_pulses_left;
+    uint8_t ws2812_flash_on;
+    uint32_t ws2812_flash_step_ms;
+    uint32_t ws2812_anim_last_ms;
     uint8_t buzzer_ready;
     uint8_t buzzer_pin;
     uint8_t buzzer_active_high;
     uint8_t buzzer_level_on;
     uint32_t buzzer_toggle_last_ms;
+    uint8_t gps_ready;
+    uint8_t gps_uart_bus;
+    uint8_t gps_txd_pin;
+    uint8_t gps_rxd_pin;
+    uint8_t adc_ready;
+    uint8_t adc_ctrl_pin;
+    uint8_t adc_vbat_pin;
+    uint8_t adc_ctrl_active_high;
+    uint8_t adc_vbat_channel;
+    uint8_t battery_valid;
+    uint8_t battery_percent;
+    uint16_t adc_sample_mv;
+    uint16_t battery_mv;
+    uint32_t battery_sample_last_ms;
+    int32_t battery_sample_last_ret;
     uint8_t display_ready;
     uint8_t display_task_started;
     volatile uint8_t display_status_dirty;
@@ -555,6 +667,11 @@ static void team_leader_failover_note_route_recovered(uint8_t member_id, uint8_t
 static uint8_t team_leader_should_seek_member(uint8_t candidate_id, uint8_t candidate_bucket);
 static uint8_t team_should_defer_member_timeout(void *user_ctx, uint8_t member_id,
     uint32_t now_s, uint32_t last_seen_s);
+static uint8_t team_interval_not_reached(uint32_t now_s, uint32_t last_s, uint32_t interval_s);
+static const char *team_rgb_state_name(team_rgb_state_t state);
+static void team_ws2812_set_state(team_rgb_state_t state);
+static void team_ws2812_refresh_network_state(void);
+static void team_ws2812_show_display_event(team_display_event_t event);
 static void team_leader_relay_config_retry_tick(void);
 static void team_leader_pairing_rotate_connections(void);
 static void team_leader_enforce_direct_capacity(uint8_t force_now);
@@ -1104,12 +1221,12 @@ static void team_display_show_event(team_display_event_t event, uint8_t member_i
     g_team_rt.display_status_dirty = 1U;
     osal_irq_restore(irq_sts);
 #else
-    unused(event);
     unused(member_id);
     unused(latitude_e6);
     unused(longitude_e6);
     unused(last_seen_s);
 #endif
+    team_ws2812_show_display_event(event);
 }
 
 static void team_display_note_offline_delta(void)
@@ -1218,6 +1335,25 @@ static void team_display_flush_pending_once(void)
 #endif
 }
 
+#if CONFIG_SLE_TEAM_ST7789_ENABLE
+static void team_display_init_log(uint8_t ready, const char *phase)
+{
+    osal_printk("[hw] display present=1 ready=%u task=%u sclk=%u sda=%u cs=%u cs_low=%u rs=%u reset=%u size=%ux%u off=%u,%u phase=%s\r\n",
+        ready, g_team_rt.display_task_started,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_DC_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_RESET_PIN,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_WIDTH,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_HEIGHT,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_X_OFFSET,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_Y_OFFSET,
+        phase);
+}
+#endif
+
 static void team_display_init(void)
 {
 #if CONFIG_SLE_TEAM_ST7789_ENABLE
@@ -1236,8 +1372,10 @@ static void team_display_init(void)
     cfg.height = (uint16_t)CONFIG_SLE_TEAM_ST7789_HEIGHT;
     if (ws63_st7789_init(&cfg) == 0) {
         g_team_rt.display_ready = 1U;
+        team_display_init_log(1U, "ready");
     } else {
         g_team_rt.display_ready = 0U;
+        team_display_init_log(0U, "failed");
         osal_printk("[display] disabled after init failure\r\n");
     }
 #endif
@@ -1279,6 +1417,50 @@ static void team_display_start(void)
 #endif
 }
 
+static void team_display_wait_ready(uint32_t timeout_ms)
+{
+#if CONFIG_SLE_TEAM_ST7789_ENABLE
+    uint32_t waited_ms = 0U;
+
+    while (g_team_rt.display_task_started != 0U && g_team_rt.display_ready == 0U && waited_ms < timeout_ms) {
+        osal_msleep(20);
+        waited_ms += 20U;
+    }
+#else
+    unused(timeout_ms);
+#endif
+}
+
+static void team_hardware_report_print(void)
+{
+    osal_printk("[hw] init summary fw=%s schematic=SCH_Schematic1_2_v3.2 constraints=%s\r\n",
+        SLE_TEAM_FW_VERSION, SLE_TEAM_HW_CONSTRAINTS);
+    osal_printk("[hw] ws2812 present=%u ready=%u pin=%u state=%s color=%u,%u,%u\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_WS2812_ENABLE, g_team_rt.ws2812_ready, g_team_rt.ws2812_pin,
+        team_rgb_state_name((team_rgb_state_t)g_team_rt.ws2812_state), g_team_rt.ws2812_r,
+        g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+    osal_printk("[hw] buzzer present=%u ready=%u pin=%u active_high=%u muted=%u level_on=%u\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_BUZZER_ENABLE, g_team_rt.buzzer_ready, g_team_rt.buzzer_pin,
+        g_team_rt.buzzer_active_high, (uint8_t)CONFIG_SLE_TEAM_BUZZER_MUTED, g_team_rt.buzzer_level_on);
+    osal_printk("[hw] gps configured=%u present=0 ready=%u uart=%u tx=%u rx=%u parser=0 module=none\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_GPS_ENABLE, g_team_rt.gps_ready, g_team_rt.gps_uart_bus,
+        g_team_rt.gps_txd_pin, g_team_rt.gps_rxd_pin);
+    osal_printk("[hw] adc present=%u ready=%u ctrl=%u vbat=%u channel=%u ctrl_active_high=%u "
+        "valid=%u adc_mv=%u vbat_mv=%u battery=%u ret=%ld\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_ADC_ENABLE, g_team_rt.adc_ready, g_team_rt.adc_ctrl_pin,
+        g_team_rt.adc_vbat_pin, g_team_rt.adc_vbat_channel, g_team_rt.adc_ctrl_active_high,
+        g_team_rt.battery_valid, g_team_rt.adc_sample_mv, g_team_rt.battery_mv,
+        g_team_rt.battery_percent, (long)g_team_rt.battery_sample_last_ret);
+    osal_printk("[hw] display present=%u ready=%u task=%u sclk=%u sda=%u cs=%u cs_low=%u rs=%u reset=%u size=%ux%u off=%u,%u\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_ENABLE, g_team_rt.display_ready, g_team_rt.display_task_started,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN, (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_PIN, (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_DC_PIN,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_RESET_PIN, (uint16_t)CONFIG_SLE_TEAM_ST7789_WIDTH,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_HEIGHT, (uint16_t)CONFIG_SLE_TEAM_ST7789_X_OFFSET,
+        (uint16_t)CONFIG_SLE_TEAM_ST7789_Y_OFFSET);
+}
+
 static void team_ws2812_force_off(void)
 {
     uint8_t i;
@@ -1293,6 +1475,13 @@ static void team_ws2812_force_off(void)
     g_team_rt.ws2812_r = 0U;
     g_team_rt.ws2812_g = 0U;
     g_team_rt.ws2812_b = 0U;
+    g_team_rt.ws2812_state = (uint8_t)TEAM_RGB_STATE_OFF;
+    g_team_rt.ws2812_state_last_ms = uapi_tcxo_get_ms();
+    g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
+    g_team_rt.ws2812_flash_pulses_left = 0U;
+    g_team_rt.ws2812_flash_on = 0U;
+    g_team_rt.ws2812_flash_step_ms = 0U;
+    g_team_rt.ws2812_anim_last_ms = 0U;
     (void)uapi_gpio_set_val(g_team_rt.ws2812_pin, GPIO_LEVEL_LOW);
     osal_printk("[diag] ws2812 force-off pin=%u clear_count=%u\r\n",
         g_team_rt.ws2812_pin, SLE_TEAM_WS2812_FORCE_CLEAR_COUNT);
@@ -1320,12 +1509,299 @@ static int team_ws2812_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
 #endif
 }
 
+static const char *team_rgb_state_name(team_rgb_state_t state)
+{
+    switch (state) {
+        case TEAM_RGB_STATE_BOOT:
+            return "boot";
+        case TEAM_RGB_STATE_IDLE:
+            return "idle";
+        case TEAM_RGB_STATE_LEADER:
+            return "leader";
+        case TEAM_RGB_STATE_MEMBER:
+            return "member";
+        case TEAM_RGB_STATE_SEEK:
+            return "seek";
+        case TEAM_RGB_STATE_TX:
+            return "tx";
+        case TEAM_RGB_STATE_RX:
+            return "rx";
+        case TEAM_RGB_STATE_WARN:
+            return "warn";
+        case TEAM_RGB_STATE_ERROR:
+            return "error";
+        case TEAM_RGB_STATE_OFF:
+        default:
+            return "off";
+    }
+}
+
+static void team_rgb_state_color(team_rgb_state_t state, uint8_t *red, uint8_t *green, uint8_t *blue)
+{
+    if (red == NULL || green == NULL || blue == NULL) {
+        return;
+    }
+    switch (state) {
+        case TEAM_RGB_STATE_BOOT:
+            *red = SLE_TEAM_WS2812_BOOT_R;
+            *green = SLE_TEAM_WS2812_BOOT_G;
+            *blue = SLE_TEAM_WS2812_BOOT_B;
+            return;
+        case TEAM_RGB_STATE_IDLE:
+            *red = SLE_TEAM_WS2812_IDLE_R;
+            *green = SLE_TEAM_WS2812_IDLE_G;
+            *blue = SLE_TEAM_WS2812_IDLE_B;
+            return;
+        case TEAM_RGB_STATE_LEADER:
+            *red = SLE_TEAM_WS2812_LEADER_R;
+            *green = SLE_TEAM_WS2812_LEADER_G;
+            *blue = SLE_TEAM_WS2812_LEADER_B;
+            return;
+        case TEAM_RGB_STATE_MEMBER:
+            *red = SLE_TEAM_WS2812_MEMBER_R;
+            *green = SLE_TEAM_WS2812_MEMBER_G;
+            *blue = SLE_TEAM_WS2812_MEMBER_B;
+            return;
+        case TEAM_RGB_STATE_SEEK:
+            *red = SLE_TEAM_WS2812_SEEK_R;
+            *green = SLE_TEAM_WS2812_SEEK_G;
+            *blue = SLE_TEAM_WS2812_SEEK_B;
+            return;
+        case TEAM_RGB_STATE_TX:
+            *red = SLE_TEAM_WS2812_TX_R;
+            *green = SLE_TEAM_WS2812_TX_G;
+            *blue = SLE_TEAM_WS2812_TX_B;
+            return;
+        case TEAM_RGB_STATE_RX:
+            *red = SLE_TEAM_WS2812_RX_R;
+            *green = SLE_TEAM_WS2812_RX_G;
+            *blue = SLE_TEAM_WS2812_RX_B;
+            return;
+        case TEAM_RGB_STATE_WARN:
+            *red = SLE_TEAM_WS2812_WARN_R;
+            *green = SLE_TEAM_WS2812_WARN_G;
+            *blue = SLE_TEAM_WS2812_WARN_B;
+            return;
+        case TEAM_RGB_STATE_ERROR:
+            *red = SLE_TEAM_WS2812_ERROR_R;
+            *green = SLE_TEAM_WS2812_ERROR_G;
+            *blue = SLE_TEAM_WS2812_ERROR_B;
+            return;
+        case TEAM_RGB_STATE_OFF:
+        default:
+            *red = 0U;
+            *green = 0U;
+            *blue = 0U;
+            return;
+    }
+}
+
+static uint8_t team_rgb_state_is_breathing(team_rgb_state_t state)
+{
+    return state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_ERROR ? 1U : 0U;
+}
+
+static uint8_t team_ws2812_scale_component(uint8_t value, uint8_t scale)
+{
+    uint16_t scaled = (uint16_t)value * (uint16_t)scale;
+
+    return (uint8_t)(scaled / SLE_TEAM_WS2812_BREATHE_MAX_SCALE);
+}
+
+static uint8_t team_ws2812_breathe_scale(uint32_t now_ms)
+{
+    uint32_t half_period = SLE_TEAM_WS2812_BREATHE_PERIOD_MS / 2U;
+    uint32_t phase;
+    uint32_t span = SLE_TEAM_WS2812_BREATHE_MAX_SCALE - SLE_TEAM_WS2812_BREATHE_MIN_SCALE;
+
+    if (half_period == 0U) {
+        return SLE_TEAM_WS2812_BREATHE_MAX_SCALE;
+    }
+    phase = now_ms % SLE_TEAM_WS2812_BREATHE_PERIOD_MS;
+    if (phase > half_period) {
+        phase = SLE_TEAM_WS2812_BREATHE_PERIOD_MS - phase;
+    }
+    return (uint8_t)(SLE_TEAM_WS2812_BREATHE_MIN_SCALE + ((phase * span) / half_period));
+}
+
+static void team_rgb_state_color_scaled(team_rgb_state_t state, uint8_t scale,
+    uint8_t *red, uint8_t *green, uint8_t *blue)
+{
+    uint8_t base_red = 0U;
+    uint8_t base_green = 0U;
+    uint8_t base_blue = 0U;
+
+    if (red == NULL || green == NULL || blue == NULL) {
+        return;
+    }
+    team_rgb_state_color(state, &base_red, &base_green, &base_blue);
+    if (scale < SLE_TEAM_WS2812_BREATHE_MAX_SCALE) {
+        base_red = team_ws2812_scale_component(base_red, scale);
+        base_green = team_ws2812_scale_component(base_green, scale);
+        base_blue = team_ws2812_scale_component(base_blue, scale);
+    }
+    *red = base_red;
+    *green = base_green;
+    *blue = base_blue;
+}
+
+static void team_ws2812_apply_color(team_rgb_state_t state, uint8_t red, uint8_t green, uint8_t blue,
+    uint8_t log_state)
+{
+    if (g_team_rt.ws2812_ready == 0U) {
+        return;
+    }
+    if (g_team_rt.ws2812_state == (uint8_t)state &&
+        g_team_rt.ws2812_r == red && g_team_rt.ws2812_g == green && g_team_rt.ws2812_b == blue) {
+        return;
+    }
+    if (team_ws2812_set_rgb(red, green, blue) == 0) {
+        g_team_rt.ws2812_state = (uint8_t)state;
+        g_team_rt.ws2812_state_last_ms = uapi_tcxo_get_ms();
+        if (log_state != 0U) {
+            osal_printk("[state] rgb state=%s pin=%u color=%u,%u,%u\r\n",
+                team_rgb_state_name(state), g_team_rt.ws2812_pin, red, green, blue);
+        }
+    }
+}
+
+static void team_ws2812_set_state(team_rgb_state_t state)
+{
+    uint8_t red = 0U;
+    uint8_t green = 0U;
+    uint8_t blue = 0U;
+
+    team_rgb_state_color(state, &red, &green, &blue);
+    team_ws2812_apply_color(state, red, green, blue, 1U);
+}
+
+static team_rgb_state_t team_ws2812_base_state(void)
+{
+    if (g_team_rt.role_configured == 0U) {
+        return TEAM_RGB_STATE_IDLE;
+    }
+    if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+        return TEAM_RGB_STATE_LEADER;
+    }
+    if (g_team_node.joined != 0U) {
+        return TEAM_RGB_STATE_MEMBER;
+    }
+    return TEAM_RGB_STATE_ERROR;
+}
+
+static void team_ws2812_render_base_state(uint32_t now_ms)
+{
+    team_rgb_state_t state = team_ws2812_base_state();
+    uint8_t red = 0U;
+    uint8_t green = 0U;
+    uint8_t blue = 0U;
+    uint8_t scale = SLE_TEAM_WS2812_BREATHE_MAX_SCALE;
+    uint8_t log_state;
+
+    if (team_rgb_state_is_breathing(state) != 0U) {
+        if (g_team_rt.ws2812_state == (uint8_t)state &&
+            g_team_rt.ws2812_anim_last_ms != 0U &&
+            (now_ms - g_team_rt.ws2812_anim_last_ms) < SLE_TEAM_WS2812_ANIM_STEP_MS) {
+            return;
+        }
+        scale = team_ws2812_breathe_scale(now_ms);
+    }
+    team_rgb_state_color_scaled(state, scale, &red, &green, &blue);
+    log_state = g_team_rt.ws2812_state == (uint8_t)state ? 0U : 1U;
+    team_ws2812_apply_color(state, red, green, blue, log_state);
+    g_team_rt.ws2812_anim_last_ms = now_ms;
+}
+
+static void team_ws2812_start_flash(team_rgb_state_t state)
+{
+    if (g_team_rt.ws2812_ready == 0U) {
+        return;
+    }
+    g_team_rt.ws2812_flash_state = (uint8_t)state;
+    g_team_rt.ws2812_flash_pulses_left = SLE_TEAM_WS2812_FLASH_PULSES;
+    g_team_rt.ws2812_flash_on = 1U;
+    g_team_rt.ws2812_flash_step_ms = uapi_tcxo_get_ms();
+    team_ws2812_set_state(state);
+}
+
+static uint8_t team_ws2812_refresh_flash(uint32_t now_ms)
+{
+    uint32_t interval_ms;
+
+    if (g_team_rt.ws2812_flash_state == (uint8_t)TEAM_RGB_STATE_OFF ||
+        g_team_rt.ws2812_flash_pulses_left == 0U) {
+        return 0U;
+    }
+    interval_ms = g_team_rt.ws2812_flash_on != 0U ?
+        SLE_TEAM_WS2812_FLASH_ON_MS : SLE_TEAM_WS2812_FLASH_OFF_MS;
+    if ((now_ms - g_team_rt.ws2812_flash_step_ms) < interval_ms) {
+        return 1U;
+    }
+
+    g_team_rt.ws2812_flash_step_ms = now_ms;
+    if (g_team_rt.ws2812_flash_on != 0U) {
+        g_team_rt.ws2812_flash_pulses_left--;
+        if (g_team_rt.ws2812_flash_pulses_left == 0U) {
+            g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
+            g_team_rt.ws2812_flash_on = 0U;
+            team_ws2812_render_base_state(now_ms);
+            return 0U;
+        }
+        g_team_rt.ws2812_flash_on = 0U;
+        team_ws2812_apply_color(TEAM_RGB_STATE_OFF, 0U, 0U, 0U, 0U);
+        return 1U;
+    }
+
+    g_team_rt.ws2812_flash_on = 1U;
+    team_ws2812_set_state((team_rgb_state_t)g_team_rt.ws2812_flash_state);
+    return 1U;
+}
+
+static void team_ws2812_refresh_network_state(void)
+{
+    uint32_t now_ms;
+
+    if (g_team_rt.ws2812_ready == 0U) {
+        return;
+    }
+    now_ms = uapi_tcxo_get_ms();
+    if (team_ws2812_refresh_flash(now_ms) != 0U) {
+        return;
+    }
+    team_ws2812_render_base_state(now_ms);
+}
+
+static void team_ws2812_show_display_event(team_display_event_t event)
+{
+    switch (event) {
+        case TEAM_DISPLAY_EVENT_TIMEOUT:
+        case TEAM_DISPLAY_EVENT_LOST:
+            if (g_team_rt.role_configured != 0U && g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+                team_ws2812_start_flash(TEAM_RGB_STATE_ERROR);
+            }
+            return;
+        case TEAM_DISPLAY_EVENT_LEFT:
+            if (g_team_rt.role_configured != 0U && g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+                team_ws2812_start_flash(TEAM_RGB_STATE_WARN);
+            }
+            return;
+        case TEAM_DISPLAY_EVENT_JOIN:
+        case TEAM_DISPLAY_EVENT_REJOIN:
+            if (g_team_rt.role_configured != 0U && g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
+                team_ws2812_start_flash(TEAM_RGB_STATE_LEADER);
+            } else {
+                team_ws2812_refresh_network_state();
+            }
+            return;
+        case TEAM_DISPLAY_EVENT_NONE:
+        default:
+            return;
+    }
+}
+
 static void team_ws2812_show_boot_marker(void)
 {
-    if (team_ws2812_set_rgb(SLE_TEAM_WS2812_BOOT_R, SLE_TEAM_WS2812_BOOT_G, SLE_TEAM_WS2812_BOOT_B) == 0) {
-        osal_printk("[diag] ws2812 startup marker on pin=%u color=%u,%u,%u\r\n",
-            g_team_rt.ws2812_pin, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
-    }
+    team_ws2812_set_state(TEAM_RGB_STATE_BOOT);
 }
 
 static void team_ws2812_test_pattern(void)
@@ -1356,6 +1832,13 @@ static void team_ws2812_init(void)
         g_team_rt.ws2812_r = 0U;
         g_team_rt.ws2812_g = 0U;
         g_team_rt.ws2812_b = 0U;
+        g_team_rt.ws2812_state = (uint8_t)TEAM_RGB_STATE_OFF;
+        g_team_rt.ws2812_state_last_ms = 0U;
+        g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
+        g_team_rt.ws2812_flash_pulses_left = 0U;
+        g_team_rt.ws2812_flash_on = 0U;
+        g_team_rt.ws2812_flash_step_ms = 0U;
+        g_team_rt.ws2812_anim_last_ms = 0U;
 #if CONFIG_SLE_TEAM_WS2812_ENABLE
         team_ws2812_show_boot_marker();
 #else
@@ -1370,21 +1853,209 @@ static void team_ws2812_init(void)
     }
 }
 
-static void team_gps_diag_print(void)
+static void team_gps_init(void)
 {
+    g_team_rt.gps_uart_bus = (uint8_t)CONFIG_SLE_TEAM_GPS_UART_BUS;
+    g_team_rt.gps_txd_pin = (uint8_t)CONFIG_SLE_TEAM_GPS_UART_TXD_PIN;
+    g_team_rt.gps_rxd_pin = (uint8_t)CONFIG_SLE_TEAM_GPS_UART_RXD_PIN;
+    g_team_rt.gps_ready = 0U;
 #if CONFIG_SLE_TEAM_GPS_ENABLE
-    osal_printk("[diag] gps pinmap (fw=%s) uart_bus=%u tx=%u rx=%u mode=enabled(no-nmea-parser)\r\n",
-        SLE_TEAM_FW_VERSION,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_BUS,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_TXD_PIN,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_RXD_PIN);
+    if (g_team_rt.gps_txd_pin <= 31U && g_team_rt.gps_rxd_pin <= 31U) {
+        (void)uapi_pin_set_mode(g_team_rt.gps_txd_pin, PIN_MODE_1);
+        (void)uapi_pin_set_mode(g_team_rt.gps_rxd_pin, PIN_MODE_1);
+        g_team_rt.gps_ready = 1U;
+    }
 #else
-    osal_printk("[diag] gps disabled by %s (fw=%s) uart_bus=%u tx=%u rx=%u\r\n",
-        SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_BUS,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_TXD_PIN,
-        (uint8_t)CONFIG_SLE_TEAM_GPS_UART_RXD_PIN);
 #endif
+    /*
+     * GPS_ENABLE only means the UART pinmap is configured. These product boards
+     * are not populated with a GPS module, and no NMEA parser is enabled here.
+     */
+    osal_printk("[hw] gps configured=%u present=0 ready=%u uart=%u tx=%u rx=%u parser=0 module=none\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_GPS_ENABLE, g_team_rt.gps_ready, g_team_rt.gps_uart_bus,
+        g_team_rt.gps_txd_pin, g_team_rt.gps_rxd_pin);
+}
+
+static uint8_t team_adc_ctrl_off_level(void) SLE_TEAM_UNUSED_FUNC;
+static uint8_t team_adc_ctrl_on_level(void) SLE_TEAM_UNUSED_FUNC;
+static void team_adc_ctrl_set(uint8_t enabled) SLE_TEAM_UNUSED_FUNC;
+
+static uint8_t team_adc_ctrl_off_level(void)
+{
+    return CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH;
+}
+
+static uint8_t team_adc_ctrl_on_level(void)
+{
+    return CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW;
+}
+
+static void team_adc_ctrl_set(uint8_t enabled)
+{
+    if (g_team_rt.adc_ctrl_pin > 31U) {
+        return;
+    }
+    (void)uapi_gpio_set_val(g_team_rt.adc_ctrl_pin,
+        enabled != 0U ? team_adc_ctrl_on_level() : team_adc_ctrl_off_level());
+}
+
+static uint16_t team_battery_vbat_mv_from_adc_mv(uint16_t adc_mv)
+{
+    uint32_t vbat_mv = ((uint32_t)adc_mv * (SLE_TEAM_ADC_DIVIDER_TOP_KOHM +
+        SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM) + (SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM / 2U)) /
+        SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM;
+
+    return vbat_mv > 65535U ? 65535U : (uint16_t)vbat_mv;
+}
+
+static uint8_t team_battery_percent_from_vbat_mv(uint16_t vbat_mv)
+{
+    uint32_t range_mv = SLE_TEAM_BATTERY_FULL_MV - SLE_TEAM_BATTERY_EMPTY_MV;
+    uint32_t above_empty_mv;
+
+    if (vbat_mv <= SLE_TEAM_BATTERY_EMPTY_MV) {
+        return 0U;
+    }
+    if (vbat_mv >= SLE_TEAM_BATTERY_FULL_MV) {
+        return 100U;
+    }
+    above_empty_mv = (uint32_t)vbat_mv - SLE_TEAM_BATTERY_EMPTY_MV;
+    return (uint8_t)((above_empty_mv * 100U + (range_mv / 2U)) / range_mv);
+}
+
+static int team_battery_sample_once(uint8_t log_result)
+{
+    int ret = SLE_TEAM_ERR_UNSUPPORTED;
+
+#if CONFIG_SLE_TEAM_ADC_ENABLE
+    uint16_t adc_mv = 0U;
+
+    if (g_team_rt.adc_ready == 0U) {
+        g_team_rt.battery_sample_last_ret = ret;
+        return ret;
+    }
+
+    team_adc_ctrl_set(1U);
+    osal_msleep((uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS);
+    ret = (int)adc_port_read(g_team_rt.adc_vbat_channel, &adc_mv);
+    uapi_adc_power_en(AFE_GADC_MODE, false);
+    team_adc_ctrl_set(0U);
+
+    g_team_rt.battery_sample_last_ms = uapi_tcxo_get_ms();
+    g_team_rt.battery_sample_last_ret = ret;
+    if (ret == (int)ERRCODE_SUCC) {
+        g_team_rt.adc_sample_mv = adc_mv;
+        g_team_rt.battery_mv = team_battery_vbat_mv_from_adc_mv(adc_mv);
+        g_team_rt.battery_percent = team_battery_percent_from_vbat_mv(g_team_rt.battery_mv);
+        g_team_rt.battery_valid = 1U;
+    }
+#else
+    unused(log_result);
+#endif
+    if (log_result != 0U) {
+        osal_printk("[battery] sample valid=%u adc_mv=%u vbat_mv=%u percent=%u ctrl=%u vbat=%u "
+            "channel=%u ratio=%u/%u ret=%ld\r\n",
+            g_team_rt.battery_valid, g_team_rt.adc_sample_mv, g_team_rt.battery_mv,
+            g_team_rt.battery_percent, g_team_rt.adc_ctrl_pin, g_team_rt.adc_vbat_pin,
+            g_team_rt.adc_vbat_channel, SLE_TEAM_ADC_DIVIDER_TOP_KOHM,
+            SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM, (long)g_team_rt.battery_sample_last_ret);
+    }
+    return ret;
+}
+
+static void team_battery_sample_tick(uint8_t force_now)
+{
+    uint32_t now_s;
+
+    if (g_team_rt.adc_ready == 0U) {
+        return;
+    }
+    now_s = team_now_s(NULL);
+    if (force_now == 0U && g_team_rt.battery_sample_last_ms != 0U &&
+        team_interval_not_reached(now_s, g_team_rt.battery_sample_last_ms / 1000U,
+            (uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S) != 0U) {
+        return;
+    }
+    (void)team_battery_sample_once(0U);
+}
+
+static uint8_t team_battery_percent_cb(void *user_ctx)
+{
+    unused(user_ctx);
+    return g_team_rt.battery_valid != 0U ? g_team_rt.battery_percent : 100U;
+}
+
+static void team_adc_init(void)
+{
+    g_team_rt.adc_ctrl_pin = (uint8_t)CONFIG_SLE_TEAM_ADC_CTRL_PIN;
+    g_team_rt.adc_vbat_pin = (uint8_t)CONFIG_SLE_TEAM_ADC_VBAT_PIN;
+    g_team_rt.adc_ctrl_active_high = (uint8_t)CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH;
+    g_team_rt.adc_vbat_channel = (uint8_t)CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL;
+    g_team_rt.adc_ready = 0U;
+    g_team_rt.battery_valid = 0U;
+    g_team_rt.battery_percent = 100U;
+    g_team_rt.adc_sample_mv = 0U;
+    g_team_rt.battery_mv = 0U;
+    g_team_rt.battery_sample_last_ms = 0U;
+    g_team_rt.battery_sample_last_ret = SLE_TEAM_ERR_UNSUPPORTED;
+#if CONFIG_SLE_TEAM_ADC_ENABLE
+    if (g_team_rt.adc_ctrl_pin <= 31U && g_team_rt.adc_vbat_pin <= 31U) {
+        uint8_t off_level;
+        errcode_t init_ret;
+
+        off_level = team_adc_ctrl_off_level();
+        (void)uapi_pin_set_mode(g_team_rt.adc_ctrl_pin, HAL_PIO_FUNC_GPIO);
+        (void)uapi_pin_set_pull(g_team_rt.adc_ctrl_pin, PIN_PULL_TYPE_DOWN);
+        (void)uapi_gpio_set_val(g_team_rt.adc_ctrl_pin, off_level);
+        (void)uapi_gpio_set_dir(g_team_rt.adc_ctrl_pin, GPIO_DIRECTION_OUTPUT);
+        (void)uapi_gpio_set_val(g_team_rt.adc_ctrl_pin, off_level);
+        init_ret = uapi_adc_init(ADC_CLOCK_500KHZ);
+        g_team_rt.battery_sample_last_ret = (int32_t)init_ret;
+        g_team_rt.adc_ready = init_ret == ERRCODE_SUCC ? 1U : 0U;
+        if (g_team_rt.adc_ready != 0U) {
+            (void)team_battery_sample_once(0U);
+        }
+    }
+#endif
+    osal_printk("[hw] adc present=%u ready=%u ctrl=%u vbat=%u channel=%u ctrl_active_high=%u "
+        "ctrl_level=off valid=%u adc_mv=%u vbat_mv=%u battery=%u ret=%ld\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_ADC_ENABLE, g_team_rt.adc_ready, g_team_rt.adc_ctrl_pin,
+        g_team_rt.adc_vbat_pin, g_team_rt.adc_vbat_channel, g_team_rt.adc_ctrl_active_high,
+        g_team_rt.battery_valid, g_team_rt.adc_sample_mv, g_team_rt.battery_mv,
+        g_team_rt.battery_percent, (long)g_team_rt.battery_sample_last_ret);
+}
+
+static void team_battery_cli_status(void)
+{
+    osal_printk("[cli] bat fw=%s ready=%u valid=%u adc_mv=%u vbat_mv=%u percent=%u ctrl=%u vbat=%u "
+        "channel=%u ratio=%u/%u empty_mv=%u full_mv=%u settle_ms=%u interval_s=%u ret=%ld\r\n",
+        SLE_TEAM_FW_VERSION, g_team_rt.adc_ready, g_team_rt.battery_valid,
+        g_team_rt.adc_sample_mv, g_team_rt.battery_mv, g_team_rt.battery_percent,
+        g_team_rt.adc_ctrl_pin, g_team_rt.adc_vbat_pin, g_team_rt.adc_vbat_channel,
+        SLE_TEAM_ADC_DIVIDER_TOP_KOHM, SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM,
+        SLE_TEAM_BATTERY_EMPTY_MV, SLE_TEAM_BATTERY_FULL_MV,
+        (uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS,
+        (uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S,
+        (long)g_team_rt.battery_sample_last_ret);
+}
+
+static int team_battery_cli_handle(const char *line)
+{
+    if (strcmp(line, "bat") == 0 || strcmp(line, "bat status") == 0 ||
+        strcmp(line, "adc") == 0 || strcmp(line, "adc status") == 0) {
+        team_battery_cli_status();
+        return 1;
+    }
+    if (strcmp(line, "bat sample") == 0 || strcmp(line, "adc sample") == 0) {
+        (void)team_battery_sample_once(1U);
+        team_battery_cli_status();
+        return 1;
+    }
+    if (strcmp(line, "bat help") == 0 || strcmp(line, "adc help") == 0) {
+        osal_printk("[cli] bat commands: status|sample; adc aliases: adc status|adc sample\r\n");
+        return 1;
+    }
+    return 0;
 }
 
 static void team_buzzer_force_pin_off(uint8_t pin)
@@ -1415,9 +2086,13 @@ static void team_buzzer_apply_level(uint8_t level)
     if (g_team_rt.buzzer_pin > 31U) {
         return;
     }
-    if (g_team_rt.buzzer_active_high == 0U) {
-        gpio_level = level != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH;
-    }
+#if CONFIG_SLE_TEAM_BUZZER_MUTED
+    gpio_level = CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH;
+    g_team_rt.buzzer_level_on = 0U;
+#else
+    gpio_level = (g_team_rt.buzzer_active_high != 0U) ? level :
+        (level != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH);
+#endif
     (void)uapi_pin_set_mode(g_team_rt.buzzer_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_pin_set_pull(g_team_rt.buzzer_pin, PIN_PULL_TYPE_DOWN);
     (void)uapi_gpio_set_dir(g_team_rt.buzzer_pin, GPIO_DIRECTION_OUTPUT);
@@ -1432,15 +2107,22 @@ static void team_buzzer_set(uint8_t on)
     g_team_rt.buzzer_level_on = 0U;
     return;
 #else
+#if CONFIG_SLE_TEAM_BUZZER_MUTED
+    unused(on);
+    g_team_rt.buzzer_level_on = 0U;
+    team_buzzer_force_pin_off(g_team_rt.buzzer_pin);
+    return;
+#else
     g_team_rt.buzzer_level_on = on != 0U ? 1U : 0U;
     team_buzzer_apply_level(g_team_rt.buzzer_level_on != 0U ? SLE_TEAM_BUZZER_FORCE_ON_LEVEL :
         SLE_TEAM_BUZZER_FORCE_OFF_LEVEL);
+#endif
 #endif
 }
 
 static void team_buzzer_toggle_tick(void)
 {
-#if !CONFIG_SLE_TEAM_BUZZER_ENABLE
+#if !CONFIG_SLE_TEAM_BUZZER_ENABLE || CONFIG_SLE_TEAM_BUZZER_MUTED || !CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE
     return;
 #else
     uint32_t now_ms;
@@ -1479,9 +2161,10 @@ static void team_buzzer_init(void)
     team_buzzer_set(0U);
     g_team_rt.buzzer_ready = 1U;
     g_team_rt.buzzer_toggle_last_ms = uapi_tcxo_get_ms();
-    osal_printk("[diag] buzzer io14 toggle mode by %s (fw=%s) pin=%u interval_ms=%u start_level=%u\r\n",
+    osal_printk("[diag] buzzer init by %s (fw=%s) pin=%u active_high=%u muted=%u auto_toggle=%u level_on=%u\r\n",
         SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.buzzer_pin,
-        (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS, g_team_rt.buzzer_level_on);
+        g_team_rt.buzzer_active_high, (uint8_t)CONFIG_SLE_TEAM_BUZZER_MUTED,
+        (uint8_t)CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE, g_team_rt.buzzer_level_on);
 }
 
 void OHOS_SystemInit(void)
@@ -1494,11 +2177,8 @@ static void team_led_set(uint8_t on)
     if (g_team_rt.led_pin > 31U) {
         return;
     }
-    if (g_team_rt.led_active_low != 0U) {
-        (void)uapi_gpio_set_val(g_team_rt.led_pin, on != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH);
-    } else {
-        (void)uapi_gpio_set_val(g_team_rt.led_pin, on != 0U ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
-    }
+    (void)uapi_gpio_set_val(g_team_rt.led_pin,
+        ((on != 0U) ^ (g_team_rt.led_active_low != 0U)) ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
 }
 
 static void team_led_configure(uint8_t pin, uint8_t active_low)
@@ -1589,6 +2269,13 @@ static void team_led_cli_status(void)
     osal_printk("[cli] led pin=%u active_low=%u\r\n", g_team_rt.led_pin, g_team_rt.led_active_low);
 }
 
+static void team_ws2812_cli_set_rgb(uint8_t red, uint8_t green, uint8_t blue, const char *name)
+{
+    (void)team_ws2812_set_rgb(red, green, blue);
+    osal_printk("[cli] rgb %s ready=%u color=%u,%u,%u\r\n",
+        name, g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+}
+
 static int team_ws2812_cli_handle(const char *line)
 {
     unsigned int r;
@@ -1596,8 +2283,10 @@ static int team_ws2812_cli_handle(const char *line)
     unsigned int b;
 
     if (strcmp(line, "rgb") == 0 || strcmp(line, "rgb status") == 0) {
-        osal_printk("[cli] rgb status %s (fw=%s) ready=%u pin=%u color=%u,%u,%u\r\n",
+        osal_printk("[cli] rgb status %s (fw=%s) ready=%u pin=%u state=%s flash=%s color=%u,%u,%u\r\n",
             SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION, g_team_rt.ws2812_ready, g_team_rt.ws2812_pin,
+            team_rgb_state_name((team_rgb_state_t)g_team_rt.ws2812_state),
+            team_rgb_state_name((team_rgb_state_t)g_team_rt.ws2812_flash_state),
             g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
         return 1;
     }
@@ -1605,28 +2294,11 @@ static int team_ws2812_cli_handle(const char *line)
         team_ws2812_force_off();
         return 1;
     }
-    if (strcmp(line, "rgb red") == 0) {
-        (void)team_ws2812_set_rgb(64U, 0U, 0U);
-        osal_printk("[cli] rgb red ready=%u color=%u,%u,%u\r\n",
-            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
-        return 1;
-    }
-    if (strcmp(line, "rgb green") == 0) {
-        (void)team_ws2812_set_rgb(0U, 64U, 0U);
-        osal_printk("[cli] rgb green ready=%u color=%u,%u,%u\r\n",
-            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
-        return 1;
-    }
-    if (strcmp(line, "rgb blue") == 0) {
-        (void)team_ws2812_set_rgb(0U, 0U, 64U);
-        osal_printk("[cli] rgb blue ready=%u color=%u,%u,%u\r\n",
-            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
-        return 1;
-    }
-    if (strcmp(line, "rgb white") == 0) {
-        (void)team_ws2812_set_rgb(40U, 40U, 40U);
-        osal_printk("[cli] rgb white ready=%u color=%u,%u,%u\r\n",
-            g_team_rt.ws2812_ready, g_team_rt.ws2812_r, g_team_rt.ws2812_g, g_team_rt.ws2812_b);
+    if (strcmp(line, "rgb red") == 0 || strcmp(line, "rgb green") == 0 ||
+        strcmp(line, "rgb blue") == 0 || strcmp(line, "rgb white") == 0) {
+        team_ws2812_cli_set_rgb(line[4] == 'r' ? 64U : (line[4] == 'w' ? 40U : 0U),
+            line[4] == 'g' ? 64U : (line[4] == 'w' ? 40U : 0U),
+            line[4] == 'b' ? 64U : (line[4] == 'w' ? 40U : 0U), line + 4);
         return 1;
     }
     if (strcmp(line, "rgb test") == 0) {
@@ -1640,8 +2312,7 @@ static int team_ws2812_cli_handle(const char *line)
         return 1;
     }
     if (strcmp(line, "rgb help") == 0) {
-        osal_printk("[cli] rgb disabled by %s (fw=%s); only rgb status|off are no-op\r\n",
-            SLE_TEAM_HW_CONSTRAINTS, SLE_TEAM_FW_VERSION);
+        osal_printk("[cli] rgb commands: status|off|red|green|blue|white|test|set <r> <g> <b>\r\n");
         return 1;
     }
     return 0;
@@ -1663,55 +2334,61 @@ static int team_buzzer_cli_handle(const char *line)
     return 0;
 #else
     if (strcmp(line, "buzz") == 0 || strcmp(line, "buzz status") == 0) {
-        osal_printk("[cli] buzz toggle mode fw=%s ready=%u pin=%u active_high=%u level_on=%u interval_ms=%u\r\n",
+        osal_printk("[cli] buzz fw=%s ready=%u pin=%u active_high=%u muted=%u auto_toggle=%u level_on=%u\r\n",
             SLE_TEAM_FW_VERSION, g_team_rt.buzzer_ready, g_team_rt.buzzer_pin, g_team_rt.buzzer_active_high,
-            g_team_rt.buzzer_level_on, (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
+            (uint8_t)CONFIG_SLE_TEAM_BUZZER_MUTED, (uint8_t)CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE,
+            g_team_rt.buzzer_level_on);
         return 1;
     }
-    if (strcmp(line, "buzz on") == 0) {
-        team_buzzer_set(1U);
-        osal_printk("[cli] buzz set on pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
-        return 1;
-    }
-    if (strcmp(line, "buzz off") == 0) {
+#if CONFIG_SLE_TEAM_BUZZER_MUTED
+    if (strcmp(line, "buzz off") == 0 || strcmp(line, "buzz on") == 0 || strcmp(line, "buzz beep") == 0 ||
+        strcmp(line, "buzz test") == 0 ||
+        (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U)) {
+        uint8_t is_off = strcmp(line, "buzz off") == 0 ? 1U : 0U;
         team_buzzer_set(0U);
-        osal_printk("[cli] buzz set off pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+        osal_printk(is_off != 0U ? "[cli] buzz forced off pin=%u muted=1\r\n" :
+            "[cli] buzz muted by firmware; command ignored pin=%u\r\n", g_team_rt.buzzer_pin);
         return 1;
     }
-    if (strcmp(line, "buzz beep") == 0) {
-        team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
-        osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+    if (strcmp(line, "buzz help") == 0) {
+        osal_printk("[cli] buzz commands: status|off; sound commands are muted by firmware\r\n");
         return 1;
     }
-    if (strcmp(line, "buzz test") == 0) {
-        team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
-        osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
+    return 0;
+#else
+    if (strcmp(line, "buzz on") == 0 || strcmp(line, "buzz off") == 0) {
+        uint8_t is_on = strcmp(line, "buzz on") == 0 ? 1U : 0U;
+        team_buzzer_set(is_on);
+        osal_printk(is_on != 0U ? "[cli] buzz set on pin=%u level_on=%u\r\n" :
+            "[cli] buzz set off pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
         return 1;
     }
-    if (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U) {
-        unused(ms);
+    if (strcmp(line, "buzz beep") == 0 || strcmp(line, "buzz test") == 0 ||
+        (sscanf(line, "buzz beep %u", &ms) == 1 && ms > 0U && ms <= 2000U)) {
         team_buzzer_set(g_team_rt.buzzer_level_on == 0U ? 1U : 0U);
         osal_printk("[cli] buzz toggled pin=%u level_on=%u\r\n", g_team_rt.buzzer_pin, g_team_rt.buzzer_level_on);
         return 1;
     }
     if (strcmp(line, "buzz help") == 0) {
-        osal_printk("[cli] buzz cmds: status|on|off|beep|test (auto toggles every %u ms)\r\n",
-            (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
+        osal_printk("[cli] buzz cmds: status|on|off|beep|test auto_toggle=%u interval_ms=%u\r\n",
+            (uint8_t)CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE, (uint32_t)SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS);
         return 1;
     }
     return 0;
+#endif
 #endif
 }
 
 static int team_display_cli_handle(const char *line)
 {
     if (strcmp(line, "disp") == 0 || strcmp(line, "disp status") == 0) {
-        osal_printk("[cli] disp ready=%u spi=%u sclk=%u mosi=%u cs=%u dc=%u rst=%u size=%ux%u off=%u,%u\r\n",
+        osal_printk("[cli] disp ready=%u spi=%u sclk=%u sda=%u cs=%u cs_low=%u rs=%u rst=%u size=%ux%u off=%u,%u\r\n",
             g_team_rt.display_ready,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_SPI_BUS,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_PIN,
+            (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_DC_PIN,
             (uint8_t)CONFIG_SLE_TEAM_ST7789_RESET_PIN,
             (uint16_t)CONFIG_SLE_TEAM_ST7789_WIDTH,
@@ -1738,37 +2415,31 @@ static int team_display_cli_handle(const char *line)
 static int team_led_cli_handle(const char *line)
 {
     unsigned int pin;
+    uint8_t is_on;
+    uint8_t is_tx;
+    uint8_t is_active_low;
 
     if (strcmp(line, "led") == 0 || strcmp(line, "led status") == 0) {
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led on") == 0) {
-        team_led_set(1U);
+    if (strcmp(line, "led on") == 0 || strcmp(line, "led off") == 0) {
+        is_on = strcmp(line, "led on") == 0 ? 1U : 0U;
+        team_led_set(is_on);
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led off") == 0) {
-        team_led_set(0U);
+    if (strcmp(line, "led tx") == 0 || strcmp(line, "led rx") == 0) {
+        is_tx = strcmp(line, "led tx") == 0 ? 1U : 0U;
+        team_led_blink(is_tx != 0U ? SLE_TEAM_LED_TX_PULSES : SLE_TEAM_LED_RX_PULSES,
+            is_tx != 0U ? SLE_TEAM_LED_TX_ON_MS : SLE_TEAM_LED_RX_ON_MS,
+            is_tx != 0U ? SLE_TEAM_LED_TX_OFF_MS : SLE_TEAM_LED_RX_OFF_MS);
         team_led_cli_status();
         return 1;
     }
-    if (strcmp(line, "led tx") == 0) {
-        team_led_blink(SLE_TEAM_LED_TX_PULSES, SLE_TEAM_LED_TX_ON_MS, SLE_TEAM_LED_TX_OFF_MS);
-        team_led_cli_status();
-        return 1;
-    }
-    if (strcmp(line, "led rx") == 0) {
-        team_led_blink(SLE_TEAM_LED_RX_PULSES, SLE_TEAM_LED_RX_ON_MS, SLE_TEAM_LED_RX_OFF_MS);
-        team_led_cli_status();
-        return 1;
-    }
-    if (strcmp(line, "led active_low") == 0) {
-        team_led_configure(g_team_rt.led_pin, 1U);
-        return 1;
-    }
-    if (strcmp(line, "led active_high") == 0) {
-        team_led_configure(g_team_rt.led_pin, 0U);
+    if (strcmp(line, "led active_low") == 0 || strcmp(line, "led active_high") == 0) {
+        is_active_low = strcmp(line, "led active_low") == 0 ? 1U : 0U;
+        team_led_configure(g_team_rt.led_pin, is_active_low);
         return 1;
     }
     if (sscanf(line, "led pin %u", &pin) == 1 && pin <= 31U) {
@@ -1987,6 +2658,12 @@ static void team_serial_cfg_print_json(void)
     }
 }
 
+static int team_serial_cfg_cli_done(void)
+{
+    team_serial_cfg_print_json();
+    return 1;
+}
+
 static int team_cfg_save_leader(uint8_t team, uint8_t channel, uint8_t apply_now)
 {
     sle_team_web_config_nv_t cfg;
@@ -2019,6 +2696,16 @@ static int team_cfg_save_member(uint16_t leader_suffix, uint8_t team, uint8_t ch
     cfg.channel_hash = channel;
     cfg.leader_suffix = leader_suffix;
     return team_serial_cfg_apply_loaded(&cfg);
+}
+
+static int team_serial_cfg_cli_save_leader(uint8_t team, uint8_t channel, uint8_t apply_now)
+{
+    int ret = team_cfg_save_leader(team, channel, apply_now);
+
+    osal_printk(apply_now != 0U ? "[cfg] leader-now queued ret=%d team=%u channel=%u self_suffix=%04X\r\n" :
+        "[cfg] save leader ret=%d team=%u channel=%u self_suffix=%04X\r\n",
+        ret, (unsigned int)team, (unsigned int)channel, team_self_mac_suffix());
+    return team_serial_cfg_cli_done();
 }
 
 static int team_cfg_apply_saved(void)
@@ -2059,8 +2746,7 @@ static int team_serial_cfg_cli_handle(const char *line)
             team_self_mac_suffix(),
             g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? team_leader_direct_capacity() : 0U,
             g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? team_leader_relay_budget() : 0U);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (strcmp(line, "cfg direct") == 0) {
@@ -2068,21 +2754,18 @@ static int team_serial_cfg_cli_handle(const char *line)
             g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? team_leader_direct_capacity() : 0U,
             g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? team_leader_relay_budget() : 0U,
             SLE_TEAM_MAX_DIRECT_CONNECTIONS);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (sscanf(line, "cfg direct %u", &direct_cap) == 1) {
         if (g_team_rt.role_configured == 0U || g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER) {
             osal_printk("[cfg] direct ret=%d reason=not_leader\r\n", SLE_TEAM_ERR_UNSUPPORTED);
-            team_serial_cfg_print_json();
-            return 1;
+            return team_serial_cfg_cli_done();
         }
         if (direct_cap < 1U || direct_cap > SLE_TEAM_MAX_DIRECT_CONNECTIONS) {
             osal_printk("[cfg] direct ret=%d reason=range value=%u hw_max=%u\r\n",
                 SLE_TEAM_ERR_ARG, direct_cap, SLE_TEAM_MAX_DIRECT_CONNECTIONS);
-            team_serial_cfg_print_json();
-            return 1;
+            return team_serial_cfg_cli_done();
         }
         g_team_node.cfg.max_downstream = (uint8_t)direct_cap;
         g_team_rt.relay_rebalance_last_s = 0U;
@@ -2090,15 +2773,13 @@ static int team_serial_cfg_cli_handle(const char *line)
         team_leader_enforce_direct_capacity(1U);
         osal_printk("[cfg] direct cap=%u relay_budget=%u hw_max=%u ret=0\r\n",
             team_leader_direct_capacity(), team_leader_relay_budget(), SLE_TEAM_MAX_DIRECT_CONNECTIONS);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (strcmp(line, "cfg clear") == 0) {
         ret = team_cfg_clear_all_saved();
         osal_printk("[cfg] clear ret=%d scope=config+allowlist (reboot to apply unconfigured state)\r\n", ret);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (strcmp(line, "cfg reboot") == 0) {
@@ -2111,29 +2792,17 @@ static int team_serial_cfg_cli_handle(const char *line)
         save_team = (g_team_node.cfg.team_id >= 1U && g_team_node.cfg.team_id != SLE_TEAM_BROADCAST_ID) ?
             g_team_node.cfg.team_id : (uint8_t)CONFIG_SLE_TEAM_TEAM_ID;
         save_channel = g_team_rt.role_configured != 0U ? g_team_node.cfg.channel_hash : (uint8_t)CONFIG_SLE_TEAM_CHANNEL_HASH;
-        ret = team_cfg_save_leader(save_team, save_channel, 0U);
-        osal_printk("[cfg] save leader ret=%d team=%u channel=%u self_suffix=%04X\r\n",
-            ret, save_team, save_channel, team_self_mac_suffix());
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_save_leader(save_team, save_channel, 0U);
     }
 
     if (sscanf(line, "cfg leader %u %u", &team, &channel) == 2 &&
         team >= 1U && team <= 254U && channel <= 255U) {
-        ret = team_cfg_save_leader((uint8_t)team, (uint8_t)channel, 0U);
-        osal_printk("[cfg] save leader ret=%d team=%u channel=%u self_suffix=%04X\r\n",
-            ret, team, channel, team_self_mac_suffix());
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_save_leader((uint8_t)team, (uint8_t)channel, 0U);
     }
 
     if (sscanf(line, "cfg leader now %u %u", &team, &channel) == 2 &&
         team >= 1U && team <= 254U && channel <= 255U) {
-        ret = team_cfg_save_leader((uint8_t)team, (uint8_t)channel, 1U);
-        osal_printk("[cfg] leader-now queued ret=%d team=%u channel=%u self_suffix=%04X\r\n",
-            ret, team, channel, team_self_mac_suffix());
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_save_leader((uint8_t)team, (uint8_t)channel, 1U);
     }
 
     if (sscanf(line, "cfg member %x %u %u", &suffix, &team, &channel) == 3 &&
@@ -2141,8 +2810,7 @@ static int team_serial_cfg_cli_handle(const char *line)
         ret = team_cfg_save_member((uint16_t)suffix, (uint8_t)team, (uint8_t)channel, 0U);
         osal_printk("[cfg] save member ret=%d leader_suffix=%04X leader=%u team=%u channel=%u\r\n",
             ret, suffix, team_route_id_from_suffix((uint16_t)suffix), team, channel);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (sscanf(line, "cfg member now %x %u %u", &suffix, &team, &channel) == 3 &&
@@ -2150,22 +2818,19 @@ static int team_serial_cfg_cli_handle(const char *line)
         ret = team_cfg_save_member((uint16_t)suffix, (uint8_t)team, (uint8_t)channel, 1U);
         osal_printk("[cfg] member-now queued ret=%d leader_suffix=%04X leader=%u team=%u channel=%u\r\n",
             ret, suffix, team_route_id_from_suffix((uint16_t)suffix), team, channel);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (strcmp(line, "cfg apply") == 0) {
         sle_team_web_config_nv_t cfg;
         if (team_nv_config_load(&cfg) != SLE_TEAM_OK) {
             osal_printk("[cfg] apply failed ret=%d reason=nv_empty\r\n", SLE_TEAM_ERR_FORMAT);
-            team_serial_cfg_print_json();
-            return 1;
+            return team_serial_cfg_cli_done();
         }
         ret = team_cfg_apply_saved();
         osal_printk("[cfg] apply queued ret=%d role=%u team=%u channel=%u leader_suffix=%04X\r\n",
             ret, cfg.role, cfg.team_id, cfg.channel_hash, cfg.leader_suffix);
-        team_serial_cfg_print_json();
-        return 1;
+        return team_serial_cfg_cli_done();
     }
 
     if (strcmp(line, "cfg help") == 0) {
@@ -5163,6 +5828,7 @@ static void team_joined(void *user_ctx, uint8_t member_id)
         g_team_rt.last_online_member_count = team_online_member_count();
     }
     team_display_refresh_status();
+    team_ws2812_refresh_network_state();
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || member_id != g_team_node.cfg.self_id) {
         return;
     }
@@ -5221,6 +5887,7 @@ static void team_member_reset_after_leave(void)
     g_team_rt.leader_label[0] = '\0';
     team_identity_refresh_labels();
     team_display_refresh_status();
+    team_ws2812_refresh_network_state();
 }
 
 static void team_on_relay_offline(void *user_ctx, uint8_t member_id)
@@ -5552,113 +6219,51 @@ static void team_http_get_path(char *out, size_t out_size)
     out[len] = '\0';
 }
 
-static int team_http_query_u8(const char *path, const char *key, uint8_t min_value, uint8_t max_value,
-    uint8_t *out)
+static const char *team_http_query_value_start(const char *path, const char *key)
 {
     char pattern[24];
     const char *p;
-    unsigned long value = 0;
-    uint8_t digits = 0U;
 
-    if (path == NULL || key == NULL || out == NULL) {
-        return -1;
+    if (path == NULL || key == NULL) {
+        return NULL;
     }
     (void)snprintf(pattern, sizeof(pattern), "%s=", key);
     p = strstr(path, pattern);
     if (p == NULL) {
-        return -1;
+        return NULL;
     }
-    p += strlen(pattern);
-    while (*p >= '0' && *p <= '9') {
-        value = value * 10UL + (unsigned long)(*p - '0');
-        p++;
-        digits++;
-        if (value > 255UL) {
-            return -1;
-        }
-    }
-    if (*p != '\0' && *p != '&') {
-        return -1;
-    }
-    if (digits == 0U || value < min_value || value > max_value) {
-        return -1;
-    }
-    *out = (uint8_t)value;
-    return 0;
+    return p + strlen(pattern);
 }
 
-static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
-    uint16_t *out) SLE_TEAM_UNUSED_FUNC;
-
-static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
-    uint16_t *out)
+static int team_http_query_number(const char *path, const char *key, int64_t min_value, int64_t max_value,
+    unsigned long positive_limit, unsigned long negative_limit, int64_t *out)
 {
-    char pattern[24];
     const char *p;
-    unsigned long value = 0;
-    uint8_t digits = 0U;
-
-    if (path == NULL || key == NULL || out == NULL) {
-        return -1;
-    }
-    (void)snprintf(pattern, sizeof(pattern), "%s=", key);
-    p = strstr(path, pattern);
-    if (p == NULL) {
-        return -1;
-    }
-    p += strlen(pattern);
-    while (*p >= '0' && *p <= '9') {
-        value = value * 10UL + (unsigned long)(*p - '0');
-        p++;
-        digits++;
-        if (value > 65535UL) {
-            return -1;
-        }
-    }
-    if (*p != '\0' && *p != '&') {
-        return -1;
-    }
-    if (digits == 0U || value < min_value || value > max_value) {
-        return -1;
-    }
-    *out = (uint16_t)value;
-    return 0;
-}
-
-static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
-    int32_t *out) SLE_TEAM_UNUSED_FUNC;
-
-static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
-    int32_t *out)
-{
-    char pattern[24];
-    const char *p;
+    unsigned long limit;
     uint8_t negative = 0U;
     unsigned long abs_value = 0UL;
     int64_t signed_value;
     uint8_t digits = 0U;
 
-    if (path == NULL || key == NULL || out == NULL) {
+    if (out == NULL) {
         return -1;
     }
-    (void)snprintf(pattern, sizeof(pattern), "%s=", key);
-    p = strstr(path, pattern);
+    p = team_http_query_value_start(path, key);
     if (p == NULL) {
         return -1;
     }
-    p += strlen(pattern);
-    if (*p == '-') {
+    if (negative_limit != 0UL && *p == '-') {
         negative = 1U;
         p++;
-    } else if (*p == '+') {
+    } else if (negative_limit != 0UL && *p == '+') {
         p++;
     }
+    limit = negative != 0U ? negative_limit : positive_limit;
     while (*p >= '0' && *p <= '9') {
         abs_value = abs_value * 10UL + (unsigned long)(*p - '0');
         p++;
         digits++;
-        if ((negative != 0U && abs_value > 2147483648UL) ||
-            (negative == 0U && abs_value > 2147483647UL)) {
+        if (abs_value > limit) {
             return -1;
         }
     }
@@ -5672,26 +6277,75 @@ static int team_http_query_i32(const char *path, const char *key, int32_t min_va
     if (signed_value < (int64_t)min_value || signed_value > (int64_t)max_value) {
         return -1;
     }
-    *out = (int32_t)signed_value;
+    *out = signed_value;
+    return 0;
+}
+
+static int team_http_query_u8(const char *path, const char *key, uint8_t min_value, uint8_t max_value,
+    uint8_t *out)
+{
+    int64_t value;
+    int ret;
+
+    if (out == NULL) {
+        return -1;
+    }
+    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 255UL, 0UL, &value);
+    if (ret != 0) {
+        return -1;
+    }
+    *out = (uint8_t)value;
+    return 0;
+}
+
+static int team_http_query_u16(const char *path, const char *key, uint16_t min_value, uint16_t max_value,
+    uint16_t *out)
+{
+    int64_t value;
+    int ret;
+
+    if (out == NULL) {
+        return -1;
+    }
+    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 65535UL, 0UL, &value);
+    if (ret != 0) {
+        return -1;
+    }
+    *out = (uint16_t)value;
+    return 0;
+}
+
+static int team_http_query_i32(const char *path, const char *key, int32_t min_value, int32_t max_value,
+    int32_t *out)
+{
+    int64_t value;
+    int ret;
+
+    if (out == NULL) {
+        return -1;
+    }
+    ret = team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value,
+        2147483647UL, 2147483648UL, &value);
+    if (ret != 0) {
+        return -1;
+    }
+    *out = (int32_t)value;
     return 0;
 }
 
 static int team_http_query_hex16(const char *path, const char *key, uint16_t *out)
 {
-    char pattern[24];
     const char *p;
     uint16_t value = 0U;
     uint8_t digits = 0U;
 
-    if (path == NULL || key == NULL || out == NULL) {
+    if (out == NULL) {
         return -1;
     }
-    (void)snprintf(pattern, sizeof(pattern), "%s=", key);
-    p = strstr(path, pattern);
+    p = team_http_query_value_start(path, key);
     if (p == NULL) {
         return -1;
     }
-    p += strlen(pattern);
     while (digits < 4U) {
         char ch = *p++;
         uint8_t nibble;
@@ -6443,7 +7097,7 @@ static void team_http_handle_client(int fd)
         int32_t lon = 0;
         uint16_t speed = 0U;
         uint16_t heading = 0U;
-        uint8_t battery = 100U;
+        uint8_t battery = team_battery_percent_cb(NULL);
         uint8_t fix = 1U;
         uint8_t sat = 0U;
         uint8_t dst = SLE_TEAM_BROADCAST_ID;
@@ -7241,6 +7895,7 @@ static void team_node_init(sle_team_node_role_t role, uint8_t leader_id)
     ops.send = team_sle_send;
     ops.now_s = team_now_s;
     ops.rssi_dbm = team_rssi_dbm;
+    ops.battery_percent = team_battery_percent_cb;
     ops.log = team_log;
     ops.on_joined = team_joined;
     ops.on_position = team_position;
@@ -7390,6 +8045,7 @@ static int team_configure_role(sle_team_node_role_t role, uint8_t leader_id)
     g_team_rt.role_configured = 1U;
     team_identity_refresh_labels();
     team_display_refresh_status();
+    team_ws2812_refresh_network_state();
     sle_team_cli_print_help(&g_team_cli);
     osal_printk("[team] configured self=%u leader=%u role=%u team=%u label=%s\r\n",
         g_team_node.cfg.self_id,
@@ -7463,11 +8119,8 @@ static void team_handle_role_request_once(void)
         team_refresh_relay_mode();
         osal_printk("[team] member initial hello ret=%d, retry by tick if not ready\r\n", hello_ret);
     }
-    if (ret == SLE_TEAM_OK && role == SLE_TEAM_ROLE_LEADER) {
-        team_ws2812_show_boot_marker();
-        team_buzzer_set(0U);
-    } else if (ret == SLE_TEAM_OK && role == SLE_TEAM_ROLE_MEMBER) {
-        team_ws2812_show_boot_marker();
+    if (ret == SLE_TEAM_OK && (role == SLE_TEAM_ROLE_LEADER || role == SLE_TEAM_ROLE_MEMBER)) {
+        team_ws2812_refresh_network_state();
         team_buzzer_set(0U);
     }
     if (ret == SLE_TEAM_OK && save_nv != 0U) {
@@ -7519,8 +8172,18 @@ static void team_restore_web_config(void)
 
 static void team_handle_cli_queue_once(void)
 {
+    typedef int (*team_cli_handler_t)(const char *line);
     sle_team_cli_msg_t msg;
     uint32_t msg_size = sizeof(msg);
+    uint8_t handler_idx;
+    static const team_cli_handler_t cli_handlers[] = {
+        team_ws2812_cli_handle,
+        team_buzzer_cli_handle,
+        team_battery_cli_handle,
+        team_display_cli_handle,
+        team_led_cli_handle,
+        team_serial_cfg_cli_handle,
+    };
 
     if (g_team_rt.cli_queue_ready == 0U) {
         osal_msleep(SLE_TEAM_CLI_QUEUE_TIMEOUT_MS);
@@ -7566,20 +8229,10 @@ static void team_handle_cli_queue_once(void)
                 suffix, team_route_id_from_suffix((uint16_t)suffix), ret, team, channel);
             return;
         }
-        if (team_ws2812_cli_handle(msg.line) != 0) {
-            return;
-        }
-        if (team_buzzer_cli_handle(msg.line) != 0) {
-            return;
-        }
-        if (team_display_cli_handle(msg.line) != 0) {
-            return;
-        }
-        if (team_led_cli_handle(msg.line) != 0) {
-            return;
-        }
-        if (team_serial_cfg_cli_handle(msg.line) != 0) {
-            return;
+        for (handler_idx = 0U; handler_idx < (uint8_t)(sizeof(cli_handlers) / sizeof(cli_handlers[0])); handler_idx++) {
+            if (cli_handlers[handler_idx](msg.line) != 0) {
+                return;
+            }
         }
         if (strcmp(msg.line, "leave") == 0) {
             int ret;
@@ -7619,14 +8272,18 @@ static void team_network_task_bootstrap(void)
 {
     sle_team_web_event_log_init(&g_team_events);
     team_network_wait_identity_ready();
-    team_gps_diag_print();
+    team_uart_init();
+    team_uart_cli_start();
+    osal_printk("[hw] init begin fw=%s\r\n", SLE_TEAM_FW_VERSION);
+    team_gps_init();
+    team_adc_init();
     team_ws2812_init();
     team_buzzer_init();
     team_display_start();
+    team_display_wait_ready(1200U);
     team_display_refresh_status();
-    team_ws2812_show_boot_marker();
-    team_uart_init();
-    team_uart_cli_start();
+    team_ws2812_refresh_network_state();
+    team_hardware_report_print();
     osal_printk("[team] boot unconfigured route=%u label=%s ssid=%s\r\n",
         g_team_rt.route_id,
         g_team_rt.self_label,
@@ -7637,6 +8294,7 @@ static void team_network_task_bootstrap(void)
 static void team_network_tick_common(void)
 {
     team_buzzer_toggle_tick();
+    team_ws2812_refresh_network_state();
     team_handle_cli_queue_once();
     team_handle_role_request_once();
     sle_uart_client_tick();
@@ -7683,6 +8341,7 @@ static void team_network_tick_role_configured(void)
     }
     team_member_autoselect_parent();
     team_request_sle_rssi();
+    team_battery_sample_tick(0U);
     sle_team_node_tick(&g_team_node);
     team_display_note_offline_delta();
     team_leader_relay_config_retry_tick();
@@ -7692,6 +8351,7 @@ static void team_network_tick_role_configured(void)
 
     if (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && joined_before != 0U && g_team_node.joined == 0U) {
         team_upstream_parent_reset("heartbeat timeout");
+        team_ws2812_refresh_network_state();
         if (g_team_rt.relay_client_started != 0U) {
             sle_uart_client_force_rescan();
         }
@@ -7700,7 +8360,7 @@ static void team_network_tick_role_configured(void)
 
 static void team_network_prestart(void)
 {
-    team_buzzer_init();
+    team_buzzer_force_pin_off((uint8_t)CONFIG_SLE_TEAM_BUZZER_PIN);
     team_led_start();
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
     team_identity_set_fallback();

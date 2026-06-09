@@ -31,6 +31,10 @@
 #define CONFIG_SLE_TEAM_ST7789_WIDTH 135
 #endif
 
+#ifndef CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW
+#define CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW 1
+#endif
+
 #if CONFIG_SLE_TEAM_DISPLAY_USE_LVGL
 #if defined(__has_include)
 #if __has_include("lvgl.h")
@@ -324,7 +328,12 @@ static const uint8_t g_st7789_font6x8[][6] = {
 
 static void st7789_cs(uint8_t selected)
 {
+#if CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW
+    (void)selected;
+    (void)uapi_gpio_set_val(g_st7789_cfg.cs_pin, GPIO_LEVEL_LOW);
+#else
     (void)uapi_gpio_set_val(g_st7789_cfg.cs_pin, selected != 0U ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH);
+#endif
 }
 
 static void st7789_dc(uint8_t data)
@@ -997,9 +1006,10 @@ int ws63_st7789_init(const ws63_st7789_config_t *cfg)
     (void)memset_s(g_st7789_last_self, sizeof(g_st7789_last_self), 0, sizeof(g_st7789_last_self));
     (void)memset_s(g_st7789_last_fw, sizeof(g_st7789_last_fw), 0, sizeof(g_st7789_last_fw));
     g_st7789_last_tick_ms = uapi_tcxo_get_ms();
-    osal_printk("[display] st7789 ready %ux%u off=%u,%u sclk=%u mosi=%u cs=%u dc=%u rst=%u\r\n",
+    osal_printk("[display] st7789 ready %ux%u off=%u,%u sclk=%u mosi=%u cs=%u cs_low=%u dc=%u rst=%u\r\n",
         g_st7789_cfg.width, g_st7789_cfg.height, g_st7789_cfg.x_offset, g_st7789_cfg.y_offset,
-        g_st7789_cfg.sclk_pin, g_st7789_cfg.mosi_pin, g_st7789_cfg.cs_pin, g_st7789_cfg.dc_pin,
+        g_st7789_cfg.sclk_pin, g_st7789_cfg.mosi_pin, g_st7789_cfg.cs_pin,
+        (uint8_t)CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW, g_st7789_cfg.dc_pin,
         g_st7789_cfg.reset_pin);
 #if ST7789_SOFT_SPI_ENABLE
     osal_printk("[display] soft-spi enabled mode=%u (cpol=%u cpha=%u)\r\n",

@@ -31,6 +31,14 @@ static int8_t sle_team_rssi_dbm(const sle_team_node_t *node)
     return node->ops.rssi_dbm(node->ops.user_ctx);
 }
 
+static uint8_t sle_team_battery_percent(const sle_team_node_t *node)
+{
+    if (node == NULL || node->ops.battery_percent == NULL) {
+        return 100U;
+    }
+    return node->ops.battery_percent(node->ops.user_ctx);
+}
+
 static uint8_t sle_team_should_defer_member_timeout(const sle_team_node_t *node, uint8_t member_id,
     uint32_t now_s, uint32_t last_seen_s)
 {
@@ -1337,7 +1345,7 @@ void sle_team_node_tick(sle_team_node_t *node)
 
     if (node->cfg.heartbeat_interval_s != 0U &&
         (now_s - node->last_heartbeat_s) >= node->cfg.heartbeat_interval_s) {
-        hb.battery_percent = 100U;
+        hb.battery_percent = sle_team_battery_percent(node);
         hb.rssi_dbm = sle_team_rssi_dbm(node);
         hb.fix_status = 1U;
         hb.reserved = 0U;
@@ -1445,7 +1453,7 @@ int sle_team_node_send_hello(sle_team_node_t *node, uint8_t dst_id)
 
     hello.device_id = node->cfg.self_id;
     hello.role = (uint8_t)node->cfg.role;
-    hello.battery_percent = 100U;
+    hello.battery_percent = sle_team_battery_percent(node);
     hello.mac_ready = node->cfg.self_mac_ready;
     (void)memcpy(hello.mac, node->cfg.self_mac, sizeof(hello.mac));
     hello.reserved = 0U;

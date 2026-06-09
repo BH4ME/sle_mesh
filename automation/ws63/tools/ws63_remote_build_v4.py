@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.95"
+VERSION = "v4.4.118"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -150,20 +150,32 @@ s = unset_kconfig_bool(s, "CONFIG_DYNAMIC_UART_ID_BINDDING")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LED_PIN", "255")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_PIN", "0")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_PIN", "14")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_MUTED", "y")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE")
 s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_GPS_ENABLE")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_BUS", "1")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_TXD_PIN", "17")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_RXD_PIN", "18")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_PIN", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_PIN", "12")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS", "50")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S", "30")
+s = set_kconfig_value(s, "CONFIG_ADC_SUPPORT_AUTO_SCAN", "y")
+s = set_kconfig_value(s, "CONFIG_ADC_USING_V154", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SPI_BUS", "0")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "6")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "8")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "7")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "9")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "7")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "9")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "8")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "10")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_X_OFFSET", "40")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_Y_OFFSET", "53")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_WIDTH", "240")
@@ -179,7 +191,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.95 pairing allowlist preserve, dynamic relay budget, clean-start config reset, labeled node rows, and relay validation flow")
+print("configured v4.4.118 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -203,7 +215,28 @@ proto_source = proto_source_path.read_text(errors="replace")
 
 required_cfg = [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
+    "CONFIG_SLE_TEAM_WS2812_ENABLE=y",
+    "CONFIG_SLE_TEAM_WS2812_PIN=0",
+    "CONFIG_SLE_TEAM_BUZZER_ENABLE=y",
+    "CONFIG_SLE_TEAM_BUZZER_PIN=14",
+    "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH=y",
+    "CONFIG_SLE_TEAM_BUZZER_MUTED=y",
+    "# CONFIG_SLE_TEAM_GPS_ENABLE is not set",
+    "CONFIG_SLE_TEAM_ADC_ENABLE=y",
+    "CONFIG_SLE_TEAM_ADC_CTRL_PIN=5",
+    "CONFIG_SLE_TEAM_ADC_VBAT_PIN=12",
+    "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL=5",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS=50",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S=30",
+    "CONFIG_ADC_SUPPORT_AUTO_SCAN=y",
+    "CONFIG_ADC_USING_V154=y",
     "CONFIG_SLE_TEAM_ST7789_ENABLE=y",
+    "CONFIG_SLE_TEAM_ST7789_SCLK_PIN=7",
+    "CONFIG_SLE_TEAM_ST7789_MOSI_PIN=9",
+    "CONFIG_SLE_TEAM_ST7789_CS_PIN=8",
+    "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW=y",
+    "CONFIG_SLE_TEAM_ST7789_DC_PIN=13",
+    "CONFIG_SLE_TEAM_ST7789_RESET_PIN=10",
     "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL=y",
 ]
 for item in required_cfg:
@@ -228,7 +261,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.95",
+    b"v4.4.118",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -236,9 +269,21 @@ for item in [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"phase=%s",
+    b"ready",
+    b"failed",
     b"TeamDisplayTask",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
+    b"[hw] init summary fw=%s",
+    b"[hw] gps configured=%u present=0 ready=%u",
+    b"[hw] adc present=%u ready=%u",
+    b"[battery] sample valid=%u",
+    b"bat commands: status|sample",
+    b"vbat_mv=%u",
+    b"[state] rgb state=%s",
+    b"state=%s flash=%s",
+    b"buzz muted by firmware",
     b"[cfg-json]",
     b"clear allowlist",
     b"scope=config+allowlist",
@@ -264,7 +309,7 @@ for item in [
     b"relay swap observe",
     b"swap-promote",
     b"swap-demote",
-    b"v4.4.95 pairing allowlist preserve",
+    b"v3.2 schematic pinmap, muted buzzer",
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
@@ -275,6 +320,9 @@ for source_name, source_text, item in [
     ("sle_team_node.c", proto_source, "hello ack deferred until reselect parent"),
     ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
+    ("ws63_team_network_app.c", app_source, "SLE_TEAM_WS2812_BREATHE_PERIOD_MS"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)"),
     ("ws63_team_network_app.c", app_source, "team_member_parent_reselect_disconnect_tick"),
     ("ws63_team_network_app.c", app_source, "RESELECT_PARENT"),
     ("ws63_team_network_app.c", app_source, "Leader-bound relayed packets always go upstream before bucket tier routing."),
@@ -285,12 +333,26 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "physical first hop"),
     ("ws63_team_network_app.c", app_source, "team_leader_relay_swap_tick"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_RELAY_SWAP_STABLE_S"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_cli_set_rgb"),
+    ("ws63_team_network_app.c", app_source,
+     'strcmp(line, "buzz beep") == 0 || strcmp(line, "buzz test") == 0 ||'),
+    ("ws63_team_network_app.c", app_source, 'strcmp(line, "led tx") == 0 || strcmp(line, "led rx") == 0'),
+    ("ws63_team_network_app.c", app_source,
+     'strcmp(line, "led active_low") == 0 || strcmp(line, "led active_high") == 0'),
+    ("ws63_team_network_app.c", app_source, 'strcmp(line, "led on") == 0 || strcmp(line, "led off") == 0'),
+    ("ws63_team_network_app.c", app_source, "static const team_cli_handler_t cli_handlers[]"),
+    ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_done"),
+    ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_save_leader"),
+    ("ws63_team_network_app.c", app_source,
+     "((on != 0U) ^ (g_team_rt.led_active_low != 0U)) ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW"),
     ("ws63_team_network_app.c", app_source, "memcpy(&route_update, app_packet->body, sizeof(route_update))"),
     ("ws63_team_network_app.c", app_source, "memcpy(&route_update, app_packet.body, sizeof(route_update))"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_MAIN_LOOP_SLEEP_MS"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_DISPLAY_TASK_STACK_SIZE 0x1800"),
     ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
      "ST7789_LVGL_HANDLER_MIN_INTERVAL_MS"),
+    ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
+     "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW"),
 ]:
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")

@@ -75,7 +75,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.95 unified runtime role (relay swap hysteresis)"
+echo "profile:    v4.4.118 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -185,20 +185,32 @@ s = unset_kconfig_bool(s, "CONFIG_DYNAMIC_UART_ID_BINDDING")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LED_PIN", "255")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WS2812_PIN", "0")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_PIN", "14")
-s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_BUZZER_MUTED", "y")
+s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_BUZZER_AUTO_TOGGLE")
 s = unset_kconfig_bool(s, "CONFIG_SLE_TEAM_GPS_ENABLE")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_BUS", "1")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_TXD_PIN", "17")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_GPS_UART_RXD_PIN", "18")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_PIN", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_PIN", "12")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL", "5")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS", "50")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S", "30")
+s = set_kconfig_value(s, "CONFIG_ADC_SUPPORT_AUTO_SCAN", "y")
+s = set_kconfig_value(s, "CONFIG_ADC_USING_V154", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SPI_BUS", "0")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "6")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "8")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "7")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "9")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_SCLK_PIN", "7")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_MOSI_PIN", "9")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_PIN", "8")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_DC_PIN", "13")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_RESET_PIN", "10")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_X_OFFSET", "40")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_Y_OFFSET", "53")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_WIDTH", "240")
@@ -214,7 +226,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.95 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer default disabled (IO14 safe off), gps UART1(IO17/18) mapped, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled, dynamic relay budget enabled, relay swap hysteresis enabled, trusted route-id tracking enabled")
+print("configured v4.4.118 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -238,7 +250,28 @@ proto_source = proto_source_path.read_text(errors="replace")
 
 required_cfg = [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
+    "CONFIG_SLE_TEAM_WS2812_ENABLE=y",
+    "CONFIG_SLE_TEAM_WS2812_PIN=0",
+    "CONFIG_SLE_TEAM_BUZZER_ENABLE=y",
+    "CONFIG_SLE_TEAM_BUZZER_PIN=14",
+    "CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH=y",
+    "CONFIG_SLE_TEAM_BUZZER_MUTED=y",
+    "# CONFIG_SLE_TEAM_GPS_ENABLE is not set",
+    "CONFIG_SLE_TEAM_ADC_ENABLE=y",
+    "CONFIG_SLE_TEAM_ADC_CTRL_PIN=5",
+    "CONFIG_SLE_TEAM_ADC_VBAT_PIN=12",
+    "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL=5",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS=50",
+    "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S=30",
+    "CONFIG_ADC_SUPPORT_AUTO_SCAN=y",
+    "CONFIG_ADC_USING_V154=y",
     "CONFIG_SLE_TEAM_ST7789_ENABLE=y",
+    "CONFIG_SLE_TEAM_ST7789_SCLK_PIN=7",
+    "CONFIG_SLE_TEAM_ST7789_MOSI_PIN=9",
+    "CONFIG_SLE_TEAM_ST7789_CS_PIN=8",
+    "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW=y",
+    "CONFIG_SLE_TEAM_ST7789_DC_PIN=13",
+    "CONFIG_SLE_TEAM_ST7789_RESET_PIN=10",
     "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL=y",
 ]
 for item in required_cfg:
@@ -264,7 +297,7 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.95",
+    b"v4.4.118",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -272,8 +305,18 @@ required_bytes = [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"phase=ready",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
+    b"[hw] init summary fw=%s",
+    b"[hw] gps configured=%u present=0 ready=%u",
+    b"[hw] adc present=%u ready=%u",
+    b"[battery] sample valid=%u",
+    b"bat commands: status|sample",
+    b"vbat_mv=%u",
+    b"[state] rgb state=%s",
+    b"state=%s flash=%s",
+    b"buzz muted by firmware",
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
@@ -288,7 +331,7 @@ required_bytes = [
     b"relay swap observe",
     b"swap-promote",
     b"swap-demote",
-    b"v4.4.95 pairing allowlist preserve",
+    b"v3.2 schematic pinmap, muted buzzer",
 ]
 for item in required_bytes:
     if item not in elf:
@@ -298,6 +341,9 @@ for source_name, source_text, item in [
     ("sle_team_node.c", proto_source, "Route updates are leader policy hints"),
     ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
+    ("ws63_team_network_app.c", app_source, "SLE_TEAM_WS2812_BREATHE_PERIOD_MS"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)"),
 ]:
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")

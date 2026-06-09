@@ -77,6 +77,7 @@ typedef int (*sle_team_send_fn)(void *user_ctx, sle_team_send_kind_t kind, uint8
     const uint8_t *buf, uint16_t len);
 typedef uint32_t (*sle_team_now_fn)(void *user_ctx);
 typedef int8_t (*sle_team_rssi_fn)(void *user_ctx);
+typedef uint8_t (*sle_team_battery_percent_fn)(void *user_ctx);
 typedef void (*sle_team_log_fn)(void *user_ctx, const char *text);
 
 typedef void (*sle_team_joined_cb)(void *user_ctx, uint8_t member_id);
@@ -90,6 +91,7 @@ typedef struct {
     sle_team_send_fn send;
     sle_team_now_fn now_s;
     sle_team_rssi_fn rssi_dbm;
+    sle_team_battery_percent_fn battery_percent;
     sle_team_log_fn log;
     sle_team_joined_cb on_joined;
     sle_team_position_cb on_position;
