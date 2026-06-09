@@ -67,6 +67,7 @@
 #define ST7789_SOFT_SPI_ENABLE 1
 #define ST7789_SOFT_SPI_MODE3 0
 #define ST7789_SOFT_SPI_DELAY_CYCLES 12U
+#define ST7789_CS_LOW_SETTLE_MS 5U
 #define ST7789_FULL_INIT_SEQ_ENABLE 1
 #define ST7789_MADCTL_DEFAULT 0x60U
 #define ST7789_COLOR_BLACK 0x0000U
@@ -629,16 +630,21 @@ static void st7789_draw_text(uint16_t x, uint16_t y, const char *text, uint16_t 
 
 static void st7789_init_pins(void)
 {
+    (void)uapi_pin_set_mode(g_st7789_cfg.cs_pin, HAL_PIO_FUNC_GPIO);
+    (void)uapi_gpio_set_dir(g_st7789_cfg.cs_pin, GPIO_DIRECTION_OUTPUT);
+    st7789_cs(0U);
+    osal_msleep(ST7789_CS_LOW_SETTLE_MS);
+
     (void)uapi_pin_set_mode(g_st7789_cfg.sclk_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_pin_set_mode(g_st7789_cfg.mosi_pin, HAL_PIO_FUNC_GPIO);
-    (void)uapi_pin_set_mode(g_st7789_cfg.cs_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_pin_set_mode(g_st7789_cfg.dc_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_pin_set_mode(g_st7789_cfg.reset_pin, HAL_PIO_FUNC_GPIO);
     (void)uapi_gpio_set_dir(g_st7789_cfg.sclk_pin, GPIO_DIRECTION_OUTPUT);
     (void)uapi_gpio_set_dir(g_st7789_cfg.mosi_pin, GPIO_DIRECTION_OUTPUT);
-    (void)uapi_gpio_set_dir(g_st7789_cfg.cs_pin, GPIO_DIRECTION_OUTPUT);
     (void)uapi_gpio_set_dir(g_st7789_cfg.dc_pin, GPIO_DIRECTION_OUTPUT);
     (void)uapi_gpio_set_dir(g_st7789_cfg.reset_pin, GPIO_DIRECTION_OUTPUT);
+    (void)uapi_gpio_set_val(g_st7789_cfg.reset_pin, GPIO_LEVEL_HIGH);
+    st7789_dc(0U);
     st7789_spi_idle_level();
     st7789_mosi(0U);
     st7789_cs(0U);
@@ -646,9 +652,13 @@ static void st7789_init_pins(void)
 
 static void st7789_hw_reset(void)
 {
+    st7789_cs(0U);
+    (void)uapi_gpio_set_val(g_st7789_cfg.reset_pin, GPIO_LEVEL_HIGH);
+    osal_msleep(5);
     (void)uapi_gpio_set_val(g_st7789_cfg.reset_pin, GPIO_LEVEL_LOW);
     osal_msleep(20);
     (void)uapi_gpio_set_val(g_st7789_cfg.reset_pin, GPIO_LEVEL_HIGH);
+    st7789_cs(0U);
     osal_msleep(120);
 }
 
@@ -972,6 +982,9 @@ int ws63_st7789_init(const ws63_st7789_config_t *cfg)
     (void)memcpy_s(&g_st7789_cfg, sizeof(g_st7789_cfg), cfg, sizeof(*cfg));
     g_st7789_ready = 0U;
     st7789_init_pins();
+    osal_printk("[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u\r\n",
+        g_st7789_cfg.cs_pin, (uint8_t)ST7789_CS_LOW_SETTLE_MS,
+        g_st7789_cfg.dc_pin, g_st7789_cfg.reset_pin);
     if (st7789_spi_init() != 0) {
         osal_printk("[display] st7789 spi init failed\r\n");
         return -1;

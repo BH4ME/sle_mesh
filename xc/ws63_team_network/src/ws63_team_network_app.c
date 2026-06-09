@@ -276,6 +276,10 @@
 #define SLE_TEAM_LED_SEEK_INTERVAL_MS 1000U
 #define SLE_TEAM_WS2812_FORCE_CLEAR_COUNT 8U
 #define SLE_TEAM_WS2812_FORCE_CLEAR_DELAY_MS 10U
+#define SLE_TEAM_WS2812_TEST_R 32U
+#define SLE_TEAM_WS2812_TEST_G 32U
+#define SLE_TEAM_WS2812_TEST_B 32U
+#define SLE_TEAM_WS2812_TEST_STEP_MS 120U
 #define SLE_TEAM_WS2812_BOOT_R 0U
 #define SLE_TEAM_WS2812_BOOT_G 3U
 #define SLE_TEAM_WS2812_BOOT_B 8U
@@ -374,7 +378,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.127"
+#define SLE_TEAM_FW_VERSION "v4.4.128"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -1351,6 +1355,7 @@ static void team_display_init_log(uint8_t ready, const char *phase)
         (uint16_t)CONFIG_SLE_TEAM_ST7789_X_OFFSET,
         (uint16_t)CONFIG_SLE_TEAM_ST7789_Y_OFFSET,
         phase);
+    osal_printk("[hw] display fpc-note cs is firmware-held-low; panel gnd still needs real board ground\r\n");
 }
 #endif
 
@@ -1803,6 +1808,11 @@ static void team_ws2812_show_display_event(team_display_event_t event)
 static void team_ws2812_show_boot_marker(void)
 {
     team_ws2812_set_state(TEAM_RGB_STATE_BOOT);
+    osal_printk("[diag] ws2812 startup marker pin=%u color=%u,%u,%u timing=cycle-counter\r\n",
+        g_team_rt.ws2812_pin,
+        (uint8_t)SLE_TEAM_WS2812_BOOT_R,
+        (uint8_t)SLE_TEAM_WS2812_BOOT_G,
+        (uint8_t)SLE_TEAM_WS2812_BOOT_B);
 }
 
 static void team_ws2812_test_pattern(void)
@@ -1812,12 +1822,16 @@ static void team_ws2812_test_pattern(void)
         osal_printk("[diag] ws2812 not ready; test pattern ignored\r\n");
         return;
     }
-    (void)team_ws2812_set_rgb(8U, 0U, 0U);
-    osal_msleep(180U);
-    (void)team_ws2812_set_rgb(0U, 8U, 0U);
-    osal_msleep(180U);
-    (void)team_ws2812_set_rgb(0U, 0U, 8U);
-    osal_msleep(180U);
+    osal_printk("[diag] ws2812 boot rgb-test pin=%u level=%u step_ms=%u\r\n",
+        g_team_rt.ws2812_pin,
+        (uint8_t)SLE_TEAM_WS2812_TEST_R,
+        (uint16_t)SLE_TEAM_WS2812_TEST_STEP_MS);
+    (void)team_ws2812_set_rgb(SLE_TEAM_WS2812_TEST_R, 0U, 0U);
+    osal_msleep(SLE_TEAM_WS2812_TEST_STEP_MS);
+    (void)team_ws2812_set_rgb(0U, SLE_TEAM_WS2812_TEST_G, 0U);
+    osal_msleep(SLE_TEAM_WS2812_TEST_STEP_MS);
+    (void)team_ws2812_set_rgb(0U, 0U, SLE_TEAM_WS2812_TEST_B);
+    osal_msleep(SLE_TEAM_WS2812_TEST_STEP_MS);
     team_ws2812_show_boot_marker();
 #else
     team_ws2812_force_off();
@@ -1841,7 +1855,9 @@ static void team_ws2812_init(void)
         g_team_rt.ws2812_flash_step_ms = 0U;
         g_team_rt.ws2812_anim_last_ms = 0U;
 #if CONFIG_SLE_TEAM_WS2812_ENABLE
-        team_ws2812_show_boot_marker();
+        osal_printk("[diag] ws2812 init ready pin=%u; boot rgb-test follows\r\n",
+            g_team_rt.ws2812_pin);
+        team_ws2812_test_pattern();
 #else
         team_ws2812_force_off();
         osal_printk("[diag] ws2812 disabled by %s (fw=%s), pin=%u cleared and held idle\r\n",

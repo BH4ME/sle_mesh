@@ -15,9 +15,15 @@
 #define WS63_WS2812_GPIO_DATA_SET_OFFSET 0x30U
 #define WS63_WS2812_GPIO_DATA_CLR_OFFSET 0x34U
 #define WS63_WS2812_RESET_US 80U
-#define WS63_WS2812_T0H_TICKS_24M 8U
-#define WS63_WS2812_T1H_TICKS_24M 17U
-#define WS63_WS2812_SLOT_TICKS_24M 30U
+#define WS63_WS2812_CPU_MHZ 160U
+#define WS63_WS2812_T0H_NS 350U
+#define WS63_WS2812_T1H_NS 700U
+#define WS63_WS2812_SLOT_NS 1250U
+#define WS63_WS2812_NS_TO_CYCLES(ns) \
+    ((uint32_t)((((uint64_t)WS63_WS2812_CPU_MHZ * (uint64_t)(ns)) + 999ULL) / 1000ULL))
+#define WS63_WS2812_T0H_CYCLES WS63_WS2812_NS_TO_CYCLES(WS63_WS2812_T0H_NS)
+#define WS63_WS2812_T1H_CYCLES WS63_WS2812_NS_TO_CYCLES(WS63_WS2812_T1H_NS)
+#define WS63_WS2812_SLOT_CYCLES WS63_WS2812_NS_TO_CYCLES(WS63_WS2812_SLOT_NS)
 
 typedef struct {
     volatile uint32_t *set_reg;
@@ -29,14 +35,17 @@ typedef struct {
 
 static ws63_ws2812_ctx_t g_ws2812;
 
-static uint64_t ws63_ws2812_now_ticks(void)
+static uint32_t ws63_ws2812_cycle32(void)
 {
-    return uapi_tcxo_get_count();
+    uint32_t cycle;
+
+    __asm__ volatile("rdcycle %0" : "=r"(cycle));
+    return cycle;
 }
 
-static void ws63_ws2812_wait_until(uint64_t target)
+static void ws63_ws2812_wait_until_cycle(uint32_t target)
 {
-    while (ws63_ws2812_now_ticks() < target) {
+    while ((int32_t)(ws63_ws2812_cycle32() - target) < 0) {
     }
 }
 
@@ -63,17 +72,14 @@ static void ws63_ws2812_pin_low(void)
 
 static void ws63_ws2812_write_bit(uint8_t bit)
 {
-    uint64_t start;
-    uint64_t high_ticks = bit != 0U ? WS63_WS2812_T1H_TICKS_24M : WS63_WS2812_T0H_TICKS_24M;
-    uint64_t target;
+    uint32_t start;
+    uint32_t high_cycles = bit != 0U ? WS63_WS2812_T1H_CYCLES : WS63_WS2812_T0H_CYCLES;
 
-    start = ws63_ws2812_now_ticks();
+    start = ws63_ws2812_cycle32();
     ws63_ws2812_pin_high();
-    target = start + high_ticks;
-    ws63_ws2812_wait_until(target);
+    ws63_ws2812_wait_until_cycle(start + high_cycles);
     ws63_ws2812_pin_low();
-    target = start + WS63_WS2812_SLOT_TICKS_24M;
-    ws63_ws2812_wait_until(target);
+    ws63_ws2812_wait_until_cycle(start + WS63_WS2812_SLOT_CYCLES);
 }
 
 static void ws63_ws2812_write_byte(uint8_t value)

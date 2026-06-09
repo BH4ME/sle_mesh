@@ -57,12 +57,12 @@ REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
 REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
 REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.127")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.128")"
 
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.127 unified runtime role (v3.2 schematic pinmap + ADC battery)"
+echo "profile:    v4.4.128 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "sdk:        $WSL_SDK"
 echo "archive:    $ARCHIVE_OUT"
 echo "latest:     $LOCAL_OUT"
@@ -182,7 +182,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.127 local WSL pinmap, ADC battery sampling, and team-network sample")
+print("configured v4.4.128 local WSL pinmap, ADC battery sampling, and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -239,12 +239,13 @@ for forbidden in [
 for item in [
     "ws63_team_network_app.c.obj",
     "ws63_st7789_display.c.obj",
+    "ws63_ws2812.c.obj",
     "sle_team_node.c.obj",
 ]:
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.127",
+    b"v4.4.128",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -252,7 +253,11 @@ for item in [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
     b"phase=ready",
+    b"timing=cycle-counter",
+    b"boot rgb-test follows",
+    b"panel gnd still needs real board ground",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
     b"[hw] init summary fw=%s",
@@ -276,7 +281,7 @@ for item in [
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.127")
+print("post-build guard passed: local WSL v4.4.128")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

@@ -88,8 +88,9 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         display_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_st7789_display.c").read_text(
             encoding="utf-8"
         )
+        ws2812_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_ws2812.c").read_text(encoding="utf-8")
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.127"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.128"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -141,8 +142,11 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define CONFIG_SLE_TEAM_ST7789_DC_PIN 13", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_ST7789_RESET_PIN 10", app_source)
         self.assertIn("CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW", display_source)
+        self.assertIn("ST7789_CS_LOW_SETTLE_MS", display_source)
+        self.assertIn("st7789 pins primed", display_source)
         self.assertIn("team_display_init_log", app_source)
         self.assertIn("phase=%s", app_source)
+        self.assertIn("panel gnd still needs real board ground", app_source)
         self.assertIn("team_gps_init();", app_source)
         self.assertIn("team_adc_init();", app_source)
         self.assertIn("team_hardware_report_print();", app_source)
@@ -151,6 +155,8 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("TEAM_RGB_STATE_LEADER", app_source)
         self.assertIn("TEAM_RGB_STATE_MEMBER", app_source)
         self.assertIn("TEAM_RGB_STATE_ERROR", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_TEST_R 32U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_TEST_STEP_MS 120U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_IDLE_R 8U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_IDLE_G 8U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_IDLE_B 8U", app_source)
@@ -162,6 +168,12 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_FLASH_PULSES 4U", app_source)
+        self.assertIn("timing=cycle-counter", app_source)
+        self.assertIn("team_ws2812_test_pattern();", app_source)
+        self.assertIn("rdcycle %0", ws2812_source)
+        self.assertIn("WS63_WS2812_SLOT_CYCLES", ws2812_source)
+        self.assertIn("ws63_ws2812_wait_until_cycle", ws2812_source)
+        self.assertNotIn("uapi_tcxo_get_count", ws2812_source)
         self.assertIn(
             "((on != 0U) ^ (g_team_rt.led_active_low != 0U)) ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW",
             app_source,
@@ -315,7 +327,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.127")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.128")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
 
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):

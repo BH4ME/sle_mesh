@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.127"
+VERSION = "v4.4.128"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -205,7 +205,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.127 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
+print("configured v4.4.128 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -219,12 +219,14 @@ cfg_path = sdk / "build/config/target_config/ws63/menuconfig/acore/ws63_liteos_a
 map_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.map"
 elf_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.elf"
 app_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_team_network_app.c"
+ws2812_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_ws2812.c"
 proto_source_path = sdk / "third_party/sle_mesh/src/sle_team_node.c"
 
 cfg = cfg_path.read_text(errors="replace")
 map_text = map_path.read_text(errors="replace")
 elf = elf_path.read_bytes()
 app_source = app_source_path.read_text(errors="replace")
+ws2812_source = ws2812_source_path.read_text(errors="replace")
 proto_source = proto_source_path.read_text(errors="replace")
 
 required_cfg = [
@@ -269,13 +271,14 @@ for forbidden in [
 for item in [
     "ws63_team_network_app.c.obj",
     "ws63_st7789_display.c.obj",
+    "ws63_ws2812.c.obj",
     "sle_team_node.c.obj",
 ]:
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.127",
+    b"v4.4.128",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -283,9 +286,13 @@ for item in [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
     b"phase=%s",
     b"ready",
     b"failed",
+    b"timing=cycle-counter",
+    b"boot rgb-test follows",
+    b"panel gnd still needs real board ground",
     b"TeamDisplayTask",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
@@ -348,9 +355,12 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_leader_relay_swap_tick"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_RELAY_SWAP_STABLE_S"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_cli_set_rgb"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_R 8U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_G 8U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
+    ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
     ("ws63_team_network_app.c", app_source, "state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER"),
     ("ws63_team_network_app.c", app_source, "state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR"),
     ("ws63_team_network_app.c", app_source,
@@ -383,6 +393,13 @@ for source_name, source_text, item in [
      "ST7789_LVGL_HANDLER_MIN_INTERVAL_MS"),
     ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
      "CONFIG_SLE_TEAM_ST7789_CS_ALWAYS_LOW"),
+    ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
+     "ST7789_CS_LOW_SETTLE_MS"),
+    ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
+     "st7789 pins primed"),
+    ("ws63_ws2812.c", ws2812_source, "rdcycle %0"),
+    ("ws63_ws2812.c", ws2812_source, "WS63_WS2812_SLOT_CYCLES"),
+    ("ws63_ws2812.c", ws2812_source, "ws63_ws2812_wait_until_cycle"),
 ]:
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")

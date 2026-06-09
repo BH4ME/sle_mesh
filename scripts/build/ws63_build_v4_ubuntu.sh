@@ -69,7 +69,7 @@ REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fw
 REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
 REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.127")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.128")"
 LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
 ssh_opts=(
@@ -89,7 +89,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.127 unified runtime role (v3.2 schematic pinmap + ADC battery)"
+echo "profile:    v4.4.128 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -241,7 +241,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.127 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.128 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -255,12 +255,14 @@ cfg_path = sdk / "build/config/target_config/ws63/menuconfig/acore/ws63_liteos_a
 map_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.map"
 elf_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.elf"
 app_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_team_network_app.c"
+ws2812_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_ws2812.c"
 proto_source_path = sdk / "third_party/sle_mesh/src/sle_team_node.c"
 
 cfg = cfg_path.read_text(errors="replace")
 map_text = map_path.read_text(errors="replace")
 elf = elf_path.read_bytes()
 app_source = app_source_path.read_text(errors="replace")
+ws2812_source = ws2812_source_path.read_text(errors="replace")
 proto_source = proto_source_path.read_text(errors="replace")
 
 required_cfg = [
@@ -305,6 +307,7 @@ for forbidden in [
 required_map = [
     "ws63_team_network_app.c.obj",
     "ws63_st7789_display.c.obj",
+    "ws63_ws2812.c.obj",
     "sle_team_node.c.obj",
 ]
 for item in required_map:
@@ -312,7 +315,7 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.127",
+    b"v4.4.128",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -320,7 +323,11 @@ required_bytes = [
     b"runtimeRelayBudget",
     b"plan=%u",
     b"[display] st7789 ready",
+    b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
     b"phase=ready",
+    b"timing=cycle-counter",
+    b"boot rgb-test follows",
+    b"panel gnd still needs real board ground",
     b"[display-event] event=%s label=%s member=%u",
     b"[team] boot unconfigured",
     b"[hw] init summary fw=%s",
@@ -357,8 +364,17 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_WS2812_BREATHE_PERIOD_MS"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
+    ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)"),
+    ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
+     "ST7789_CS_LOW_SETTLE_MS"),
+    ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
+     "st7789 pins primed"),
+    ("ws63_ws2812.c", ws2812_source, "rdcycle %0"),
+    ("ws63_ws2812.c", ws2812_source, "WS63_WS2812_SLOT_CYCLES"),
 ]:
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")
