@@ -57,12 +57,12 @@ REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
 REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
 REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.128")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.129")"
 
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.128 unified runtime role (v3.2 schematic pinmap + ADC battery)"
+echo "profile:    v4.4.129 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG)"
 echo "sdk:        $WSL_SDK"
 echo "archive:    $ARCHIVE_OUT"
 echo "latest:     $LOCAL_OUT"
@@ -157,6 +157,10 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL", "5")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS", "50")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S", "30")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_CHRG_ENABLE", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_CHRG_PIN", "2")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW", "y")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP", "y")
 s = set_kconfig_value(s, "CONFIG_ADC_SUPPORT_AUTO_SCAN", "y")
 s = set_kconfig_value(s, "CONFIG_ADC_USING_V154", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_ENABLE", "y")
@@ -182,7 +186,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.128 local WSL pinmap, ADC battery sampling, and team-network sample")
+print("configured v4.4.129 local WSL pinmap, ADC battery sampling, TP4054 CHRG IO2, and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -215,6 +219,10 @@ for item in [
     "CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL=5",
     "CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS=50",
     "CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S=30",
+    "CONFIG_SLE_TEAM_CHRG_ENABLE=y",
+    "CONFIG_SLE_TEAM_CHRG_PIN=2",
+    "CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW=y",
+    "CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP=y",
     "CONFIG_ADC_SUPPORT_AUTO_SCAN=y",
     "CONFIG_ADC_USING_V154=y",
     "CONFIG_SLE_TEAM_ST7789_ENABLE=y",
@@ -245,7 +253,7 @@ for item in [
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.128",
+    b"v4.4.129",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -263,9 +271,15 @@ for item in [
     b"[hw] init summary fw=%s",
     b"[hw] gps configured=%u present=0 ready=%u",
     b"[hw] adc present=%u ready=%u",
+    b"[hw] chrg present=%u ready=%u",
     b"[battery] sample valid=%u",
     b"bat commands: status|sample",
     b"vbat_mv=%u",
+    b"powerSource",
+    b"battery-or-full",
+    b"pwr-charging",
+    b"api=power",
+    b"chrgExternalPullup",
     b"[state] rgb state=%s",
     b"state=%s flash=%s",
     b"buzz muted by firmware",
@@ -281,7 +295,7 @@ for item in [
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.128")
+print("post-build guard passed: local WSL v4.4.129")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

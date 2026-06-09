@@ -90,7 +90,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         )
         ws2812_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_ws2812.c").read_text(encoding="utf-8")
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.128"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.129"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -109,6 +109,10 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define CONFIG_SLE_TEAM_ADC_VBAT_CHANNEL 5", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS 50", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S 30", app_source)
+        self.assertIn("#define CONFIG_SLE_TEAM_CHRG_ENABLE 1", app_source)
+        self.assertIn("#define CONFIG_SLE_TEAM_CHRG_PIN 2", app_source)
+        self.assertIn("#define CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW 1", app_source)
+        self.assertIn("#define CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP 1", app_source)
         self.assertIn("#define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U", app_source)
         self.assertIn("#define SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM 100U", app_source)
         self.assertIn("team_gpio_config_output_level", app_source)
@@ -121,6 +125,16 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("team_battery_sample_tick(0U);", app_source)
         self.assertIn("ops.battery_percent = team_battery_percent_cb;", app_source)
         self.assertIn("bat commands: status|sample", app_source)
+        self.assertIn("team_chrg_init();", app_source)
+        self.assertIn("team_chrg_sample();", app_source)
+        self.assertIn("team_power_source_name", app_source)
+        self.assertIn("battery-or-full", app_source)
+        self.assertIn("pwr-charging", app_source)
+        self.assertIn("powerSource", app_source)
+        self.assertIn("sourceCertain", app_source)
+        self.assertIn("chrgExternalPullup", app_source)
+        self.assertIn("GET /api/power", app_source)
+        self.assertIn("api=power", app_source)
         self.assertNotIn("sample=0", app_source)
         self.assertIn("team_cli_match2", app_source)
         self.assertIn(
@@ -327,7 +341,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.128")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.129")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
 
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):

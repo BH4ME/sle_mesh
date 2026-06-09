@@ -163,6 +163,22 @@
 #define CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S 30
 #endif
 
+#ifndef CONFIG_SLE_TEAM_CHRG_ENABLE
+#define CONFIG_SLE_TEAM_CHRG_ENABLE 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_CHRG_PIN
+#define CONFIG_SLE_TEAM_CHRG_PIN 2
+#endif
+
+#ifndef CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW
+#define CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW 1
+#endif
+
+#ifndef CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP
+#define CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP 1
+#endif
+
 #ifndef CONFIG_SLE_TEAM_ST7789_SPI_BUS
 #define CONFIG_SLE_TEAM_ST7789_SPI_BUS 0
 #endif
@@ -336,7 +352,7 @@
 #define SLE_TEAM_FACTORY_RESET_TASK_STACK_SIZE 0x800
 #define SLE_TEAM_FACTORY_RESET_TASK_PRIO 12
 #define SLE_TEAM_HTTP_REQ_BUF_SIZE 768
-#define SLE_TEAM_HTTP_JSON_BUF_SIZE 1024
+#define SLE_TEAM_HTTP_JSON_BUF_SIZE 2048
 #define SLE_TEAM_HTTP_HTML_BUF_SIZE 8192
 #define SLE_TEAM_HTTP_PATH_BUF_SIZE 160
 #define SLE_TEAM_ROUTE_ID_FALLBACK 1U
@@ -378,7 +394,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.128"
+#define SLE_TEAM_FW_VERSION "v4.4.129"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -522,6 +538,11 @@ typedef struct {
     uint8_t adc_vbat_pin;
     uint8_t adc_ctrl_active_high;
     uint8_t adc_vbat_channel;
+    uint8_t chrg_ready;
+    uint8_t chrg_pin;
+    uint8_t chrg_active_low;
+    uint8_t chrg_raw;
+    uint8_t charging;
     uint8_t battery_valid;
     uint8_t battery_percent;
     uint16_t adc_sample_mv;
@@ -657,6 +678,10 @@ static int team_request_role_config(sle_team_node_role_t role, uint8_t leader_id
 static uint16_t team_self_mac_suffix(void);
 static void team_reboot_schedule(const char *reason);
 static uint8_t team_route_id_from_suffix(uint16_t suffix);
+static void team_chrg_init(void);
+static void team_chrg_sample(void);
+static const char *team_power_source_name(void);
+static uint8_t team_power_source_certain(void);
 static void team_handle_role_request_once(void);
 static void team_register_connection_callbacks(void);
 static int team_nv_allowed_apply_to_node(void);
@@ -1456,6 +1481,12 @@ static void team_hardware_report_print(void)
         g_team_rt.adc_vbat_pin, g_team_rt.adc_vbat_channel, g_team_rt.adc_ctrl_active_high,
         g_team_rt.battery_valid, g_team_rt.adc_sample_mv, g_team_rt.battery_mv,
         g_team_rt.battery_percent, (long)g_team_rt.battery_sample_last_ret);
+    team_chrg_sample();
+    osal_printk("[hw] chrg present=%u ready=%u pin=%u active_low=%u external_pullup=%u raw=%u "
+        "charging=%u source=%s source_certain=%u\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_CHRG_ENABLE, g_team_rt.chrg_ready, g_team_rt.chrg_pin,
+        g_team_rt.chrg_active_low, (uint8_t)CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP,
+        g_team_rt.chrg_raw, g_team_rt.charging, team_power_source_name(), team_power_source_certain());
     osal_printk("[hw] display present=%u ready=%u task=%u sclk=%u sda=%u cs=%u cs_low=%u rs=%u reset=%u size=%ux%u off=%u,%u\r\n",
         (uint8_t)CONFIG_SLE_TEAM_ST7789_ENABLE, g_team_rt.display_ready, g_team_rt.display_task_started,
         (uint8_t)CONFIG_SLE_TEAM_ST7789_SCLK_PIN, (uint8_t)CONFIG_SLE_TEAM_ST7789_MOSI_PIN,
@@ -1906,6 +1937,59 @@ static uint8_t team_adc_ctrl_off_level(void) SLE_TEAM_UNUSED_FUNC;
 static uint8_t team_adc_ctrl_on_level(void) SLE_TEAM_UNUSED_FUNC;
 static void team_adc_ctrl_set(uint8_t enabled) SLE_TEAM_UNUSED_FUNC;
 
+static void team_chrg_sample(void)
+{
+#if CONFIG_SLE_TEAM_CHRG_ENABLE
+    if (g_team_rt.chrg_ready == 0U || g_team_rt.chrg_pin > 31U) {
+        return;
+    }
+    g_team_rt.chrg_raw = (uint8_t)uapi_gpio_get_val(g_team_rt.chrg_pin);
+    if (g_team_rt.chrg_active_low != 0U) {
+        g_team_rt.charging = g_team_rt.chrg_raw == (uint8_t)GPIO_LEVEL_LOW ? 1U : 0U;
+    } else {
+        g_team_rt.charging = g_team_rt.chrg_raw == (uint8_t)GPIO_LEVEL_HIGH ? 1U : 0U;
+    }
+#endif
+}
+
+static const char *team_power_source_name(void)
+{
+    if (g_team_rt.chrg_ready == 0U) {
+        return "unknown";
+    }
+    if (g_team_rt.charging != 0U) {
+        return "pwr-charging";
+    }
+    return "battery-or-full";
+}
+
+static uint8_t team_power_source_certain(void)
+{
+    return (uint8_t)(g_team_rt.chrg_ready != 0U && g_team_rt.charging != 0U);
+}
+
+static void team_chrg_init(void)
+{
+    g_team_rt.chrg_pin = (uint8_t)CONFIG_SLE_TEAM_CHRG_PIN;
+    g_team_rt.chrg_active_low = (uint8_t)CONFIG_SLE_TEAM_CHRG_ACTIVE_LOW;
+    g_team_rt.chrg_ready = 0U;
+    g_team_rt.chrg_raw = GPIO_LEVEL_HIGH;
+    g_team_rt.charging = 0U;
+#if CONFIG_SLE_TEAM_CHRG_ENABLE
+    if (g_team_rt.chrg_pin <= 31U) {
+        (void)uapi_pin_set_mode(g_team_rt.chrg_pin, HAL_PIO_FUNC_GPIO);
+        (void)uapi_gpio_set_dir(g_team_rt.chrg_pin, GPIO_DIRECTION_INPUT);
+        g_team_rt.chrg_ready = 1U;
+        team_chrg_sample();
+    }
+#endif
+    osal_printk("[hw] chrg present=%u ready=%u pin=%u active_low=%u external_pullup=%u raw=%u "
+        "charging=%u source=%s source_certain=%u\r\n",
+        (uint8_t)CONFIG_SLE_TEAM_CHRG_ENABLE, g_team_rt.chrg_ready, g_team_rt.chrg_pin,
+        g_team_rt.chrg_active_low, (uint8_t)CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP,
+        g_team_rt.chrg_raw, g_team_rt.charging, team_power_source_name(), team_power_source_certain());
+}
+
 static uint8_t team_adc_ctrl_off_level(void)
 {
     return CONFIG_SLE_TEAM_ADC_CTRL_ACTIVE_HIGH ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH;
@@ -1953,6 +2037,7 @@ static int team_battery_sample_once(uint8_t log_result)
 {
     int ret = SLE_TEAM_ERR_UNSUPPORTED;
 
+    team_chrg_sample();
 #if CONFIG_SLE_TEAM_ADC_ENABLE
     uint16_t adc_mv = 0U;
 
@@ -1980,11 +2065,13 @@ static int team_battery_sample_once(uint8_t log_result)
 #endif
     if (log_result != 0U) {
         osal_printk("[battery] sample valid=%u adc_mv=%u vbat_mv=%u percent=%u ctrl=%u vbat=%u "
-            "channel=%u ratio=%u/%u ret=%ld\r\n",
+            "channel=%u ratio=%u/%u ret=%ld source=%s source_certain=%u charging=%u chrg_raw=%u chrg_pin=%u\r\n",
             g_team_rt.battery_valid, g_team_rt.adc_sample_mv, g_team_rt.battery_mv,
             g_team_rt.battery_percent, g_team_rt.adc_ctrl_pin, g_team_rt.adc_vbat_pin,
             g_team_rt.adc_vbat_channel, SLE_TEAM_ADC_DIVIDER_TOP_KOHM,
-            SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM, (long)g_team_rt.battery_sample_last_ret);
+            SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM, (long)g_team_rt.battery_sample_last_ret,
+            team_power_source_name(), team_power_source_certain(), g_team_rt.charging,
+            g_team_rt.chrg_raw, g_team_rt.chrg_pin);
     }
     return ret;
 }
@@ -2049,8 +2136,10 @@ static void team_adc_init(void)
 
 static void team_battery_cli_status(void)
 {
+    team_chrg_sample();
     osal_printk("[cli] bat fw=%s ready=%u valid=%u adc_mv=%u vbat_mv=%u percent=%u ctrl=%u vbat=%u "
-        "channel=%u ratio=%u/%u empty_mv=%u full_mv=%u settle_ms=%u interval_s=%u ret=%ld\r\n",
+        "channel=%u ratio=%u/%u empty_mv=%u full_mv=%u settle_ms=%u interval_s=%u ret=%ld "
+        "source=%s source_certain=%u charging=%u chrg_ready=%u chrg_pin=%u chrg_raw=%u chrg_active_low=%u\r\n",
         SLE_TEAM_FW_VERSION, g_team_rt.adc_ready, g_team_rt.battery_valid,
         g_team_rt.adc_sample_mv, g_team_rt.battery_mv, g_team_rt.battery_percent,
         g_team_rt.adc_ctrl_pin, g_team_rt.adc_vbat_pin, g_team_rt.adc_vbat_channel,
@@ -2058,7 +2147,9 @@ static void team_battery_cli_status(void)
         SLE_TEAM_BATTERY_EMPTY_MV, SLE_TEAM_BATTERY_FULL_MV,
         (uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_SETTLE_MS,
         (uint32_t)CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S,
-        (long)g_team_rt.battery_sample_last_ret);
+        (long)g_team_rt.battery_sample_last_ret,
+        team_power_source_name(), team_power_source_certain(), g_team_rt.charging,
+        g_team_rt.chrg_ready, g_team_rt.chrg_pin, g_team_rt.chrg_raw, g_team_rt.chrg_active_low);
 }
 
 static uint8_t team_cli_match2(const char *line, const char *first, const char *second)
@@ -2069,17 +2160,22 @@ static uint8_t team_cli_match2(const char *line, const char *first, const char *
 static int team_battery_cli_handle(const char *line)
 {
     if (team_cli_match2(line, "bat", "bat status") != 0U ||
-        team_cli_match2(line, "adc", "adc status") != 0U) {
+        team_cli_match2(line, "adc", "adc status") != 0U ||
+        team_cli_match2(line, "power", "power status") != 0U ||
+        team_cli_match2(line, "pwr", "pwr status") != 0U) {
         team_battery_cli_status();
         return 1;
     }
-    if (team_cli_match2(line, "bat sample", "adc sample") != 0U) {
+    if (team_cli_match2(line, "bat sample", "adc sample") != 0U ||
+        team_cli_match2(line, "power sample", "pwr sample") != 0U) {
         (void)team_battery_sample_once(1U);
         team_battery_cli_status();
         return 1;
     }
-    if (team_cli_match2(line, "bat help", "adc help") != 0U) {
-        osal_printk("[cli] bat commands: status|sample; adc aliases: adc status|adc sample\r\n");
+    if (team_cli_match2(line, "bat help", "adc help") != 0U ||
+        team_cli_match2(line, "power help", "pwr help") != 0U) {
+        osal_printk("[cli] bat commands: status|sample; adc aliases: adc status|adc sample; "
+            "power aliases: power status|power sample|pwr status|pwr sample\r\n");
         return 1;
     }
     return 0;
@@ -6389,20 +6485,93 @@ static uint8_t team_route_id_from_suffix(uint16_t suffix)
     return id;
 }
 
+static int team_http_write_power_json(char *out, size_t out_size)
+{
+    int len;
+
+    if (out == NULL || out_size == 0U) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    (void)team_battery_sample_once(0U);
+    team_chrg_sample();
+    len = snprintf(out, out_size,
+        "{\"ok\":true,\"fw\":\"%s\",\"adcReady\":%s,\"batteryValid\":%s,"
+        "\"adcMv\":%u,\"vbatMv\":%u,\"vbat_mv\":%u,\"batteryPercent\":%u,"
+        "\"powerSource\":\"%s\",\"sourceCertain\":%s,\"charging\":%s,"
+        "\"chrgReady\":%s,\"chrgPin\":%u,\"chrgRaw\":%u,\"chrgActiveLow\":%s,"
+        "\"chrgExternalPullup\":%s,\"lastSampleMs\":%lu,\"sampleRet\":%ld}",
+        SLE_TEAM_FW_VERSION,
+        g_team_rt.adc_ready != 0U ? "true" : "false",
+        g_team_rt.battery_valid != 0U ? "true" : "false",
+        g_team_rt.adc_sample_mv,
+        g_team_rt.battery_mv,
+        g_team_rt.battery_mv,
+        g_team_rt.battery_percent,
+        team_power_source_name(),
+        team_power_source_certain() != 0U ? "true" : "false",
+        g_team_rt.charging != 0U ? "true" : "false",
+        g_team_rt.chrg_ready != 0U ? "true" : "false",
+        g_team_rt.chrg_pin,
+        g_team_rt.chrg_raw,
+        g_team_rt.chrg_active_low != 0U ? "true" : "false",
+        (uint8_t)CONFIG_SLE_TEAM_CHRG_EXTERNAL_PULLUP != 0U ? "true" : "false",
+        (unsigned long)g_team_rt.battery_sample_last_ms,
+        (long)g_team_rt.battery_sample_last_ret);
+    return len < 0 || len >= (int)out_size ? SLE_TEAM_ERR_BUF : len;
+}
+
+static int team_http_append_power_to_status_json(char *out, size_t out_size)
+{
+    char power_json[512];
+    size_t used;
+    int power_ret;
+    int len;
+
+    if (out == NULL || out_size == 0U) {
+        return SLE_TEAM_ERR_ARG;
+    }
+    used = strlen(out);
+    if (used == 0U || out[used - 1U] != '}') {
+        return SLE_TEAM_ERR_FORMAT;
+    }
+    power_ret = team_http_write_power_json(power_json, sizeof(power_json));
+    if (power_ret < 0) {
+        return power_ret;
+    }
+    used--;
+    len = snprintf(&out[used], out_size - used, ",\"power\":%s}", power_json);
+    return len < 0 || len >= (int)(out_size - used) ? SLE_TEAM_ERR_BUF : (int)(used + (size_t)len);
+}
+
+static void team_http_send_power_json_response(int fd)
+{
+    int ret = team_http_write_power_json(g_team_http_json_buf, sizeof(g_team_http_json_buf));
+
+    team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
+        ret < 0 ? "{\"ok\":false,\"error\":\"power\"}" : g_team_http_json_buf);
+}
+
 static void team_http_send_status_json_response(int fd)
 {
     int ret;
 
     if (g_team_rt.role_configured == 0U) {
+        char power_json[512];
+        int power_ret = team_http_write_power_json(power_json, sizeof(power_json));
+
+        if (power_ret < 0) {
+            (void)snprintf(power_json, sizeof(power_json), "{\"ok\":false,\"error\":\"power\"}");
+        }
         (void)snprintf(g_team_http_json_buf, sizeof(g_team_http_json_buf),
             "{\"configured\":false,\"selfLabel\":\"%s\",\"routeId\":%u,\"macReady\":%s,"
-            "\"macSuffix\":\"%02X%02X\",\"ssid\":\"%s\",\"transport\":\"ws63-softap\"}",
+            "\"macSuffix\":\"%02X%02X\",\"ssid\":\"%s\",\"transport\":\"ws63-softap\",\"power\":%s}",
             g_team_rt.self_label,
             g_team_rt.route_id,
             g_team_rt.self_mac_ready != 0U ? "true" : "false",
             g_team_rt.self_mac[4],
             g_team_rt.self_mac[5],
-            g_team_rt.softap_ssid);
+            g_team_rt.softap_ssid,
+            power_json);
         team_http_send_response(fd, "200 OK", "application/json", g_team_http_json_buf);
         return;
     }
@@ -6435,6 +6604,9 @@ static void team_http_send_status_json_response(int fd)
         }
         ret = sle_team_web_write_status_json(&g_team_node, team_now_s(NULL), "ws63-softap", route_metrics,
             g_team_http_json_buf, sizeof(g_team_http_json_buf));
+    }
+    if (ret >= 0) {
+        ret = team_http_append_power_to_status_json(g_team_http_json_buf, sizeof(g_team_http_json_buf));
     }
     team_http_send_response(fd, ret < 0 ? "500 Internal Server Error" : "200 OK", "application/json",
         ret < 0 ? "{\"error\":\"status\"}" : g_team_http_json_buf);
@@ -6581,6 +6753,34 @@ static void team_http_append_fmt(char *buf, size_t buf_size, size_t *used, const
     *used += (size_t)len;
 }
 
+static void team_http_append_power_rows(char *buf, size_t buf_size, size_t *used)
+{
+    (void)team_battery_sample_once(0U);
+    team_chrg_sample();
+    team_http_append_fmt(buf, buf_size, used,
+        "<div class=\"row\"><span class=\"k\">Power</span><span class=\"v %s\">%s</span></div>",
+        team_power_source_certain() != 0U ? "ok" : "warn",
+        team_power_source_name());
+    if (g_team_rt.battery_valid != 0U) {
+        team_http_append_fmt(buf, buf_size, used,
+            "<div class=\"row\"><span class=\"k\">VBAT</span><span class=\"v\">%u mV</span></div>",
+            g_team_rt.battery_mv);
+    } else {
+        team_http_append_str(buf, buf_size, used,
+            "<div class=\"row\"><span class=\"k\">VBAT</span><span class=\"v\">NA</span></div>");
+    }
+    team_http_append_fmt(buf, buf_size, used,
+        "<div class=\"row\"><span class=\"k\">Battery</span><span class=\"v\">%u%%</span></div>",
+        g_team_rt.battery_percent);
+    team_http_append_fmt(buf, buf_size, used,
+        "<div class=\"row\"><span class=\"k\">Charging</span><span class=\"v %s\">%s</span></div>",
+        g_team_rt.charging != 0U ? "ok" : "warn",
+        g_team_rt.charging != 0U ? "true" : "false");
+    team_http_append_fmt(buf, buf_size, used,
+        "<div class=\"row\"><span class=\"k\">CHRG IO2</span><span class=\"v\">raw=%u active_low=%u</span></div>",
+        g_team_rt.chrg_raw, g_team_rt.chrg_active_low);
+}
+
 static void team_http_append_html_shell_start(char *buf, size_t buf_size, size_t *used, const char *active)
 {
     static const char * const chunks[] = {
@@ -6651,6 +6851,7 @@ static void team_http_send_status_page(int fd)
             "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_SELF_LABEL
             "</span><span class=\"v\">%s</span></div>",
             g_team_rt.self_label[0] != '\0' ? g_team_rt.self_label : "NA");
+        team_http_append_power_rows(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
         team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
             "<div class=\"row\"><span class=\"k\">SSID</span><span class=\"v\">");
         team_http_append_str(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
@@ -6681,6 +6882,7 @@ static void team_http_send_status_page(int fd)
         "<div class=\"row\"><span class=\"k\">" WS63_CONSOLE_STATUS_JOINED_LABEL
         "</span><span class=\"v\">%s</span></div>",
         g_team_node.joined != 0U ? "true" : "false");
+    team_http_append_power_rows(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used);
     team_http_append_fmt(g_team_http_html_buf, sizeof(g_team_http_html_buf), &used,
         "<div class=\"row\"><span class=\"k\">Relay Allowed</span><span class=\"v\">%s</span></div>",
         g_team_node.cfg.relay_allowed != 0U ? "true" : "false");
@@ -7099,6 +7301,9 @@ static void team_http_handle_client(int fd)
     if (strncmp(g_team_http_req_buf, "GET /api/status", 15) == 0) {
         osal_printk("[team-wifi] http route api=status\r\n");
         team_http_send_status_json_response(fd);
+    } else if (strncmp(g_team_http_req_buf, "GET /api/power", 14) == 0) {
+        osal_printk("[team-wifi] http route api=power\r\n");
+        team_http_send_power_json_response(fd);
     } else if (strncmp(g_team_http_req_buf, "GET /api/nodes", 14) == 0) {
         osal_printk("[team-wifi] http route api=nodes\r\n");
         ret = sle_team_web_write_nodes_json(&g_team_node, g_team_http_json_buf, sizeof(g_team_http_json_buf));
@@ -8290,6 +8495,7 @@ static void team_network_task_bootstrap(void)
     team_uart_cli_start();
     osal_printk("[hw] init begin fw=%s\r\n", SLE_TEAM_FW_VERSION);
     team_gps_init();
+    team_chrg_init();
     team_adc_init();
     team_ws2812_init();
     team_buzzer_init();

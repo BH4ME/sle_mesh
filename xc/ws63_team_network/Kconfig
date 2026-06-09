@@ -179,6 +179,35 @@ config SLE_TEAM_ADC_SAMPLE_INTERVAL_S
     help
         Periodic VBAT sampling interval while the team network is running.
 
+config SLE_TEAM_CHRG_ENABLE
+    bool "Enable TP4054 CHRG status input"
+    default y
+    help
+        Sample the TP4054 CHRG pin as a status input and publish charging/source
+        state through UART and Web status.
+
+config SLE_TEAM_CHRG_PIN
+    int "TP4054 CHRG GPIO"
+    default 2
+    depends on SLE_TEAM_CHRG_ENABLE
+    help
+        On the current board, TP4054 CHRG is routed to WS63 IO02.
+
+config SLE_TEAM_CHRG_ACTIVE_LOW
+    bool "TP4054 CHRG active low"
+    default y
+    depends on SLE_TEAM_CHRG_ENABLE
+    help
+        TP4054 CHRG is open-drain and pulls low while charging.
+
+config SLE_TEAM_CHRG_EXTERNAL_PULLUP
+    bool "TP4054 CHRG has external pull-up"
+    default y
+    depends on SLE_TEAM_CHRG_ENABLE
+    help
+        The board already pulls CHRG high externally, so firmware leaves the
+        internal pull configuration unchanged and reads the pin as GPIO input.
+
 config SLE_TEAM_ST7789_ENABLE
     bool "Enable v3.2 ST7789 display"
     default y

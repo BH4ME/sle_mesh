@@ -4,9 +4,9 @@
 
 ## 当前版本
 
-- 固件版本：`v4.4.128`
-- 仓库整理记录：`v4.4.128`
-- 版本说明：[../../versions/v4.4.128/VERSION.md](../../versions/v4.4.128/VERSION.md)
+- 固件版本：`v4.4.129`
+- 仓库整理记录：`v4.4.129`
+- 版本说明：[../../versions/v4.4.129/VERSION.md](../../versions/v4.4.129/VERSION.md)
 - 仓库结构说明：[../../docs/repository_layout.md](../../docs/repository_layout.md)
 
 ## 功能
@@ -50,6 +50,7 @@ URL: http://192.168.43.1/
 常用 API：
 
 - `GET /api/status`
+- `GET /api/power`
 - `GET /api/nodes`
 - `GET /api/events`
 - `GET /api/pending`
