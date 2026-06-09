@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.121"
+VERSION = "v4.4.122"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -191,7 +191,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.121 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
+print("configured v4.4.122 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -261,7 +261,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.121",
+    b"v4.4.122",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -344,6 +344,8 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_cli_match2"),
     ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_done"),
     ("ws63_team_network_app.c", app_source, "team_cfg_apply_role"),
+    ("ws63_team_network_app.c", app_source,
+     "g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && g_team_node.cfg.leader_id == leader_id"),
     ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_save_leader"),
     ("ws63_team_network_app.c", app_source,
      "((on != 0U) ^ (g_team_rt.led_active_low != 0U)) ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW"),

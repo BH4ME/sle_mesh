@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.121"
+#define SLE_TEAM_FW_VERSION "v4.4.122"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -2476,10 +2476,7 @@ static uint8_t team_serial_cfg_matches_runtime(const sle_team_web_config_nv_t *c
         return 0U;
     }
     leader_id = team_route_id_from_suffix(cfg->leader_suffix);
-    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || g_team_node.cfg.leader_id != leader_id) {
-        return 0U;
-    }
-    return 1U;
+    return (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && g_team_node.cfg.leader_id == leader_id) ? 1U : 0U;
 }
 
 static int team_serial_cfg_apply_loaded(const sle_team_web_config_nv_t *cfg)

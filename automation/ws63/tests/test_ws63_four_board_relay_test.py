@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.121"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.122"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -287,6 +287,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("team_cfg_clear_all_saved()", cli_handle)
         self.assertIn("team_serial_cfg_cli_done()", cli_handle)
         self.assertIn("team_cfg_apply_role", app_source)
+        self.assertIn("g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && g_team_node.cfg.leader_id == leader_id", app_source)
         self.assertIn("team_serial_cfg_cli_save_leader", app_source)
         self.assertIn("scope=config+allowlist", cli_handle)
         self.assertIn("team_cfg_clear_all_saved()", http_handle)
