@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.118"
+#define SLE_TEAM_FW_VERSION "v4.4.119"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -1876,6 +1876,15 @@ static void team_gps_init(void)
         g_team_rt.gps_txd_pin, g_team_rt.gps_rxd_pin);
 }
 
+static void team_gpio_config_output_level(uint8_t pin, uint8_t level)
+{
+    (void)uapi_pin_set_mode(pin, HAL_PIO_FUNC_GPIO);
+    (void)uapi_pin_set_pull(pin, PIN_PULL_TYPE_DOWN);
+    (void)uapi_gpio_set_val(pin, level);
+    (void)uapi_gpio_set_dir(pin, GPIO_DIRECTION_OUTPUT);
+    (void)uapi_gpio_set_val(pin, level);
+}
+
 static uint8_t team_adc_ctrl_off_level(void) SLE_TEAM_UNUSED_FUNC;
 static uint8_t team_adc_ctrl_on_level(void) SLE_TEAM_UNUSED_FUNC;
 static void team_adc_ctrl_set(uint8_t enabled) SLE_TEAM_UNUSED_FUNC;
@@ -2004,11 +2013,7 @@ static void team_adc_init(void)
         errcode_t init_ret;
 
         off_level = team_adc_ctrl_off_level();
-        (void)uapi_pin_set_mode(g_team_rt.adc_ctrl_pin, HAL_PIO_FUNC_GPIO);
-        (void)uapi_pin_set_pull(g_team_rt.adc_ctrl_pin, PIN_PULL_TYPE_DOWN);
-        (void)uapi_gpio_set_val(g_team_rt.adc_ctrl_pin, off_level);
-        (void)uapi_gpio_set_dir(g_team_rt.adc_ctrl_pin, GPIO_DIRECTION_OUTPUT);
-        (void)uapi_gpio_set_val(g_team_rt.adc_ctrl_pin, off_level);
+        team_gpio_config_output_level(g_team_rt.adc_ctrl_pin, off_level);
         init_ret = uapi_adc_init(ADC_CLOCK_500KHZ);
         g_team_rt.battery_sample_last_ret = (int32_t)init_ret;
         g_team_rt.adc_ready = init_ret == ERRCODE_SUCC ? 1U : 0U;
@@ -2066,11 +2071,7 @@ static void team_buzzer_force_pin_off(uint8_t pin)
         return;
     }
     off_level = CONFIG_SLE_TEAM_BUZZER_ACTIVE_HIGH ? GPIO_LEVEL_LOW : GPIO_LEVEL_HIGH;
-    (void)uapi_pin_set_mode(pin, HAL_PIO_FUNC_GPIO);
-    (void)uapi_pin_set_pull(pin, PIN_PULL_TYPE_DOWN);
-    (void)uapi_gpio_set_val(pin, off_level);
-    (void)uapi_gpio_set_dir(pin, GPIO_DIRECTION_OUTPUT);
-    (void)uapi_gpio_set_val(pin, off_level);
+    team_gpio_config_output_level(pin, off_level);
 }
 
 static void team_buzzer_apply_level(uint8_t level) SLE_TEAM_UNUSED_FUNC;

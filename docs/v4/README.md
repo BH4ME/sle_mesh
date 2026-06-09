@@ -4,8 +4,8 @@
 
 ## 当前主线
 
-- 当前固件版本：`v4.4.118`
-- 最新仓库整理记录：`v4.4.118`
+- 当前固件版本：`v4.4.119`
+- 最新仓库整理记录：`v4.4.119`
 - 固件工程：[../../xc/ws63_team_network/](../../xc/ws63_team_network/)
 - 硬件原理图：[../../hardware/schematics/sle-main-board/v0.1/](../../hardware/schematics/sle-main-board/v0.1/)
 - 远程构建脚本：[../../scripts/build/ws63_build_v4_ubuntu.sh](../../scripts/build/ws63_build_v4_ubuntu.sh)

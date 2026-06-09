@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.118"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.119"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -110,6 +110,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define CONFIG_SLE_TEAM_ADC_SAMPLE_INTERVAL_S 30", app_source)
         self.assertIn("#define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U", app_source)
         self.assertIn("#define SLE_TEAM_ADC_DIVIDER_BOTTOM_KOHM 100U", app_source)
+        self.assertIn("team_gpio_config_output_level", app_source)
         self.assertIn("#define SLE_TEAM_BATTERY_EMPTY_MV 3300U", app_source)
         self.assertIn("#define SLE_TEAM_BATTERY_FULL_MV 4200U", app_source)
         self.assertIn("uapi_adc_init(ADC_CLOCK_500KHZ)", app_source)

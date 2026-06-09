@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.118"
+VERSION = "v4.4.119"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -191,7 +191,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.118 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
+print("configured v4.4.119 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -261,7 +261,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.118",
+    b"v4.4.119",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -345,6 +345,7 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_serial_cfg_cli_save_leader"),
     ("ws63_team_network_app.c", app_source,
      "((on != 0U) ^ (g_team_rt.led_active_low != 0U)) ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW"),
+    ("ws63_team_network_app.c", app_source, "team_gpio_config_output_level"),
     ("ws63_team_network_app.c", app_source, "memcpy(&route_update, app_packet->body, sizeof(route_update))"),
     ("ws63_team_network_app.c", app_source, "memcpy(&route_update, app_packet.body, sizeof(route_update))"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_MAIN_LOOP_SLEEP_MS"),

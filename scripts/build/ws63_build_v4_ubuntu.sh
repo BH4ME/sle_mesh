@@ -75,7 +75,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.118 unified runtime role (v3.2 schematic pinmap + ADC battery)"
+echo "profile:    v4.4.119 unified runtime role (v3.2 schematic pinmap + ADC battery)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -226,7 +226,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.118 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.119 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -297,7 +297,7 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.118",
+    b"v4.4.119",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
