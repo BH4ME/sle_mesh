@@ -374,7 +374,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.123"
+#define SLE_TEAM_FW_VERSION "v4.4.124"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -2046,7 +2046,7 @@ static void team_battery_cli_status(void)
 
 static uint8_t team_cli_match2(const char *line, const char *first, const char *second)
 {
-    return (strcmp(line, first) == 0 || strcmp(line, second) == 0) ? 1U : 0U;
+    return (uint8_t)(strcmp(line, first) == 0 || strcmp(line, second) == 0);
 }
 
 static int team_battery_cli_handle(const char *line)

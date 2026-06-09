@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.123"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.124"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -122,6 +122,10 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("bat commands: status|sample", app_source)
         self.assertNotIn("sample=0", app_source)
         self.assertIn("team_cli_match2", app_source)
+        self.assertIn(
+            "return (uint8_t)(strcmp(line, first) == 0 || strcmp(line, second) == 0);",
+            app_source,
+        )
         self.assertIn(
             "team_http_query_number(path, key, (int64_t)min_value, (int64_t)max_value, 255UL, 0UL, &value) != 0",
             app_source,
