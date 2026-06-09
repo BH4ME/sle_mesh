@@ -89,7 +89,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.124"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.125"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -151,12 +151,14 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("TEAM_RGB_STATE_LEADER", app_source)
         self.assertIn("TEAM_RGB_STATE_MEMBER", app_source)
         self.assertIn("TEAM_RGB_STATE_ERROR", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_R 64U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_G 64U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_IDLE_B 64U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_LEADER_G 64U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_R 32U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_G 32U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_B 32U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_LEADER_G 32U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_MEMBER_G 0U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_B 64U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_B 32U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_ERROR_R 32U", app_source)
+        self.assertIn("team_ws2812_cli_set_rgb(line[4] == 'r' ? 32U : (line[4] == 'w' ? 20U : 0U)", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_FLASH_PULSES 4U", app_source)
         self.assertIn(
@@ -311,7 +313,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.124")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.125")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
 
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):

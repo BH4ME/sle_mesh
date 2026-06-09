@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.124"
+VERSION = "v4.4.125"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -205,7 +205,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.124 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
+print("configured v4.4.125 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, and ADC battery sampling")
 '''
 
 
@@ -275,7 +275,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.124",
+    b"v4.4.125",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -348,6 +348,10 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_leader_relay_swap_tick"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_RELAY_SWAP_STABLE_S"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_cli_set_rgb"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_R 32U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_G 32U"),
+    ("ws63_team_network_app.c", app_source,
+     "team_ws2812_cli_set_rgb(line[4] == 'r' ? 32U : (line[4] == 'w' ? 20U : 0U)"),
     ("ws63_team_network_app.c", app_source,
      'team_cli_match2(line, "buzz beep", "buzz test")'),
     ("ws63_team_network_app.c", app_source, 'team_cli_match2(line, "led tx", "led rx")'),
