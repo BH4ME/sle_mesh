@@ -88,8 +88,8 @@ test("firmware exposes unified config over HTTP and serial", () => {
 });
 
 test("current firmware makes ST7789 member events readable and panel-styled", () => {
-  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.95"/);
-  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v4\.4\.95 pairing allowlist preserve"/);
+  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.131"/);
+  assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v3\.2 schematic pinmap, muted buzzer"/);
   assert.match(displaySource, /SLE\/\/BOOT/);
   assert.match(displaySource, /LINK-MESH/);
   assert.match(displaySource, /g_st7789_lv_panel_status/);
@@ -115,16 +115,16 @@ test("current firmware makes ST7789 member events readable and panel-styled", ()
   assert.match(firmwareSource, /team_display_event_name/);
   assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
   assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
-  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.98`/);
-  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.95`/);
+  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.131`/);
+  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.131`/);
   assert.match(rootReadmeSource, /docs\/version_management\.md/);
   assert.match(rootReadmeSource, /hardware\/enclosures\/sle-pcb-enclosure\/v1\.1\.4/);
   assert.match(rootReadmeSource, /scripts\/build\/ws63_build_v4_ubuntu\.sh/);
   assert.match(rootReadmeSource, /scripts\/flash\/ws63_flash_multi\.ps1/);
-  assert.match(rootReadmeSource, /versions\/v4\.4\.95\/VERSION\.md/);
+  assert.match(rootReadmeSource, /versions\/v4\.4\.131\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.131\]\(\.\/v4\.4\.131\/VERSION\.md\)/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.129\]\(\.\/v4\.4\.129\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.98\]\(\.\/v4\.4\.98\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.97\]\(\.\/v4\.4\.97\/VERSION\.md\)/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.96\]\(\.\/v4\.4\.96\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.95\]\(\.\/v4\.4\.95\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.94\]\(\.\/v4\.4\.94\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.93\]\(\.\/v4\.4\.93\/VERSION\.md\)/);
@@ -268,7 +268,8 @@ test("v4.4.48 accepts idempotent runtime role config without reopening SLE", () 
   assert.match(firmwareSource, /static uint8_t team_serial_cfg_matches_runtime\(const sle_team_web_config_nv_t \*cfg\)/);
   assert.match(firmwareSource, /g_team_node\.cfg\.team_id != cfg->team_id/);
   assert.match(firmwareSource, /g_team_node\.cfg\.channel_hash != cfg->channel_hash/);
-  assert.match(firmwareSource, /g_team_node\.cfg\.leader_id != leader_id/);
+  assert.match(firmwareSource, /leader_id = team_route_id_from_suffix\(cfg->leader_suffix\)/);
+  assert.match(firmwareSource, /g_team_node\.cfg\.role == SLE_TEAM_ROLE_MEMBER && g_team_node\.cfg\.leader_id == leader_id/);
   assert.match(firmwareSource, /runtime already matches role=%u team=%u channel=%u leader_suffix=%04X/);
   assert.match(
     firmwareSource,
@@ -358,7 +359,7 @@ test("v4.4.30 leader rescans when members are offline and keeps 30 logical membe
   assert.match(firmwareSource, /static uint8_t team_leader_has_offline_members\(void\)/);
   assert.match(firmwareSource, /leader_has_offline_members = team_leader_has_offline_members\(\)/);
   assert.match(firmwareSource, /rescan_reason = "member_offline"/);
-  assert.match(firmwareSource, /#define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 3U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 1U/);
   assert.match(
     fs.readFileSync(path.join(repoRoot, "include/sle_team_node.h"), "utf8"),
     /#define SLE_TEAM_MAX_LOGICAL_MEMBERS 30U/,
@@ -534,14 +535,17 @@ test("firmware pairing page exposes phone GPS upload and auto-report bridge", ()
   assert.match(firmwareSource, /clearWatch/);
 });
 
-test("v4.4 build keeps WS2812 build-enable path and buzzer io14 safe-off defaults", () => {
+test("v4.4 build keeps WS2812 path and muted buzzer io14 defaults", () => {
   assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_SLE_TEAM_WS2812_ENABLE",\s*"y"\)/);
-  assert.match(buildScriptSource, /unset_kconfig_bool\(s,\s*"CONFIG_SLE_TEAM_BUZZER_ENABLE"\)/);
+  assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_SLE_TEAM_BUZZER_ENABLE",\s*"y"\)/);
+  assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_SLE_TEAM_BUZZER_MUTED",\s*"y"\)/);
   assert.match(buildScriptSource, /set_kconfig_value\(s,\s*"CONFIG_AT_UART",\s*"3"\)/);
   assert.match(buildScriptSource, /unset_kconfig_bool\(s,\s*"CONFIG_DYNAMIC_UART_ID_BINDDING"\)/);
-  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_WS2812_ENABLE 0/);
-  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_BUZZER_ENABLE 0/);
-  assert.match(firmwareKconfigSource, /config SLE_TEAM_WS2812_ENABLE\s+bool "Enable v4 WS2812 RGB status LED"\s+default n/);
+  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_WS2812_ENABLE 1/);
+  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_BUZZER_ENABLE 1/);
+  assert.match(firmwareSource, /#define CONFIG_SLE_TEAM_BUZZER_MUTED 1/);
+  assert.match(firmwareKconfigSource, /config SLE_TEAM_WS2812_ENABLE\s+bool "Enable v3\.2 WS2812 RGB status LED"\s+default y/);
+  assert.match(firmwareKconfigSource, /config SLE_TEAM_BUZZER_ENABLE\s+bool "Enable v3\.2 buzzer output"\s+default y/);
   assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_FORCE_OFF_LEVEL GPIO_LEVEL_LOW/);
   assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_FORCE_ON_LEVEL GPIO_LEVEL_HIGH/);
   assert.match(firmwareSource, /#define SLE_TEAM_BUZZER_TOGGLE_INTERVAL_MS 3000U/);
@@ -555,9 +559,9 @@ test("v4.4 build keeps WS2812 build-enable path and buzzer io14 safe-off default
   assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(1U/);
   assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(2U/);
   assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_R 0U/);
-  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_G 24U/);
-  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_B 64U/);
-  assert.match(firmwareSource, /team_ws2812_set_rgb\(SLE_TEAM_WS2812_BOOT_R,\s*SLE_TEAM_WS2812_BOOT_G,\s*SLE_TEAM_WS2812_BOOT_B\)/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_G 3U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_B 8U/);
+  assert.match(firmwareSource, /team_ws2812_set_state\(TEAM_RGB_STATE_BOOT\)/);
 });
 
 test("v4.4 display tuple stays aligned across Kconfig, fallback defines, and build script", () => {
@@ -679,10 +683,12 @@ test("relay swap requires 8 dB hysteresis for 30 seconds before exchanging roles
 
 test("firmware i32 query parser avoids 32-bit signed overflow at bounds", () => {
   const i32Parser = firmwareSource.match(/static int team_http_query_i32[\s\S]+?\n}\n/)?.[0] ?? "";
-  assert.match(i32Parser, /int64_t signed_value;/);
-  assert.match(i32Parser, /abs_value > 2147483648UL/);
-  assert.match(i32Parser, /abs_value > 2147483647UL/);
-  assert.match(i32Parser, /signed_value = negative != 0U \? -\(int64_t\)abs_value : \(int64_t\)abs_value;/);
+  const numberParser = firmwareSource.match(/static int team_http_query_number[\s\S]+?\n}\n/)?.[0] ?? "";
+  assert.match(i32Parser, /team_http_query_number\(path,\s*key,\s*\(int64_t\)min_value,\s*\(int64_t\)max_value,\s*2147483647UL,\s*2147483648UL,\s*&value\)/);
+  assert.match(numberParser, /int64_t signed_value;/);
+  assert.match(numberParser, /if \(abs_value > limit\)/);
+  assert.match(numberParser, /limit = negative != 0U \? negative_limit : positive_limit;/);
+  assert.match(numberParser, /signed_value = negative != 0U \? -\(int64_t\)abs_value : \(int64_t\)abs_value;/);
 });
 
 test("hello ack path keeps relay_enabled sync when config is cached before ack", () => {

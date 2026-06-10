@@ -44,7 +44,7 @@ errcode_t sle_uart_server_send_report_by_uuid(const uint8_t *data, uint8_t len);
 
 errcode_t sle_uart_server_send_report_by_handle(const uint8_t *data, uint16_t len);
 errcode_t sle_uart_server_send_report_by_conn(uint16_t conn_id, const uint8_t *data, uint16_t len);
-void sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id);
+uint8_t sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id);
 uint16_t sle_uart_server_find_conn_by_member(uint8_t member_id);
 uint8_t sle_uart_server_find_conn_by_member_ex(uint8_t member_id, uint16_t *conn_id);
 uint8_t sle_uart_server_has_conn(uint16_t conn_id);

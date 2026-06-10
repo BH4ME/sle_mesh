@@ -166,16 +166,23 @@ uint8_t sle_uart_server_find_conn_by_member_ex(uint8_t member_id, uint16_t *conn
     return 1U;
 }
 
-void sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id)
+uint8_t sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id)
 {
     sle_uart_server_conn_t *conn;
 
     if (member_id == 0U || member_id > SLE_UART_MEMBER_ID_MAX) {
-        return;
+        return 0U;
     }
     conn = sle_uart_server_find_conn(conn_id);
     if (conn == NULL) {
-        return;
+        conn = sle_uart_server_alloc_conn(conn_id);
+        if (conn == NULL) {
+            sample_at_log_print("%s bind member:%u conn_id:%x failed: table full\r\n",
+                SLE_UART_SERVER_LOG, member_id, conn_id);
+            return 0U;
+        }
+        sample_at_log_print("%s recover conn_id:%x from packet bind member:%u\r\n",
+            SLE_UART_SERVER_LOG, conn_id, member_id);
     }
     for (uint8_t i = 0; i < SLE_UART_SERVER_MAX_CONNECTIONS; i++) {
         if (g_sle_conns[i].active != 0U && g_sle_conns[i].conn_id != conn_id &&
@@ -185,6 +192,7 @@ void sle_uart_server_bind_member_conn(uint8_t member_id, uint16_t conn_id)
     }
     conn->member_id = member_id;
     sample_at_log_print("%s bind member:%u conn_id:%x\r\n", SLE_UART_SERVER_LOG, member_id, conn_id);
+    return 1U;
 }
 
 static void sle_uart_server_remove_conn(uint16_t conn_id)

@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.129"
+VERSION = "v4.4.134"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -201,7 +201,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_HEIGHT", "135")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LVGL_DRAW_BUF_LINES", "8")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S", "1")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "4")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "3")
 s = set_kconfig_value(s, "CONFIG_SPI_SUPPORT_MASTER", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_AUTO_START", "y")
@@ -209,7 +209,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.129 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status states, ADC battery sampling, and TP4054 CHRG IO2")
+print("configured v4.4.134 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status blink states, ADC battery sampling, and TP4054 CHRG IO2")
 '''
 
 
@@ -286,7 +286,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.129",
+    b"v4.4.134",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -326,6 +326,7 @@ for item in [
     b"[team] disconnect lookup",
     b"already_offline=%u",
     b"relay failover begin",
+    b"relay failover duplicate lost=%u",
     b"relay failover holding relay target",
     b"relay config notify pending",
     b"relay failover member=%u route pending next_hop=%u",
@@ -340,6 +341,12 @@ for item in [
     b"direct cap prune deferred",
     b"parent reselect drop old leader conn",
     b"parent reselect drop upstream",
+    b"force rescan stop seek ret",
+    b"seek disabled for force rescan",
+    b"packet-bind-recover",
+    b"recover conn_id:%u from packet bind",
+    b"pairing restart scan reason=%s",
+    b"relay demote drop child conn=%u",
     b"seek filter reject",
     b"relay swap observe",
     b"swap-promote",
@@ -355,7 +362,18 @@ for source_name, source_text, item in [
     ("sle_team_node.c", proto_source, "hello ack deferred until reselect parent"),
     ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
-    ("ws63_team_network_app.c", app_source, "SLE_TEAM_WS2812_BREATHE_PERIOD_MS"),
+    ("ws63_team_network_app.c", app_source, "team_leader_pairing_restart_scan"),
+    ("ws63_team_network_app.c", app_source, "team_member_drop_relay_children"),
+    ("ws63_team_network_app.c", app_source, "stale routes through the lost relay"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U"),
+    ("ws63_team_network_app.c", app_source, "team_rgb_state_is_blinking"),
+    ("ws63_team_network_app.c", app_source, "ws2812_base_enter_ms = now_ms"),
+    ("ws63_team_network_app.c", app_source, "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)"),
+    ("ws63_team_network_app.c", app_source, "static void team_ws2812_restart_base_phase"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_restart_base_phase(now_ms);"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)"),
     ("ws63_team_network_app.c", app_source, "team_member_parent_reselect_disconnect_tick"),
@@ -372,7 +390,6 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_R 8U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_G 8U"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
     ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
     ("ws63_team_network_app.c", app_source, "state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER"),
@@ -418,7 +435,16 @@ for source_name, source_text, item in [
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")
 
-print("post-build guard passed: team-network app, ST7789/LVGL display, version strings, route-copy guards, and direct-cap source guards are present")
+if "BREATHE" in app_source or "team_rgb_state_is_breathing" in app_source:
+    raise SystemExit("post-build guard failed: WS2812 breathing path still present")
+
+flash_source_start = app_source.index("static uint8_t team_ws2812_refresh_flash")
+flash_source_end = app_source.index("static void team_ws2812_refresh_network_state", flash_source_start)
+flash_source = app_source[flash_source_start:flash_source_end]
+if flash_source.index("team_ws2812_restart_base_phase(now_ms);") > flash_source.index("team_ws2812_render_base_state(now_ms);"):
+    raise SystemExit("post-build guard failed: WS2812 flash completion restores base state before restarting blink phase")
+
+print("post-build guard passed: team-network app, RGB blink states, ST7789/LVGL display, version strings, route-copy guards, and direct-cap source guards are present")
 '''
 
 

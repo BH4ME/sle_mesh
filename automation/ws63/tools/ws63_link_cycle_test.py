@@ -63,7 +63,17 @@ def _extract_suffix(text: str) -> Optional[int]:
 
 
 def _open_peer(name: str, port: str, baudrate: int) -> Peer:
-    ser = serial.Serial(port, baudrate=baudrate, timeout=0.1)
+    ser = serial.Serial()
+    ser.port = port
+    ser.baudrate = baudrate
+    ser.timeout = 0.1
+    # Keep control lines inactive; several CH340-wired WS63 boards reset or
+    # remain quiet when pyserial opens with default DTR/RTS assertion.
+    ser.dtr = False
+    ser.rts = False
+    ser.open()
+    ser.dtr = False
+    ser.rts = False
     ser.reset_input_buffer()
     ser.reset_output_buffer()
     return Peer(name=name, port=port, baudrate=baudrate, ser=ser)

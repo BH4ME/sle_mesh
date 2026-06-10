@@ -57,12 +57,12 @@ REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
 REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
 REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.129")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.134")"
 
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.129 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG)"
+echo "profile:    v4.4.134 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
 echo "sdk:        $WSL_SDK"
 echo "archive:    $ARCHIVE_OUT"
 echo "latest:     $LOCAL_OUT"
@@ -178,7 +178,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_HEIGHT", "135")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LVGL_DRAW_BUF_LINES", "8")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S", "1")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "4")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "3")
 s = set_kconfig_value(s, "CONFIG_SPI_SUPPORT_MASTER", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_AUTO_START", "y")
@@ -186,7 +186,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.129 local WSL pinmap, ADC battery sampling, TP4054 CHRG IO2, and team-network sample")
+print("configured v4.4.134 local WSL pinmap, ADC battery sampling, TP4054 CHRG IO2, RGB blink states, and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -200,9 +200,11 @@ sdk = Path(sys.argv[1])
 cfg_path = sdk / "build/config/target_config/ws63/menuconfig/acore/ws63_liteos_app.config"
 map_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.map"
 elf_path = sdk / "output/ws63/acore/ws63-liteos-app/ws63-liteos-app.elf"
+app_source_path = sdk / "application/samples/products/sle_team_network/src/ws63_team_network_app.c"
 cfg = cfg_path.read_text(errors="replace")
 map_text = map_path.read_text(errors="replace")
 elf = elf_path.read_bytes()
+app_source = app_source_path.read_text(errors="replace")
 
 for item in [
     "CONFIG_SAMPLE_SUPPORT_SLE_TEAM_NETWORK=y",
@@ -253,7 +255,7 @@ for item in [
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.129",
+    b"v4.4.134",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -286,6 +288,11 @@ for item in [
     b"[cfg-json]",
     b"[team] disconnect lookup",
     b"already_offline=%u",
+    b"relay failover duplicate lost=%u",
+    b"force rescan stop seek ret",
+    b"seek disabled for force rescan",
+    b"pairing restart scan reason=%s",
+    b"relay demote drop child conn=%u",
     b"TeamDisplayTask",
     b"relay rebalance demand",
     b"relay swap observe",
@@ -295,7 +302,30 @@ for item in [
 ]:
     if item not in elf:
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
-print("post-build guard passed: local WSL v4.4.129")
+
+for item in [
+    "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U",
+    "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U",
+    "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U",
+    "team_rgb_state_is_blinking",
+    "ws2812_base_enter_ms = now_ms",
+    "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)",
+    "static void team_ws2812_restart_base_phase",
+    "team_ws2812_restart_base_phase(now_ms);",
+]:
+    if item not in app_source:
+        raise SystemExit(f"post-build guard failed: source ws63_team_network_app.c missing {item}")
+
+if "BREATHE" in app_source or "team_rgb_state_is_breathing" in app_source:
+    raise SystemExit("post-build guard failed: WS2812 breathing path still present")
+
+flash_source_start = app_source.index("static uint8_t team_ws2812_refresh_flash")
+flash_source_end = app_source.index("static void team_ws2812_refresh_network_state", flash_source_start)
+flash_source = app_source[flash_source_start:flash_source_end]
+if flash_source.index("team_ws2812_restart_base_phase(now_ms);") > flash_source.index("team_ws2812_render_base_state(now_ms);"):
+    raise SystemExit("post-build guard failed: WS2812 flash completion restores base state before restarting blink phase")
+
+print("post-build guard passed: local WSL v4.4.134 RGB blink states")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

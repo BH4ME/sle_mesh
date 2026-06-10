@@ -69,7 +69,7 @@ REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fw
 REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
 REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.129")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.134")"
 LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
 ssh_opts=(
@@ -89,7 +89,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.129 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG)"
+echo "profile:    v4.4.134 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -237,7 +237,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_ST7789_HEIGHT", "135")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_DISPLAY_USE_LVGL", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_LVGL_DRAW_BUF_LINES", "8")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_INTERVAL_S", "1")
-s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "4")
+s = set_kconfig_value(s, "CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S", "3")
 s = set_kconfig_value(s, "CONFIG_SPI_SUPPORT_MASTER", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_ENABLE", "y")
 s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_AUTO_START", "y")
@@ -245,7 +245,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.129 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.134 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0 blink states, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -323,7 +323,7 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.129",
+    b"v4.4.134",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -357,11 +357,16 @@ required_bytes = [
     b"[team] disconnect lookup",
     b"already_offline=%u",
     b"relay failover begin",
+    b"relay failover duplicate lost=%u",
     b"relay failover holding relay target",
     b"relay config notify pending",
     b"liveness preserved",
     b"direct cap prune confirmed",
     b"direct cap prune disconnect",
+    b"force rescan stop seek ret",
+    b"seek disabled for force rescan",
+    b"pairing restart scan reason=%s",
+    b"relay demote drop child conn=%u",
     b"TeamDisplayTask",
     b"relay rebalance demand",
     b"relay swap observe",
@@ -377,7 +382,18 @@ for source_name, source_text, item in [
     ("sle_team_node.c", proto_source, "Route updates are leader policy hints"),
     ("ws63_team_network_app.c", app_source, "team_member_relay_can_accept_child"),
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
-    ("ws63_team_network_app.c", app_source, "SLE_TEAM_WS2812_BREATHE_PERIOD_MS"),
+    ("ws63_team_network_app.c", app_source, "team_leader_pairing_restart_scan"),
+    ("ws63_team_network_app.c", app_source, "team_member_drop_relay_children"),
+    ("ws63_team_network_app.c", app_source, "stale routes through the lost relay"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U"),
+    ("ws63_team_network_app.c", app_source, "team_rgb_state_is_blinking"),
+    ("ws63_team_network_app.c", app_source, "ws2812_base_enter_ms = now_ms"),
+    ("ws63_team_network_app.c", app_source, "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)"),
+    ("ws63_team_network_app.c", app_source, "static void team_ws2812_restart_base_phase"),
+    ("ws63_team_network_app.c", app_source, "team_ws2812_restart_base_phase(now_ms);"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
     ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
@@ -393,7 +409,16 @@ for source_name, source_text, item in [
     if item not in source_text:
         raise SystemExit(f"post-build guard failed: source {source_name} missing {item}")
 
-print("post-build guard passed: team-network app, ST7789/LVGL display, version strings, and direct-cap source guards are present")
+if "BREATHE" in app_source or "team_rgb_state_is_breathing" in app_source:
+    raise SystemExit("post-build guard failed: WS2812 breathing path still present")
+
+flash_source_start = app_source.index("static uint8_t team_ws2812_refresh_flash")
+flash_source_end = app_source.index("static void team_ws2812_refresh_network_state", flash_source_start)
+flash_source = app_source[flash_source_start:flash_source_end]
+if flash_source.index("team_ws2812_restart_base_phase(now_ms);") > flash_source.index("team_ws2812_render_base_state(now_ms);"):
+    raise SystemExit("post-build guard failed: WS2812 flash completion restores base state before restarting blink phase")
+
+print("post-build guard passed: team-network app, RGB blink states, ST7789/LVGL display, version strings, and direct-cap source guards are present")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

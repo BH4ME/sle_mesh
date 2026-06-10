@@ -90,7 +90,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         )
         ws2812_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_ws2812.c").read_text(encoding="utf-8")
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.129"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.134"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -179,8 +179,15 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define SLE_TEAM_WS2812_MEMBER_B 8U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_ERROR_R 8U", app_source)
         self.assertIn("team_ws2812_cli_set_rgb(line[4] == 'r' ? 8U : (line[4] == 'w' ? 5U : 0U)", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U", app_source)
-        self.assertIn("#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U", app_source)
+        self.assertNotIn("BREATHE", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_IDLE_BLINK_PERIOD_MS 1600U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 220U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 220U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_MEMBER_BLINK_PERIOD_MS 1000U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 160U", app_source)
+        self.assertIn("#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U", app_source)
         self.assertIn("#define SLE_TEAM_WS2812_FLASH_PULSES 4U", app_source)
         self.assertIn("timing=cycle-counter", app_source)
         self.assertIn("team_ws2812_test_pattern();", app_source)
@@ -200,9 +207,26 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("g_team_node.joined != 0U", rgb_base)
         self.assertIn("return TEAM_RGB_STATE_MEMBER;", rgb_base)
         self.assertIn("return TEAM_RGB_STATE_ERROR;", rgb_base)
-        rgb_breathe = self._extract_c_function(app_source, "static uint8_t team_rgb_state_is_breathing")
-        self.assertIn("state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER", rgb_breathe)
-        self.assertIn("state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR", rgb_breathe)
+        rgb_blink = self._extract_c_function(app_source, "static uint8_t team_rgb_state_is_blinking")
+        self.assertIn("state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER", rgb_blink)
+        self.assertIn("state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR", rgb_blink)
+        blink_is_on = self._extract_c_function(app_source, "static uint8_t team_rgb_state_blink_is_on")
+        self.assertIn("uint32_t elapsed_ms", blink_is_on)
+        self.assertIn("(elapsed_ms % period_ms) < on_ms", blink_is_on)
+        rgb_render = self._extract_c_function(app_source, "static void team_ws2812_render_base_state")
+        self.assertIn("g_team_rt.ws2812_base_state != (uint8_t)state", rgb_render)
+        self.assertIn("g_team_rt.ws2812_base_enter_ms = now_ms", rgb_render)
+        self.assertIn("team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)", rgb_render)
+        self.assertIn("team_rgb_state_color(state, &red, &green, &blue)", rgb_render)
+        rgb_restart = self._extract_c_function(app_source, "static void team_ws2812_restart_base_phase")
+        self.assertIn("g_team_rt.ws2812_base_state = (uint8_t)TEAM_RGB_STATE_OFF", rgb_restart)
+        self.assertIn("g_team_rt.ws2812_base_enter_ms = now_ms", rgb_restart)
+        rgb_flash = self._extract_c_function(app_source, "static uint8_t team_ws2812_refresh_flash")
+        self.assertIn("team_ws2812_restart_base_phase(now_ms);", rgb_flash)
+        self.assertLess(
+            rgb_flash.index("team_ws2812_restart_base_phase(now_ms);"),
+            rgb_flash.index("team_ws2812_render_base_state(now_ms);"),
+        )
         rgb_event = self._extract_c_function(app_source, "static void team_ws2812_show_display_event")
         self.assertIn("team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)", rgb_event)
         self.assertIn("team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)", rgb_event)
@@ -249,13 +273,29 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("route hint skip member=%u parent=%u reason=no-route", app_source)
         self.assertIn("team_leader_failover_should_seek_member", app_source)
         self.assertIn("member_id == g_team_rt.relay_failover_lost_id", app_source)
-        self.assertIn("direct cap defer reason=failover", app_source)
-        self.assertIn("watched = (uint8_t)(watched + team_leader_failover_watch_member(lost_relay_id));", app_source)
+        self.assertNotIn("direct cap defer reason=failover", app_source)
+        self.assertNotIn("team_leader_failover_watch_member(lost_relay_id)", app_source)
+        self.assertIn("relay failover duplicate lost=%u grace=%u", app_source)
+        self.assertIn("stale routes through the lost relay", app_source)
         self.assertIn("next_hop_id == member_id", app_source)
         self.assertIn("relay failover member=%u route pending next_hop=%u", app_source)
         self.assertIn("team_leader_route_physical_parent_matches", app_source)
         self.assertIn("reason=physical-parent", app_source)
         self.assertIn("reason=failover-parent-not-ready", app_source)
+        self.assertIn("team_leader_pairing_restart_scan", app_source)
+        self.assertIn("pairing restart scan reason=%s", app_source)
+        self.assertIn("team_member_drop_relay_children", app_source)
+        self.assertIn("relay demote drop child conn=%u", app_source)
+        self.assertIn("#define CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S 3", app_source)
+        self.assertIn("#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U", app_source)
+        self.assertIn("#define SLE_TEAM_ROUTE_METRICS_INTERVAL_S 1U", app_source)
+        self.assertIn("#define SLE_TEAM_ROUTE_HINT_COOLDOWN_S 2U", app_source)
+        client_source = (self.REPO_ROOT / "xc/ws63_team_network/sle_uart_client/sle_uart_client.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("g_sle_uart_force_rescan_pending", client_source)
+        self.assertIn("force rescan stop seek ret", client_source)
+        self.assertIn("seek disabled for force rescan", client_source)
         self.assertIn("node->joined = 0U;", node_source)
         self.assertIn("node->state = SLE_TEAM_NET_DISCOVERING;", node_source)
         self.assertIn("node->last_hello_s = 0U;", node_source)
@@ -341,8 +381,25 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.129")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.134")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
+
+    def test_firmware_keeps_active_relay_parents_direct(self):
+        app_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_team_network_app.c").read_text(encoding="utf-8")
+        helper = self._extract_c_function(app_source, "static uint8_t team_leader_member_has_downstream_children")
+        stay_direct = self._extract_c_function(app_source, "static uint8_t team_leader_member_should_stay_direct")
+        pick_worst = self._extract_c_function(app_source, "static sle_team_member_record_t *team_leader_pick_worst_active_relay")
+
+        self.assertIn("route->dir != TEAM_CONN_DIR_DOWNSTREAM", helper)
+        self.assertIn("route->member_id == member_id", helper)
+        self.assertIn("route->next_hop_id != member_id", helper)
+        self.assertIn("team_route_conn_is_active(route->dir, route->conn_id) != 0U", helper)
+        self.assertIn("team_leader_member_has_downstream_children(member->member_id) != 0U", stay_direct)
+        self.assertIn("team_leader_member_has_downstream_children(member->member_id) != 0U", pick_worst)
+        self.assertLess(
+            pick_worst.index("team_leader_member_has_downstream_children(member->member_id) != 0U"),
+            pick_worst.index("member_rssi ="),
+        )
 
     def test_four_board_test_cleans_saved_topology_before_configuring_roles(self):
         tool_source = (self.REPO_ROOT / "automation/ws63/tools/ws63_four_board_relay_test.py").read_text(
@@ -445,17 +502,19 @@ class FourBoardRelayUnitTest(unittest.TestCase):
             "physical_peer_id = team_conn_track_route_id_is_valid(track) != 0U ? track->route_id : app_packet.src_id",
             bind_source,
         )
-        self.assertIn("sle_uart_client_bind_member_conn(physical_peer_id, conn_id);", bind_source)
+        leader_bind = "if (sle_uart_client_bind_member_conn(physical_peer_id, conn_id) != 0U)"
+        self.assertIn(leader_bind, bind_source)
         self.assertIn(
             "team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_DOWNSTREAM, next_hop_id);",
             bind_source,
         )
+        self.assertIn("reason=bind-failed", bind_source)
         self.assertLess(
             bind_source.index("if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER)"),
-            bind_source.index("sle_uart_client_bind_member_conn(physical_peer_id, conn_id);"),
+            bind_source.index(leader_bind),
         )
         self.assertLess(
-            bind_source.index("sle_uart_client_bind_member_conn(physical_peer_id, conn_id);"),
+            bind_source.index(leader_bind),
             bind_source.index("} else if (dir == TEAM_LINK_DOWNSTREAM)"),
         )
 

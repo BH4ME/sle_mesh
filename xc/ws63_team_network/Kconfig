@@ -317,7 +317,7 @@ config SLE_TEAM_LOST_DISTANCE_M
 
 config SLE_TEAM_HEARTBEAT_TIMEOUT_S
     int "Heartbeat timeout in seconds"
-    default 4
+    default 3
     range 1 300
 
 config SLE_TEAM_WIFI_AP_ENABLE

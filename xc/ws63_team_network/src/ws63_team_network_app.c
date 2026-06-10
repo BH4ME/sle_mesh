@@ -240,7 +240,7 @@
 #endif
 
 #ifndef CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S
-#define CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S 4
+#define CONFIG_SLE_TEAM_HEARTBEAT_TIMEOUT_S 3
 #endif
 
 #if defined(CONFIG_SLE_TEAM_WIFI_AP_ENABLE)
@@ -323,10 +323,14 @@
 #define SLE_TEAM_WS2812_ERROR_R 8U
 #define SLE_TEAM_WS2812_ERROR_G 0U
 #define SLE_TEAM_WS2812_ERROR_B 0U
-#define SLE_TEAM_WS2812_BREATHE_MIN_SCALE 0U
-#define SLE_TEAM_WS2812_BREATHE_MAX_SCALE 64U
-#define SLE_TEAM_WS2812_BREATHE_PERIOD_MS 1600U
-#define SLE_TEAM_WS2812_ANIM_STEP_MS 32U
+#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U
+#define SLE_TEAM_WS2812_IDLE_BLINK_PERIOD_MS 1600U
+#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 220U
+#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U
+#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 220U
+#define SLE_TEAM_WS2812_MEMBER_BLINK_PERIOD_MS 1000U
+#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 160U
+#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U
 #define SLE_TEAM_WS2812_FLASH_ON_MS 80U
 #define SLE_TEAM_WS2812_FLASH_OFF_MS 80U
 #define SLE_TEAM_WS2812_FLASH_PULSES 4U
@@ -359,25 +363,25 @@
 #define TEAM_CONN_TRACK_MAX 16U
 #define TEAM_PENDING_CONN_MAX SLE_TEAM_MAX_DIRECT_CONNECTIONS
 #define TEAM_ROUTE_ENTRY_MAX SLE_TEAM_MAX_MEMBERS
-#define SLE_TEAM_PAIRING_ROTATE_INTERVAL_S 6U
+#define SLE_TEAM_PAIRING_ROTATE_INTERVAL_S 2U
 #define SLE_TEAM_PAIRING_KEEP_CONNECTED 4U
 #define SLE_TEAM_RELAY_MGMT_RAM_BUDGET_BYTES 512U
 #define SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY 64U
 #define SLE_TEAM_RELAY_MGMT_HARD_MAX SLE_TEAM_MAX_DIRECT_CONNECTIONS
 #define SLE_TEAM_RELAY_DENSE_MIN 2U
-#define SLE_TEAM_PARENT_SWITCH_COOLDOWN_S 5U
+#define SLE_TEAM_PARENT_SWITCH_COOLDOWN_S 2U
 #define SLE_TEAM_PARENT_SWITCH_RSSI_HYST_DBM 8
 #define SLE_TEAM_PARENT_CANDIDATE_MIN_RSSI (-95)
-#define SLE_TEAM_RELAY_REBALANCE_INTERVAL_S 3U
+#define SLE_TEAM_RELAY_REBALANCE_INTERVAL_S 1U
 #define SLE_TEAM_RELAY_REVOKE_STALE_FACTOR 2U
 #define SLE_TEAM_RELAY_CANDIDATE_MIN_RSSI (-92)
 #define SLE_TEAM_RELAY_SWAP_RSSI_HYST_DBM 8
 #define SLE_TEAM_RELAY_SWAP_STABLE_S 30U
-#define SLE_TEAM_ROUTE_METRICS_INTERVAL_S 4U
-#define SLE_TEAM_ROUTE_STALE_FACTOR 3U
-#define SLE_TEAM_ROUTE_HINT_COOLDOWN_S 12U
-#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 30U
-#define SLE_TEAM_RELAY_CONFIG_RETRY_INTERVAL_S 2U
+#define SLE_TEAM_ROUTE_METRICS_INTERVAL_S 1U
+#define SLE_TEAM_ROUTE_STALE_FACTOR 2U
+#define SLE_TEAM_ROUTE_HINT_COOLDOWN_S 2U
+#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U
+#define SLE_TEAM_RELAY_CONFIG_RETRY_INTERVAL_S 1U
 #define SLE_TEAM_DIRECT_ENFORCE_INTERVAL_S 1U
 #define SLE_TEAM_RELAY_CHILD_RESCAN_INTERVAL_S 2U
 #define SLE_TEAM_PARENT_RESELECT_DISCONNECT_DELAY_S 1U
@@ -387,14 +391,14 @@
 #define SLE_TEAM_NV_CONFIG_VERSION 1U
 #define SLE_TEAM_NV_ALLOWED_MAGIC 0x534C414DU
 #define SLE_TEAM_NV_ALLOWED_VERSION 1U
-#define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 3U
+#define SLE_TEAM_MEMBER_RESCAN_INTERVAL_S 1U
 #define SLE_TEAM_WIFI_SECURITY_COMPAT_MIX ((wifi_security_enum)WIFI_SEC_TYPE_WPA2_WPA_PSK_MIX)
 #define SLE_TEAM_WIFI_PROTOCOL_COMPAT_AX WIFI_MODE_11B_G_N_AX
 #if (SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY == 0U)
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.129"
+#define SLE_TEAM_FW_VERSION "v4.4.134"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -519,11 +523,12 @@ typedef struct {
     uint8_t ws2812_b;
     uint8_t ws2812_state;
     uint32_t ws2812_state_last_ms;
+    uint8_t ws2812_base_state;
+    uint32_t ws2812_base_enter_ms;
     uint8_t ws2812_flash_state;
     uint8_t ws2812_flash_pulses_left;
     uint8_t ws2812_flash_on;
     uint32_t ws2812_flash_step_ms;
-    uint32_t ws2812_anim_last_ms;
     uint8_t buzzer_ready;
     uint8_t buzzer_pin;
     uint8_t buzzer_active_high;
@@ -702,10 +707,12 @@ static void team_ws2812_set_state(team_rgb_state_t state);
 static void team_ws2812_refresh_network_state(void);
 static void team_ws2812_show_display_event(team_display_event_t event);
 static void team_leader_relay_config_retry_tick(void);
+static void team_leader_pairing_restart_scan(const char *reason);
 static void team_leader_pairing_rotate_connections(void);
 static void team_leader_enforce_direct_capacity(uint8_t force_now);
 static void team_leader_auto_approve_pending(void);
 static void team_member_autoselect_parent(void);
+static void team_member_drop_relay_children(const char *reason);
 static uint8_t team_leader_direct_capacity(void);
 static uint8_t team_leader_relay_budget(void);
 static void team_leader_rebalance_relays(uint8_t force_now);
@@ -1513,11 +1520,12 @@ static void team_ws2812_force_off(void)
     g_team_rt.ws2812_b = 0U;
     g_team_rt.ws2812_state = (uint8_t)TEAM_RGB_STATE_OFF;
     g_team_rt.ws2812_state_last_ms = uapi_tcxo_get_ms();
+    g_team_rt.ws2812_base_state = (uint8_t)TEAM_RGB_STATE_OFF;
+    g_team_rt.ws2812_base_enter_ms = 0U;
     g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
     g_team_rt.ws2812_flash_pulses_left = 0U;
     g_team_rt.ws2812_flash_on = 0U;
     g_team_rt.ws2812_flash_step_ms = 0U;
-    g_team_rt.ws2812_anim_last_ms = 0U;
     (void)uapi_gpio_set_val(g_team_rt.ws2812_pin, GPIO_LEVEL_LOW);
     osal_printk("[diag] ws2812 force-off pin=%u clear_count=%u\r\n",
         g_team_rt.ws2812_pin, SLE_TEAM_WS2812_FORCE_CLEAR_COUNT);
@@ -1632,54 +1640,68 @@ static void team_rgb_state_color(team_rgb_state_t state, uint8_t *red, uint8_t *
     }
 }
 
-static uint8_t team_rgb_state_is_breathing(team_rgb_state_t state)
+static uint8_t team_rgb_state_is_blinking(team_rgb_state_t state)
 {
     return state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER ||
         state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR ? 1U : 0U;
 }
 
-static uint8_t team_ws2812_scale_component(uint8_t value, uint8_t scale)
+static uint32_t team_rgb_state_blink_on_ms(team_rgb_state_t state)
 {
-    uint16_t scaled = (uint16_t)value * (uint16_t)scale;
-
-    return (uint8_t)(scaled / SLE_TEAM_WS2812_BREATHE_MAX_SCALE);
+    switch (state) {
+        case TEAM_RGB_STATE_IDLE:
+            return SLE_TEAM_WS2812_IDLE_BLINK_ON_MS;
+        case TEAM_RGB_STATE_LEADER:
+            return SLE_TEAM_WS2812_LEADER_BLINK_ON_MS;
+        case TEAM_RGB_STATE_MEMBER:
+            return SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS;
+        case TEAM_RGB_STATE_ERROR:
+            return SLE_TEAM_WS2812_ERROR_BLINK_ON_MS;
+        case TEAM_RGB_STATE_BOOT:
+        case TEAM_RGB_STATE_SEEK:
+        case TEAM_RGB_STATE_TX:
+        case TEAM_RGB_STATE_RX:
+        case TEAM_RGB_STATE_WARN:
+        case TEAM_RGB_STATE_OFF:
+        default:
+            return 0U;
+    }
 }
 
-static uint8_t team_ws2812_breathe_scale(uint32_t now_ms)
+static uint32_t team_rgb_state_blink_period_ms(team_rgb_state_t state)
 {
-    uint32_t half_period = SLE_TEAM_WS2812_BREATHE_PERIOD_MS / 2U;
-    uint32_t phase;
-    uint32_t span = SLE_TEAM_WS2812_BREATHE_MAX_SCALE - SLE_TEAM_WS2812_BREATHE_MIN_SCALE;
-
-    if (half_period == 0U) {
-        return SLE_TEAM_WS2812_BREATHE_MAX_SCALE;
+    switch (state) {
+        case TEAM_RGB_STATE_IDLE:
+            return SLE_TEAM_WS2812_IDLE_BLINK_PERIOD_MS;
+        case TEAM_RGB_STATE_LEADER:
+            return SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS;
+        case TEAM_RGB_STATE_MEMBER:
+            return SLE_TEAM_WS2812_MEMBER_BLINK_PERIOD_MS;
+        case TEAM_RGB_STATE_ERROR:
+            return SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS;
+        case TEAM_RGB_STATE_BOOT:
+        case TEAM_RGB_STATE_SEEK:
+        case TEAM_RGB_STATE_TX:
+        case TEAM_RGB_STATE_RX:
+        case TEAM_RGB_STATE_WARN:
+        case TEAM_RGB_STATE_OFF:
+        default:
+            return 0U;
     }
-    phase = now_ms % SLE_TEAM_WS2812_BREATHE_PERIOD_MS;
-    if (phase > half_period) {
-        phase = SLE_TEAM_WS2812_BREATHE_PERIOD_MS - phase;
-    }
-    return (uint8_t)(SLE_TEAM_WS2812_BREATHE_MIN_SCALE + ((phase * span) / half_period));
 }
 
-static void team_rgb_state_color_scaled(team_rgb_state_t state, uint8_t scale,
-    uint8_t *red, uint8_t *green, uint8_t *blue)
+static uint8_t team_rgb_state_blink_is_on(team_rgb_state_t state, uint32_t elapsed_ms)
 {
-    uint8_t base_red = 0U;
-    uint8_t base_green = 0U;
-    uint8_t base_blue = 0U;
+    uint32_t period_ms = team_rgb_state_blink_period_ms(state);
+    uint32_t on_ms = team_rgb_state_blink_on_ms(state);
 
-    if (red == NULL || green == NULL || blue == NULL) {
-        return;
+    if (period_ms == 0U) {
+        return 1U;
     }
-    team_rgb_state_color(state, &base_red, &base_green, &base_blue);
-    if (scale < SLE_TEAM_WS2812_BREATHE_MAX_SCALE) {
-        base_red = team_ws2812_scale_component(base_red, scale);
-        base_green = team_ws2812_scale_component(base_green, scale);
-        base_blue = team_ws2812_scale_component(base_blue, scale);
+    if (on_ms >= period_ms) {
+        return 1U;
     }
-    *red = base_red;
-    *green = base_green;
-    *blue = base_blue;
+    return (elapsed_ms % period_ms) < on_ms ? 1U : 0U;
 }
 
 static void team_ws2812_apply_color(team_rgb_state_t state, uint8_t red, uint8_t green, uint8_t blue,
@@ -1732,21 +1754,24 @@ static void team_ws2812_render_base_state(uint32_t now_ms)
     uint8_t red = 0U;
     uint8_t green = 0U;
     uint8_t blue = 0U;
-    uint8_t scale = SLE_TEAM_WS2812_BREATHE_MAX_SCALE;
     uint8_t log_state;
 
-    if (team_rgb_state_is_breathing(state) != 0U) {
-        if (g_team_rt.ws2812_state == (uint8_t)state &&
-            g_team_rt.ws2812_anim_last_ms != 0U &&
-            (now_ms - g_team_rt.ws2812_anim_last_ms) < SLE_TEAM_WS2812_ANIM_STEP_MS) {
-            return;
-        }
-        scale = team_ws2812_breathe_scale(now_ms);
+    if (g_team_rt.ws2812_base_state != (uint8_t)state) {
+        g_team_rt.ws2812_base_state = (uint8_t)state;
+        g_team_rt.ws2812_base_enter_ms = now_ms;
     }
-    team_rgb_state_color_scaled(state, scale, &red, &green, &blue);
+    if (team_rgb_state_is_blinking(state) == 0U ||
+        team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms) != 0U) {
+        team_rgb_state_color(state, &red, &green, &blue);
+    }
     log_state = g_team_rt.ws2812_state == (uint8_t)state ? 0U : 1U;
     team_ws2812_apply_color(state, red, green, blue, log_state);
-    g_team_rt.ws2812_anim_last_ms = now_ms;
+}
+
+static void team_ws2812_restart_base_phase(uint32_t now_ms)
+{
+    g_team_rt.ws2812_base_state = (uint8_t)TEAM_RGB_STATE_OFF;
+    g_team_rt.ws2812_base_enter_ms = now_ms;
 }
 
 static void team_ws2812_start_flash(team_rgb_state_t state)
@@ -1781,6 +1806,7 @@ static uint8_t team_ws2812_refresh_flash(uint32_t now_ms)
         if (g_team_rt.ws2812_flash_pulses_left == 0U) {
             g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
             g_team_rt.ws2812_flash_on = 0U;
+            team_ws2812_restart_base_phase(now_ms);
             team_ws2812_render_base_state(now_ms);
             return 0U;
         }
@@ -1880,11 +1906,12 @@ static void team_ws2812_init(void)
         g_team_rt.ws2812_b = 0U;
         g_team_rt.ws2812_state = (uint8_t)TEAM_RGB_STATE_OFF;
         g_team_rt.ws2812_state_last_ms = 0U;
+        g_team_rt.ws2812_base_state = (uint8_t)TEAM_RGB_STATE_OFF;
+        g_team_rt.ws2812_base_enter_ms = 0U;
         g_team_rt.ws2812_flash_state = (uint8_t)TEAM_RGB_STATE_OFF;
         g_team_rt.ws2812_flash_pulses_left = 0U;
         g_team_rt.ws2812_flash_on = 0U;
         g_team_rt.ws2812_flash_step_ms = 0U;
-        g_team_rt.ws2812_anim_last_ms = 0U;
 #if CONFIG_SLE_TEAM_WS2812_ENABLE
         osal_printk("[diag] ws2812 init ready pin=%u; boot rgb-test follows\r\n",
             g_team_rt.ws2812_pin);
@@ -3719,6 +3746,13 @@ static void team_leader_failover_begin(uint8_t lost_relay_id, uint32_t now_s)
         lost_relay_id == SLE_TEAM_BROADCAST_ID) {
         return;
     }
+    if (g_team_rt.relay_failover_active != 0U &&
+        g_team_rt.relay_failover_lost_id == lost_relay_id &&
+        team_leader_failover_window_active(now_s) != 0U) {
+        osal_printk("[team] relay failover duplicate lost=%u grace=%u\r\n",
+            lost_relay_id, SLE_TEAM_RELAY_FAILOVER_GRACE_S);
+        return;
+    }
     (void)memset_s(g_team_rt.relay_failover_member_ids, sizeof(g_team_rt.relay_failover_member_ids), 0,
         sizeof(g_team_rt.relay_failover_member_ids));
     for (i = 0U; i < TEAM_ROUTE_ENTRY_MAX; i++) {
@@ -3731,7 +3765,6 @@ static void team_leader_failover_begin(uint8_t lost_relay_id, uint32_t now_s)
         }
         watched = (uint8_t)(watched + team_leader_failover_watch_member(route->member_id));
     }
-    watched = (uint8_t)(watched + team_leader_failover_watch_member(lost_relay_id));
     g_team_rt.relay_failover_active = watched != 0U ? 1U : 0U;
     g_team_rt.relay_failover_lost_id = watched != 0U ? lost_relay_id : 0U;
     g_team_rt.relay_failover_start_s = now_s;
@@ -3824,13 +3857,14 @@ static void team_route_clear_by_next_hop(uint8_t next_hop_id)
 
 static uint8_t team_leader_failover_should_preserve_route(uint8_t member_id, uint8_t next_hop_id)
 {
-    if (team_leader_failover_window_active(team_now_s(NULL)) == 0U) {
-        return 0U;
-    }
-    if (member_id == g_team_rt.relay_failover_lost_id || next_hop_id != g_team_rt.relay_failover_lost_id) {
-        return 0U;
-    }
-    return team_leader_failover_has_member(member_id);
+    unused(member_id);
+    unused(next_hop_id);
+    /*
+     * The watched-member list is enough to keep failover policy active. Keeping
+     * stale routes through the lost relay makes route_find() prefer a dead next
+     * hop and blocks the direct-cap migration that repairs the topology.
+     */
+    return 0U;
 }
 
 static uint8_t team_route_member_by_conn(uint16_t conn_id, team_conn_dir_t dir, uint8_t *member_id)
@@ -3970,6 +4004,29 @@ static uint8_t team_leader_online_relay_count(void)
     return count;
 }
 
+static uint8_t team_leader_member_has_downstream_children(uint8_t member_id)
+{
+    uint8_t i;
+
+    if (member_id == 0U || member_id == SLE_TEAM_BROADCAST_ID ||
+        member_id == g_team_node.cfg.self_id || member_id == g_team_node.cfg.leader_id) {
+        return 0U;
+    }
+    for (i = 0U; i < TEAM_ROUTE_ENTRY_MAX; i++) {
+        const team_route_entry_t *route = &g_team_routes[i];
+
+        if (route->active == 0U || route->dir != TEAM_CONN_DIR_DOWNSTREAM ||
+            route->member_id == 0U || route->member_id == SLE_TEAM_BROADCAST_ID ||
+            route->member_id == member_id || route->next_hop_id != member_id) {
+            continue;
+        }
+        if (team_route_conn_is_active(route->dir, route->conn_id) != 0U) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
 static uint8_t team_leader_member_should_stay_direct(const sle_team_member_record_t *member)
 {
     uint8_t i;
@@ -3983,6 +4040,9 @@ static uint8_t team_leader_member_should_stay_direct(const sle_team_member_recor
         return 0U;
     }
     if (member->relay_allowed != 0U) {
+        return 1U;
+    }
+    if (team_leader_member_has_downstream_children(member->member_id) != 0U) {
         return 1U;
     }
 
@@ -4221,11 +4281,6 @@ static void team_leader_enforce_direct_capacity(uint8_t force_now)
         return;
     }
     g_team_rt.direct_enforce_last_s = now_s;
-    if (team_leader_failover_window_active(now_s) != 0U) {
-        osal_printk("[team] direct cap defer reason=failover lost=%u\r\n",
-            g_team_rt.relay_failover_lost_id);
-        return;
-    }
 
     conn_count = sle_uart_client_get_active_conns(conn_ids, (uint8_t)SLE_TEAM_MAX_DIRECT_CONNECTIONS);
     if (conn_count <= team_leader_direct_capacity()) {
@@ -5217,6 +5272,20 @@ static void team_leader_rescan_if_needed(const char *reason)
     sle_uart_client_force_rescan();
 }
 
+static void team_leader_pairing_restart_scan(const char *reason)
+{
+    if (g_team_rt.role_configured == 0U || g_team_rt.sle_started == 0U ||
+        g_team_node.cfg.role != SLE_TEAM_ROLE_LEADER || g_team_node.cfg.pairing_enabled == 0U) {
+        return;
+    }
+    (void)memset_s(g_team_pending_conns, sizeof(g_team_pending_conns), 0, sizeof(g_team_pending_conns));
+    g_team_rt.member_rescan_last_s = 0U;
+    g_team_rt.pairing_rotate_last_s = 0U;
+    g_team_rt.pairing_rotate_index = 0U;
+    osal_printk("[team] pairing restart scan reason=%s\r\n", reason != NULL ? reason : "unknown");
+    sle_uart_client_force_rescan();
+}
+
 static uint8_t team_leader_has_offline_members(void)
 {
     uint8_t i;
@@ -5521,6 +5590,9 @@ static sle_team_member_record_t *team_leader_pick_worst_active_relay(uint32_t no
         }
         if (team_elapsed_exceeds(now_s, member->last_seen_s,
                 (uint32_t)timeout_s * SLE_TEAM_RELAY_REVOKE_STALE_FACTOR) != 0U) {
+            continue;
+        }
+        if (team_leader_member_has_downstream_children(member->member_id) != 0U) {
             continue;
         }
         /* Unknown RSSI must be treated as weakest so known links are demoted first. */
@@ -5905,6 +5977,9 @@ static uint8_t team_member_current_next_hop_id(void)
 static void team_cli_print(void *user_ctx, const char *text)
 {
     unused(user_ctx);
+    if (strncmp(text, "pairing start ret=0", 19) == 0) {
+        team_leader_pairing_restart_scan("cli");
+    }
     if (strncmp(text, "allow all ret=0", 15) == 0 ||
         strncmp(text, "allow only", 10) == 0 ||
         strncmp(text, "allow add", 9) == 0 ||
@@ -7437,8 +7512,9 @@ static void team_http_handle_client(int fd)
         }
         if (strstr(path, "action=start") != NULL) {
             ret = sle_team_node_pairing_start(&g_team_node);
-            g_team_rt.pairing_rotate_last_s = 0U;
-            g_team_rt.pairing_rotate_index = 0U;
+            if (ret == SLE_TEAM_OK) {
+                team_leader_pairing_restart_scan("http");
+            }
             osal_printk("[team-wifi] pairing start ret=%d\r\n", ret);
             team_http_send_redirect(fd, "/pairing");
         } else if (strstr(path, "action=stop") != NULL) {
@@ -8068,14 +8144,26 @@ static void team_bind_packet_source(uint16_t conn_id, const uint8_t *buf, uint16
         }
     }
     if (g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER) {
-        sle_uart_client_bind_member_conn(physical_peer_id, conn_id);
-        team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_DOWNSTREAM, next_hop_id);
+        if (sle_uart_client_bind_member_conn(physical_peer_id, conn_id) != 0U) {
+            team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_DOWNSTREAM, next_hop_id);
+        } else {
+            osal_printk("[team] route note skip member=%u conn=%u dir=%u reason=bind-failed\r\n",
+                app_packet.src_id, conn_id, (uint8_t)TEAM_CONN_DIR_DOWNSTREAM);
+        }
     } else if (dir == TEAM_LINK_DOWNSTREAM) {
-        sle_uart_client_bind_member_conn(app_packet.src_id, conn_id);
-        team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_DOWNSTREAM, next_hop_id);
+        if (sle_uart_client_bind_member_conn(app_packet.src_id, conn_id) != 0U) {
+            team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_DOWNSTREAM, next_hop_id);
+        } else {
+            osal_printk("[team] route note skip member=%u conn=%u dir=%u reason=bind-failed\r\n",
+                app_packet.src_id, conn_id, (uint8_t)TEAM_CONN_DIR_DOWNSTREAM);
+        }
     } else {
-        sle_uart_server_bind_member_conn(physical_peer_id, conn_id);
-        team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_UPSTREAM, next_hop_id);
+        if (sle_uart_server_bind_member_conn(physical_peer_id, conn_id) != 0U) {
+            team_route_note(app_packet.src_id, conn_id, TEAM_CONN_DIR_UPSTREAM, next_hop_id);
+        } else {
+            osal_printk("[team] route note skip member=%u conn=%u dir=%u reason=bind-failed\r\n",
+                app_packet.src_id, conn_id, (uint8_t)TEAM_CONN_DIR_UPSTREAM);
+        }
     }
 }
 
@@ -8144,10 +8232,42 @@ static void team_server_read_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_r
     unused(status);
 }
 
+static void team_member_drop_relay_children(const char *reason)
+{
+    uint16_t conn_ids[SLE_TEAM_MAX_DIRECT_CONNECTIONS];
+    uint8_t conn_count;
+    uint8_t i;
+    uint8_t dropped = 0U;
+
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || g_team_rt.relay_client_started == 0U) {
+        return;
+    }
+    conn_count = sle_uart_client_get_active_conns(conn_ids, (uint8_t)SLE_TEAM_MAX_DIRECT_CONNECTIONS);
+    for (i = 0U; i < conn_count; i++) {
+        uint8_t member_id = 0U;
+        uint8_t ret;
+
+        (void)sle_uart_client_get_conn_member(conn_ids[i], &member_id);
+        ret = sle_uart_client_disconnect_conn(conn_ids[i]);
+        team_route_clear_by_conn(conn_ids[i]);
+        team_conn_track_clear(conn_ids[i]);
+        if (ret != 0U) {
+            dropped++;
+        }
+        osal_printk("[team] relay demote drop child conn=%u member=%u reason=%s ret=%u\r\n",
+            conn_ids[i], member_id, reason != NULL ? reason : "unknown", ret);
+    }
+    if (dropped != 0U) {
+        g_team_rt.relay_child_rescan_last_s = 0U;
+    }
+}
+
 static void team_server_write_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_write_cb_t *write_cb_para,
     errcode_t status)
 {
     int ret;
+    uint8_t relay_allowed_before;
+    uint8_t relay_enabled_before;
 
     unused(server_id);
     unused(conn_id);
@@ -8157,7 +8277,14 @@ static void team_server_write_cb(uint8_t server_id, uint16_t conn_id, ssaps_req_
     team_bind_packet_source(conn_id, write_cb_para->value, write_cb_para->length, TEAM_LINK_UPSTREAM);
     team_web_record_packet(SLE_TEAM_WEB_EVENT_RX, write_cb_para->value, write_cb_para->length,
         g_team_node.cfg.role == SLE_TEAM_ROLE_LEADER ? "leader rx" : "member rx");
+    relay_allowed_before = g_team_node.cfg.relay_allowed;
+    relay_enabled_before = g_team_node.cfg.relay_enabled;
     ret = sle_team_node_on_packet(&g_team_node, write_cb_para->value, write_cb_para->length);
+    if (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER &&
+        (relay_allowed_before != 0U || relay_enabled_before != 0U) &&
+        g_team_node.cfg.relay_allowed == 0U) {
+        team_member_drop_relay_children("config-demote");
+    }
     osal_printk("[team] node packet role=%u len=%u ret=%d\r\n", g_team_node.cfg.role,
         write_cb_para->length, ret);
 }

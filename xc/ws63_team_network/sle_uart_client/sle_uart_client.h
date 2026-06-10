@@ -37,7 +37,7 @@ uint16_t sle_uart_client_connected_count(void);
 void sle_uart_client_force_rescan(void);
 errcode_t sle_uart_client_send_by_conn(uint16_t conn_id, const uint8_t *data, uint16_t len);
 errcode_t sle_uart_client_send_all(const uint8_t *data, uint16_t len);
-void sle_uart_client_bind_member_conn(uint8_t member_id, uint16_t conn_id);
+uint8_t sle_uart_client_bind_member_conn(uint8_t member_id, uint16_t conn_id);
 uint8_t sle_uart_client_find_conn_by_member(uint8_t member_id, uint16_t *conn_id);
 void sle_uart_client_tick(void);
 
