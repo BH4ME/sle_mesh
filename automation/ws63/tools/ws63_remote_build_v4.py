@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.137"
+VERSION = "v4.4.138"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -209,7 +209,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.137 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status blink states, ADC battery sampling, and TP4054 CHRG IO2")
+print("configured v4.4.138 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status blink states, ADC battery sampling, and TP4054 CHRG IO2")
 '''
 
 
@@ -286,7 +286,7 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.137",
+    b"v4.4.138",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -444,6 +444,7 @@ for source_name, source_text, item in [
     ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
      "st7789 pins primed"),
     ("ws63_ws2812.c", ws2812_source, "rdcycle %0"),
+    ("ws63_ws2812.c", ws2812_source, "#define WS63_WS2812_RESET_US 320U"),
     ("ws63_ws2812.c", ws2812_source, "WS63_WS2812_SLOT_CYCLES"),
     ("ws63_ws2812.c", ws2812_source, "ws63_ws2812_wait_until_cycle"),
 ]:

@@ -90,7 +90,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         )
         ws2812_source = (self.REPO_ROOT / "xc/ws63_team_network/src/ws63_ws2812.c").read_text(encoding="utf-8")
 
-        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.137"', app_source)
+        self.assertIn('#define SLE_TEAM_FW_VERSION "v4.4.138"', app_source)
         self.assertIn('#define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"', app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_ENABLE 1", app_source)
         self.assertIn("#define CONFIG_SLE_TEAM_WS2812_PIN 0", app_source)
@@ -192,6 +192,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("#define SLE_TEAM_WS2812_FLASH_PULSES 4U", app_source)
         self.assertIn("timing=cycle-counter", app_source)
         self.assertIn("team_ws2812_test_pattern();", app_source)
+        self.assertIn("#define WS63_WS2812_RESET_US 320U", ws2812_source)
         self.assertIn("rdcycle %0", ws2812_source)
         self.assertIn("WS63_WS2812_SLOT_CYCLES", ws2812_source)
         self.assertIn("ws63_ws2812_wait_until_cycle", ws2812_source)
@@ -396,7 +397,7 @@ class FourBoardRelayUnitTest(unittest.TestCase):
         self.assertIn("shutil.copy2(archive_output, local_output)", remote_build)
         for script in (local_wsl, ubuntu):
             self.assertIn("next_archive_path()", script)
-            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.137")"', script)
+            self.assertIn('ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.138")"', script)
             self.assertIn('cp "$ARCHIVE_OUT" "$LOCAL_OUT"', script)
 
     def test_firmware_keeps_active_relay_parents_direct(self):

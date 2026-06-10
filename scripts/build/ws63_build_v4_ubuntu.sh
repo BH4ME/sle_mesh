@@ -69,7 +69,7 @@ REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fw
 REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
 REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.137")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.138")"
 LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
 ssh_opts=(
@@ -89,7 +89,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.137 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
+echo "profile:    v4.4.138 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -245,7 +245,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.137 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0 blink states, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.138 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0 blink states, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -323,7 +323,7 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.137",
+    b"v4.4.138",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
@@ -419,6 +419,7 @@ for source_name, source_text, item in [
     ("ws63_st7789_display.c", app_source_path.with_name("ws63_st7789_display.c").read_text(errors="replace"),
      "st7789 pins primed"),
     ("ws63_ws2812.c", ws2812_source, "rdcycle %0"),
+    ("ws63_ws2812.c", ws2812_source, "#define WS63_WS2812_RESET_US 320U"),
     ("ws63_ws2812.c", ws2812_source, "WS63_WS2812_SLOT_CYCLES"),
 ]:
     if item not in source_text:
