@@ -69,7 +69,7 @@ REMOTE_PKG="$UBUNTU_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fw
 REMOTE_PROTO="$UBUNTU_SDK/third_party/sle_mesh"
 REMOTE_APP="$UBUNTU_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.134")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.137")"
 LVGL_PATCH="$REMOTE_APP/third_party/lvgl-patches/lv8.3.11-ws63-c89-rect.patch"
 
 ssh_opts=(
@@ -89,7 +89,7 @@ fi
 ssh_cmd=("${ssh_base[@]}" -p "$UBUNTU_PORT" "$UBUNTU_USER@$UBUNTU_HOST")
 
 echo "WS63 Ubuntu build"
-echo "profile:    v4.4.134 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
+echo "profile:    v4.4.137 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
 echo "fallback id:$self_id"
 echo "host:       $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_PORT"
 echo "sdk:        $UBUNTU_SDK"
@@ -245,7 +245,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.134 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0 blink states, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
+print("configured v4.4.137 schematic pinmap: team-network sample selected, official SLE UART samples disabled, AT UART on UART3, ws2812 IO0 blink states, buzzer IO14 muted, gps UART1(IO17/18) mapped, adc IO5/IO12 channel5 battery sampling mapped, TP4054 CHRG IO2 active-low mapped, display IO7/9/8(cs-low)/13/10, central+peripheral enabled, LVGL event panel requested, HTTP WebUI auto-start enabled")
 PY
 
 "${ssh_cmd[@]}" "cd '$UBUNTU_SDK' && python3 build.py -c ws63-liteos-app -j'$BUILD_JOBS'"
@@ -323,12 +323,13 @@ for item in required_map:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 required_bytes = [
-    b"v4.4.134",
+    b"v4.4.137",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
     b"runtimeDirectCap",
     b"runtimeRelayBudget",
+    b"member upstream recover",
     b"plan=%u",
     b"[display] st7789 ready",
     b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
@@ -367,6 +368,7 @@ required_bytes = [
     b"seek disabled for force rescan",
     b"pairing restart scan reason=%s",
     b"relay demote drop child conn=%u",
+    b"member-leave",
     b"TeamDisplayTask",
     b"relay rebalance demand",
     b"relay swap observe",
@@ -384,17 +386,30 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
     ("ws63_team_network_app.c", app_source, "team_leader_pairing_restart_scan"),
     ("ws63_team_network_app.c", app_source, "team_member_drop_relay_children"),
+    ("ws63_team_network_app.c", app_source, 'team_member_drop_relay_children("member-leave");'),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_MEMBER_UPSTREAM_RECOVER_INTERVAL_S 2U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_MEMBER_UPSTREAM_STUCK_S 8U"),
+    ("ws63_team_network_app.c", app_source, "team_member_upstream_recover_after_tx_fail"),
+    ("ws63_team_network_app.c", app_source, 'team_member_upstream_recover_after_tx_fail("not-ready"'),
+    ("ws63_team_network_app.c", app_source, 'team_member_upstream_recover_after_tx_fail("write-fail"'),
+    ("ws63_team_network_app.c", app_source, "team_member_upstream_recover_tick();"),
+    ("ws63_team_network_app.c", app_source, "sle_uart_server_adv_restart();"),
+    ("ws63_team_network_app.c", app_source, "sle_uart_server_disconnect_current();"),
     ("ws63_team_network_app.c", app_source, "stale routes through the lost relay"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 220U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_FLASH_ON_MS 140U"),
     ("ws63_team_network_app.c", app_source, "team_rgb_state_is_blinking"),
     ("ws63_team_network_app.c", app_source, "ws2812_base_enter_ms = now_ms"),
     ("ws63_team_network_app.c", app_source, "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)"),
     ("ws63_team_network_app.c", app_source, "static void team_ws2812_restart_base_phase"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_restart_base_phase(now_ms);"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 64U"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
     ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),

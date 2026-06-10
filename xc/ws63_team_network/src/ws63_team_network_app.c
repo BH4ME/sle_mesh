@@ -292,46 +292,46 @@
 #define SLE_TEAM_LED_SEEK_INTERVAL_MS 1000U
 #define SLE_TEAM_WS2812_FORCE_CLEAR_COUNT 8U
 #define SLE_TEAM_WS2812_FORCE_CLEAR_DELAY_MS 10U
-#define SLE_TEAM_WS2812_TEST_R 32U
-#define SLE_TEAM_WS2812_TEST_G 32U
-#define SLE_TEAM_WS2812_TEST_B 32U
+#define SLE_TEAM_WS2812_TEST_R 64U
+#define SLE_TEAM_WS2812_TEST_G 64U
+#define SLE_TEAM_WS2812_TEST_B 64U
 #define SLE_TEAM_WS2812_TEST_STEP_MS 120U
 #define SLE_TEAM_WS2812_BOOT_R 0U
-#define SLE_TEAM_WS2812_BOOT_G 3U
-#define SLE_TEAM_WS2812_BOOT_B 8U
-#define SLE_TEAM_WS2812_IDLE_R 8U
-#define SLE_TEAM_WS2812_IDLE_G 8U
-#define SLE_TEAM_WS2812_IDLE_B 8U
+#define SLE_TEAM_WS2812_BOOT_G 6U
+#define SLE_TEAM_WS2812_BOOT_B 16U
+#define SLE_TEAM_WS2812_IDLE_R 16U
+#define SLE_TEAM_WS2812_IDLE_G 16U
+#define SLE_TEAM_WS2812_IDLE_B 16U
 #define SLE_TEAM_WS2812_LEADER_R 0U
-#define SLE_TEAM_WS2812_LEADER_G 8U
+#define SLE_TEAM_WS2812_LEADER_G 16U
 #define SLE_TEAM_WS2812_LEADER_B 0U
 #define SLE_TEAM_WS2812_MEMBER_R 0U
 #define SLE_TEAM_WS2812_MEMBER_G 0U
-#define SLE_TEAM_WS2812_MEMBER_B 8U
-#define SLE_TEAM_WS2812_SEEK_R 8U
-#define SLE_TEAM_WS2812_SEEK_G 6U
+#define SLE_TEAM_WS2812_MEMBER_B 16U
+#define SLE_TEAM_WS2812_SEEK_R 16U
+#define SLE_TEAM_WS2812_SEEK_G 12U
 #define SLE_TEAM_WS2812_SEEK_B 0U
-#define SLE_TEAM_WS2812_TX_R 8U
+#define SLE_TEAM_WS2812_TX_R 16U
 #define SLE_TEAM_WS2812_TX_G 0U
-#define SLE_TEAM_WS2812_TX_B 6U
+#define SLE_TEAM_WS2812_TX_B 12U
 #define SLE_TEAM_WS2812_RX_R 0U
 #define SLE_TEAM_WS2812_RX_G 0U
-#define SLE_TEAM_WS2812_RX_B 8U
-#define SLE_TEAM_WS2812_WARN_R 8U
-#define SLE_TEAM_WS2812_WARN_G 3U
+#define SLE_TEAM_WS2812_RX_B 16U
+#define SLE_TEAM_WS2812_WARN_R 16U
+#define SLE_TEAM_WS2812_WARN_G 6U
 #define SLE_TEAM_WS2812_WARN_B 0U
-#define SLE_TEAM_WS2812_ERROR_R 8U
+#define SLE_TEAM_WS2812_ERROR_R 16U
 #define SLE_TEAM_WS2812_ERROR_G 0U
 #define SLE_TEAM_WS2812_ERROR_B 0U
-#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U
+#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 500U
 #define SLE_TEAM_WS2812_IDLE_BLINK_PERIOD_MS 1600U
-#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 220U
+#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 500U
 #define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U
-#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 220U
+#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 500U
 #define SLE_TEAM_WS2812_MEMBER_BLINK_PERIOD_MS 1000U
-#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 160U
+#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 220U
 #define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U
-#define SLE_TEAM_WS2812_FLASH_ON_MS 80U
+#define SLE_TEAM_WS2812_FLASH_ON_MS 140U
 #define SLE_TEAM_WS2812_FLASH_OFF_MS 80U
 #define SLE_TEAM_WS2812_FLASH_PULSES 4U
 #define SLE_TEAM_BUZZER_FORCE_OFF_LEVEL GPIO_LEVEL_LOW
@@ -385,6 +385,8 @@
 #define SLE_TEAM_DIRECT_ENFORCE_INTERVAL_S 1U
 #define SLE_TEAM_RELAY_CHILD_RESCAN_INTERVAL_S 2U
 #define SLE_TEAM_PARENT_RESELECT_DISCONNECT_DELAY_S 1U
+#define SLE_TEAM_MEMBER_UPSTREAM_RECOVER_INTERVAL_S 2U
+#define SLE_TEAM_MEMBER_UPSTREAM_STUCK_S 8U
 #define SLE_TEAM_NV_KEY_WEB_CONFIG 0x5001
 #define SLE_TEAM_NV_KEY_ALLOWED_MEMBERS 0x5002
 #define SLE_TEAM_NV_CONFIG_MAGIC 0x534C4554U
@@ -398,7 +400,7 @@
 #error "SLE_TEAM_RELAY_MGMT_EST_BYTES_PER_RELAY must be non-zero"
 #endif
 
-#define SLE_TEAM_FW_VERSION "v4.4.134"
+#define SLE_TEAM_FW_VERSION "v4.4.137"
 #define SLE_TEAM_HW_CONSTRAINTS "v3.2 schematic pinmap, muted buzzer"
 #define SLE_TEAM_DISPLAY_STATUS_MIN_INTERVAL_MS 500U
 #define SLE_TEAM_ADC_DIVIDER_TOP_KOHM 390U
@@ -624,6 +626,9 @@ typedef struct {
     uint32_t relay_failover_start_s;
     uint32_t relay_config_retry_last_s;
     uint32_t parent_reselect_disconnect_last_s;
+    uint32_t member_upstream_recover_last_s;
+    uint32_t member_upstream_not_ready_since_s;
+    uint16_t member_upstream_not_ready_count;
     uint8_t relay_failover_member_ids[SLE_TEAM_MAX_MEMBERS];
     uint8_t relay_config_pending_member_ids[SLE_TEAM_MAX_MEMBERS];
     uint16_t direct_prune_conn_ids[SLE_TEAM_MAX_DIRECT_CONNECTIONS];
@@ -711,6 +716,7 @@ static void team_leader_pairing_restart_scan(const char *reason);
 static void team_leader_pairing_rotate_connections(void);
 static void team_leader_enforce_direct_capacity(uint8_t force_now);
 static void team_leader_auto_approve_pending(void);
+static void team_member_upstream_recover_tick(void);
 static void team_member_autoselect_parent(void);
 static void team_member_drop_relay_children(const char *reason);
 static uint8_t team_leader_direct_capacity(void);
@@ -2442,9 +2448,9 @@ static int team_ws2812_cli_handle(const char *line)
     }
     if (strcmp(line, "rgb red") == 0 || strcmp(line, "rgb green") == 0 ||
         strcmp(line, "rgb blue") == 0 || strcmp(line, "rgb white") == 0) {
-        team_ws2812_cli_set_rgb(line[4] == 'r' ? 8U : (line[4] == 'w' ? 5U : 0U),
-            line[4] == 'g' ? 8U : (line[4] == 'w' ? 5U : 0U),
-            line[4] == 'b' ? 8U : (line[4] == 'w' ? 5U : 0U), line + 4);
+        team_ws2812_cli_set_rgb(line[4] == 'r' ? 16U : (line[4] == 'w' ? 10U : 0U),
+            line[4] == 'g' ? 16U : (line[4] == 'w' ? 10U : 0U),
+            line[4] == 'b' ? 16U : (line[4] == 'w' ? 10U : 0U), line + 4);
         return 1;
     }
     if (strcmp(line, "rgb test") == 0) {
@@ -5021,6 +5027,95 @@ static void team_upstream_parent_reset(const char *reason)
         g_team_node.upstream_parent_id, reason != NULL ? reason : "unknown");
 }
 
+static void team_member_upstream_recover_clear(const char *reason)
+{
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER) {
+        return;
+    }
+    if (g_team_rt.member_upstream_not_ready_since_s == 0U &&
+        g_team_rt.member_upstream_not_ready_count == 0U) {
+        return;
+    }
+    osal_printk("[team] member upstream ready reason=%s fails=%u\r\n",
+        reason != NULL ? reason : "ready", g_team_rt.member_upstream_not_ready_count);
+    g_team_rt.member_upstream_recover_last_s = 0U;
+    g_team_rt.member_upstream_not_ready_since_s = 0U;
+    g_team_rt.member_upstream_not_ready_count = 0U;
+}
+
+static void team_member_upstream_prepare_retry(const char *reason)
+{
+    if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || g_team_node.state == SLE_TEAM_NET_IDLE) {
+        return;
+    }
+    if (g_team_node.joined == 0U) {
+        g_team_node.state = SLE_TEAM_NET_DISCOVERING;
+        g_team_node.last_hello_s = 0U;
+    }
+    if (g_team_node.upstream_parent_id != 0U &&
+        g_team_node.upstream_parent_id != SLE_TEAM_BROADCAST_ID) {
+        team_upstream_parent_reset(reason);
+    } else {
+        g_team_node.upstream_parent_state = SLE_TEAM_PARENT_DISCOVERING;
+        g_team_node.upstream_parent_reselect_pending = 0U;
+        g_team_rt.parent_selected_rssi = SLE_TEAM_RSSI_UNKNOWN;
+        g_team_rt.parent_switch_last_s = 0U;
+    }
+}
+
+static void team_member_upstream_recover_after_tx_fail(const char *reason, uint8_t dst_id, int ret)
+{
+    uint32_t now_s;
+    uint32_t fail_age_s;
+    errcode_t disconnect_ret = ERRCODE_SUCC;
+    errcode_t adv_ret;
+    uint8_t stuck;
+
+    if (g_team_rt.role_configured == 0U || g_team_rt.sle_started == 0U ||
+        g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER) {
+        return;
+    }
+    now_s = team_now_s(NULL);
+    if (g_team_rt.member_upstream_not_ready_since_s == 0U) {
+        g_team_rt.member_upstream_not_ready_since_s = now_s;
+    }
+    if (g_team_rt.member_upstream_not_ready_count < 0xFFFFU) {
+        g_team_rt.member_upstream_not_ready_count++;
+    }
+    if (team_interval_not_reached(now_s, g_team_rt.member_upstream_recover_last_s,
+            SLE_TEAM_MEMBER_UPSTREAM_RECOVER_INTERVAL_S) != 0U) {
+        return;
+    }
+    g_team_rt.member_upstream_recover_last_s = now_s;
+    fail_age_s = team_elapsed_s(now_s, g_team_rt.member_upstream_not_ready_since_s);
+    stuck = (uint8_t)(fail_age_s >= SLE_TEAM_MEMBER_UPSTREAM_STUCK_S);
+    if (stuck != 0U) {
+        team_member_upstream_prepare_retry("transport-stuck");
+        disconnect_ret = sle_uart_server_disconnect_current();
+    }
+    adv_ret = sle_uart_server_adv_restart();
+    osal_printk("[team] member upstream recover reason=%s dst=%u ret=%d fails=%u age=%u stuck=%u disc=0x%x adv=0x%x joined=%u parent=%u state=%u\r\n",
+        reason != NULL ? reason : "tx-fail", dst_id, ret, g_team_rt.member_upstream_not_ready_count,
+        fail_age_s, stuck, disconnect_ret, adv_ret, g_team_node.joined, g_team_node.upstream_parent_id,
+        (uint8_t)g_team_node.upstream_parent_state);
+}
+
+static void team_member_upstream_recover_tick(void)
+{
+    if (g_team_rt.role_configured == 0U || g_team_rt.sle_started == 0U ||
+        g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER ||
+        g_team_node.cfg.leader_id == 0U || g_team_node.cfg.leader_id == SLE_TEAM_BROADCAST_ID ||
+        g_team_node.state == SLE_TEAM_NET_IDLE) {
+        return;
+    }
+    if (sle_uart_server_connected_count() != 0U) {
+        team_member_upstream_recover_clear("conn");
+        return;
+    }
+    team_member_upstream_recover_after_tx_fail("no-upstream", g_team_node.cfg.leader_id,
+        SLE_TEAM_ERR_UNSUPPORTED);
+}
+
 static void team_member_parent_reselect_disconnect_tick(void)
 {
     uint16_t conn_id = 0U;
@@ -6023,6 +6118,7 @@ static void team_joined(void *user_ctx, uint8_t member_id)
     if (g_team_node.cfg.role != SLE_TEAM_ROLE_MEMBER || member_id != g_team_node.cfg.self_id) {
         return;
     }
+    team_member_upstream_recover_clear("joined");
     next_hop_id = team_member_current_next_hop_id();
     if (next_hop_id == 0U) {
         return;
@@ -6069,6 +6165,10 @@ static void team_alert(void *user_ctx, uint8_t member_id, uint8_t reason)
 
 static void team_member_reset_after_leave(void)
 {
+    team_member_drop_relay_children("member-leave");
+    g_team_rt.member_upstream_recover_last_s = 0U;
+    g_team_rt.member_upstream_not_ready_since_s = 0U;
+    g_team_rt.member_upstream_not_ready_count = 0U;
     (void)team_nv_config_clear();
     g_team_rt.role_configured = 0U;
     g_team_rt.role_request_pending = 0U;
@@ -7946,6 +8046,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         if (sle_uart_server_connected_count() == 0U) {
             osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NOT_READY\r\n",
                 dst_id, SLE_TEAM_ERR_UNSUPPORTED);
+            team_member_upstream_recover_after_tx_fail("not-ready", dst_id, SLE_TEAM_ERR_UNSUPPORTED);
             return SLE_TEAM_ERR_UNSUPPORTED;
         }
         if (dst_id != SLE_TEAM_BROADCAST_ID && dst_id != g_team_node.cfg.leader_id) {
@@ -7971,8 +8072,10 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
         }
         if (send_ret != ERRCODE_SLE_SUCCESS) {
             osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n", dst_id, SLE_TEAM_ERR_FORMAT);
+            team_member_upstream_recover_after_tx_fail("write-fail", dst_id, SLE_TEAM_ERR_FORMAT);
             return SLE_TEAM_ERR_FORMAT;
         }
+        team_member_upstream_recover_clear("tx");
         team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "member tx");
         return SLE_TEAM_OK;
     }
@@ -8038,6 +8141,7 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
     if (sle_uart_server_connected_count() == 0U) {
         osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=NOT_READY\r\n",
             dst_id, SLE_TEAM_ERR_UNSUPPORTED);
+        team_member_upstream_recover_after_tx_fail("not-ready", dst_id, SLE_TEAM_ERR_UNSUPPORTED);
         return SLE_TEAM_ERR_UNSUPPORTED;
     }
     if (dst_id != SLE_TEAM_BROADCAST_ID && dst_id != g_team_node.cfg.leader_id) {
@@ -8066,8 +8170,10 @@ static int team_sle_send(void *user_ctx, sle_team_send_kind_t kind, uint8_t dst_
     }
     if (send_ret != ERRCODE_SLE_SUCCESS) {
         osal_printk("[sle-tx-fail] type=PACKET dst=%u ret=%d reason=WRITE_FAIL\r\n", dst_id, SLE_TEAM_ERR_FORMAT);
+        team_member_upstream_recover_after_tx_fail("write-fail", dst_id, SLE_TEAM_ERR_FORMAT);
         return SLE_TEAM_ERR_FORMAT;
     }
+    team_member_upstream_recover_clear("tx");
     team_web_record_packet(SLE_TEAM_WEB_EVENT_TX, buf, len, "relay up tx");
     return SLE_TEAM_OK;
 }
@@ -8213,6 +8319,9 @@ static void team_node_init(sle_team_node_role_t role, uint8_t leader_id)
     (void)sle_team_node_init(&g_team_node, &cfg, &ops);
     sle_uart_server_adv_set_route_id(g_team_node.cfg.self_id);
     g_team_rt.relay_client_started = 0U;
+    g_team_rt.member_upstream_recover_last_s = 0U;
+    g_team_rt.member_upstream_not_ready_since_s = 0U;
+    g_team_rt.member_upstream_not_ready_count = 0U;
     (void)memset_s(g_team_conn_tracks, sizeof(g_team_conn_tracks), 0, sizeof(g_team_conn_tracks));
     (void)memset_s(g_team_pending_conns, sizeof(g_team_pending_conns), 0, sizeof(g_team_pending_conns));
     (void)memset_s(g_team_routes, sizeof(g_team_routes), 0, sizeof(g_team_routes));
@@ -8676,6 +8785,7 @@ static void team_network_tick_role_configured(void)
 
     team_relay_start_client_if_ready();
     team_member_parent_reselect_disconnect_tick();
+    team_member_upstream_recover_tick();
     if (g_team_node.cfg.role == SLE_TEAM_ROLE_MEMBER && team_member_relay_can_accept_child() != 0U &&
         g_team_rt.relay_client_started != 0U) {
         uint32_t now_s = team_now_s(NULL);

@@ -88,7 +88,7 @@ test("firmware exposes unified config over HTTP and serial", () => {
 });
 
 test("current firmware makes ST7789 member events readable and panel-styled", () => {
-  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.131"/);
+  assert.match(firmwareSource, /#define SLE_TEAM_FW_VERSION "v4\.4\.137"/);
   assert.match(firmwareSource, /#define SLE_TEAM_HW_CONSTRAINTS "v3\.2 schematic pinmap, muted buzzer"/);
   assert.match(displaySource, /SLE\/\/BOOT/);
   assert.match(displaySource, /LINK-MESH/);
@@ -115,14 +115,14 @@ test("current firmware makes ST7789 member events readable and panel-styled", ()
   assert.match(firmwareSource, /team_display_event_name/);
   assert.match(firmwareSource, /\[display-event\] event=%s label=%s member=%u/);
   assert.match(firmwareSource, /team_identity_format_route_label\(member->member_id, member->role, member->mac/);
-  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.131`/);
-  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.131`/);
+  assert.match(rootReadmeSource, /最新仓库记录：`v4\.4\.137`/);
+  assert.match(rootReadmeSource, /当前固件版本：`v4\.4\.137`/);
   assert.match(rootReadmeSource, /docs\/version_management\.md/);
   assert.match(rootReadmeSource, /hardware\/enclosures\/sle-pcb-enclosure\/v1\.1\.4/);
   assert.match(rootReadmeSource, /scripts\/build\/ws63_build_v4_ubuntu\.sh/);
   assert.match(rootReadmeSource, /scripts\/flash\/ws63_flash_multi\.ps1/);
-  assert.match(rootReadmeSource, /versions\/v4\.4\.131\/VERSION\.md/);
-  assert.match(versionsReadmeSource, /- \[v4\.4\.131\]\(\.\/v4\.4\.131\/VERSION\.md\)/);
+  assert.match(rootReadmeSource, /versions\/v4\.4\.137\/VERSION\.md/);
+  assert.match(versionsReadmeSource, /- \[v4\.4\.137\]\(\.\/v4\.4\.137\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.129\]\(\.\/v4\.4\.129\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.98\]\(\.\/v4\.4\.98\/VERSION\.md\)/);
   assert.match(versionsReadmeSource, /- \[v4\.4\.95\]\(\.\/v4\.4\.95\/VERSION\.md\)/);
@@ -559,8 +559,8 @@ test("v4.4 build keeps WS2812 path and muted buzzer io14 defaults", () => {
   assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(1U/);
   assert.doesNotMatch(firmwareSource, /team_buzzer_beep\(2U/);
   assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_R 0U/);
-  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_G 3U/);
-  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_B 8U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_G 6U/);
+  assert.match(firmwareSource, /#define SLE_TEAM_WS2812_BOOT_B 16U/);
   assert.match(firmwareSource, /team_ws2812_set_state\(TEAM_RGB_STATE_BOOT\)/);
 });
 

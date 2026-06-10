@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 
 
-VERSION = "v4.4.134"
+VERSION = "v4.4.137"
 REMOTE_PROTO_REL = "third_party/sle_mesh"
 REMOTE_APP_REL = "application/samples/products/sle_team_network"
 REMOTE_PKG_REL = "output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg"
@@ -209,7 +209,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.134 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status blink states, ADC battery sampling, and TP4054 CHRG IO2")
+print("configured v4.4.137 v3.2 schematic pinmap, muted buzzer, boot hardware report, RGB status blink states, ADC battery sampling, and TP4054 CHRG IO2")
 '''
 
 
@@ -286,12 +286,13 @@ for item in [
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 
 for item in [
-    b"v4.4.134",
+    b"v4.4.137",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
     b"runtimeDirectCap",
     b"runtimeRelayBudget",
+    b"member upstream recover",
     b"plan=%u",
     b"[display] st7789 ready",
     b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
@@ -347,6 +348,7 @@ for item in [
     b"recover conn_id:%u from packet bind",
     b"pairing restart scan reason=%s",
     b"relay demote drop child conn=%u",
+    b"member-leave",
     b"seek filter reject",
     b"relay swap observe",
     b"swap-promote",
@@ -364,11 +366,16 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_leader_enforce_direct_capacity"),
     ("ws63_team_network_app.c", app_source, "team_leader_pairing_restart_scan"),
     ("ws63_team_network_app.c", app_source, "team_member_drop_relay_children"),
+    ("ws63_team_network_app.c", app_source, 'team_member_drop_relay_children("member-leave");'),
     ("ws63_team_network_app.c", app_source, "stale routes through the lost relay"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_RELAY_FAILOVER_GRACE_S 6U"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 500U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 220U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U"),
     ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_FLASH_ON_MS 140U"),
     ("ws63_team_network_app.c", app_source, "team_rgb_state_is_blinking"),
     ("ws63_team_network_app.c", app_source, "ws2812_base_enter_ms = now_ms"),
     ("ws63_team_network_app.c", app_source, "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)"),
@@ -377,6 +384,14 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_ERROR)"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_start_flash(TEAM_RGB_STATE_LEADER)"),
     ("ws63_team_network_app.c", app_source, "team_member_parent_reselect_disconnect_tick"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_MEMBER_UPSTREAM_RECOVER_INTERVAL_S 2U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_MEMBER_UPSTREAM_STUCK_S 8U"),
+    ("ws63_team_network_app.c", app_source, "team_member_upstream_recover_after_tx_fail"),
+    ("ws63_team_network_app.c", app_source, 'team_member_upstream_recover_after_tx_fail("not-ready"'),
+    ("ws63_team_network_app.c", app_source, 'team_member_upstream_recover_after_tx_fail("write-fail"'),
+    ("ws63_team_network_app.c", app_source, "team_member_upstream_recover_tick();"),
+    ("ws63_team_network_app.c", app_source, "sle_uart_server_adv_restart();"),
+    ("ws63_team_network_app.c", app_source, "sle_uart_server_disconnect_current();"),
     ("ws63_team_network_app.c", app_source, "RESELECT_PARENT"),
     ("ws63_team_network_app.c", app_source, "Leader-bound relayed packets always go upstream before bucket tier routing."),
     ("ws63_team_network_app.c", app_source, "team_route_next_hop_is_direct_peer"),
@@ -387,15 +402,15 @@ for source_name, source_text, item in [
     ("ws63_team_network_app.c", app_source, "team_leader_relay_swap_tick"),
     ("ws63_team_network_app.c", app_source, "SLE_TEAM_RELAY_SWAP_STABLE_S"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_cli_set_rgb"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 32U"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_R 8U"),
-    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_G 8U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_TEST_R 64U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_IDLE_R 16U"),
+    ("ws63_team_network_app.c", app_source, "#define SLE_TEAM_WS2812_LEADER_G 16U"),
     ("ws63_team_network_app.c", app_source, "team_ws2812_test_pattern();"),
     ("ws63_team_network_app.c", app_source, "timing=cycle-counter"),
     ("ws63_team_network_app.c", app_source, "state == TEAM_RGB_STATE_IDLE || state == TEAM_RGB_STATE_LEADER"),
     ("ws63_team_network_app.c", app_source, "state == TEAM_RGB_STATE_MEMBER || state == TEAM_RGB_STATE_ERROR"),
     ("ws63_team_network_app.c", app_source,
-     "team_ws2812_cli_set_rgb(line[4] == 'r' ? 8U : (line[4] == 'w' ? 5U : 0U)"),
+     "team_ws2812_cli_set_rgb(line[4] == 'r' ? 16U : (line[4] == 'w' ? 10U : 0U)"),
     ("ws63_team_network_app.c", app_source,
      'team_cli_match2(line, "buzz beep", "buzz test")'),
     ("ws63_team_network_app.c", app_source, 'team_cli_match2(line, "led tx", "led rx")'),

@@ -57,12 +57,12 @@ REMOTE_PKG="$WSL_SDK/output/ws63/fwpkg/ws63-liteos-app/ws63-liteos-app_all.fwpkg
 REMOTE_PROTO="$WSL_SDK/third_party/sle_mesh"
 REMOTE_APP="$WSL_SDK/application/samples/products/sle_team_network"
 LOCAL_OUT="$OUT_ROOT/$out_dir/$out_name"
-ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.134")"
+ARCHIVE_OUT="$(next_archive_path "$LOCAL_OUT" "v4.4.137")"
 
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "WS63 local WSL build"
-echo "profile:    v4.4.134 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
+echo "profile:    v4.4.137 unified runtime role (v3.2 schematic pinmap + ADC battery + TP4054 CHRG + RGB blink states)"
 echo "sdk:        $WSL_SDK"
 echo "archive:    $ARCHIVE_OUT"
 echo "latest:     $LOCAL_OUT"
@@ -186,7 +186,7 @@ s = set_kconfig_value(s, "CONFIG_SLE_TEAM_WIFI_AP_SSID", '"SLE-TEAM-V4"')
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_PERIPHERAL", "y")
 s = set_kconfig_value(s, "CONFIG_SUPPORT_SLE_CENTRAL", "y")
 path.write_text(s)
-print("configured v4.4.134 local WSL pinmap, ADC battery sampling, TP4054 CHRG IO2, RGB blink states, and team-network sample")
+print("configured v4.4.137 local WSL pinmap, ADC battery sampling, TP4054 CHRG IO2, RGB blink states, and team-network sample")
 PY
 
 cd "$WSL_SDK"
@@ -255,12 +255,13 @@ for item in [
     if item not in map_text:
         raise SystemExit(f"post-build guard failed: linked map missing {item}")
 for item in [
-    b"v4.4.134",
+    b"v4.4.137",
     b"seek stop timeout, fallback connect pending",
     b"connect request addr:",
     b"cfg direct",
     b"runtimeDirectCap",
     b"runtimeRelayBudget",
+    b"member upstream recover",
     b"plan=%u",
     b"[display] st7789 ready",
     b"[display] st7789 pins primed cs=%u held-low settle_ms=%u dc=%u rst=%u",
@@ -293,6 +294,7 @@ for item in [
     b"seek disabled for force rescan",
     b"pairing restart scan reason=%s",
     b"relay demote drop child conn=%u",
+    b"member-leave",
     b"TeamDisplayTask",
     b"relay rebalance demand",
     b"relay swap observe",
@@ -304,14 +306,27 @@ for item in [
         raise SystemExit(f"post-build guard failed: ELF missing {item.decode('ascii', errors='replace')}")
 
 for item in [
-    "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 160U",
+    "#define SLE_TEAM_WS2812_IDLE_BLINK_ON_MS 500U",
+    "#define SLE_TEAM_WS2812_LEADER_BLINK_ON_MS 500U",
+    "#define SLE_TEAM_WS2812_MEMBER_BLINK_ON_MS 500U",
+    "#define SLE_TEAM_WS2812_ERROR_BLINK_ON_MS 220U",
     "#define SLE_TEAM_WS2812_LEADER_BLINK_PERIOD_MS 1000U",
     "#define SLE_TEAM_WS2812_ERROR_BLINK_PERIOD_MS 360U",
+    "#define SLE_TEAM_WS2812_FLASH_ON_MS 140U",
     "team_rgb_state_is_blinking",
     "ws2812_base_enter_ms = now_ms",
     "team_rgb_state_blink_is_on(state, now_ms - g_team_rt.ws2812_base_enter_ms)",
     "static void team_ws2812_restart_base_phase",
     "team_ws2812_restart_base_phase(now_ms);",
+    'team_member_drop_relay_children("member-leave");',
+    "#define SLE_TEAM_MEMBER_UPSTREAM_RECOVER_INTERVAL_S 2U",
+    "#define SLE_TEAM_MEMBER_UPSTREAM_STUCK_S 8U",
+    "team_member_upstream_recover_after_tx_fail",
+    'team_member_upstream_recover_after_tx_fail("not-ready"',
+    'team_member_upstream_recover_after_tx_fail("write-fail"',
+    "team_member_upstream_recover_tick();",
+    "sle_uart_server_adv_restart();",
+    "sle_uart_server_disconnect_current();",
 ]:
     if item not in app_source:
         raise SystemExit(f"post-build guard failed: source ws63_team_network_app.c missing {item}")
@@ -325,7 +340,7 @@ flash_source = app_source[flash_source_start:flash_source_end]
 if flash_source.index("team_ws2812_restart_base_phase(now_ms);") > flash_source.index("team_ws2812_render_base_state(now_ms);"):
     raise SystemExit("post-build guard failed: WS2812 flash completion restores base state before restarting blink phase")
 
-print("post-build guard passed: local WSL v4.4.134 RGB blink states")
+print("post-build guard passed: local WSL v4.4.137 RGB blink states")
 PY
 
 mkdir -p "$(dirname "$LOCAL_OUT")"

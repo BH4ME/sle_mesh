@@ -2,7 +2,7 @@ param(
     [string[]]$Ports = @("COM16", "COM13", "COM17", "COM18"),
     [string]$Firmware = "",
     [string]$Python = "",
-    [string]$ExpectedVersion = "v4.4.134",
+    [string]$ExpectedVersion = "v4.4.137",
     [switch]$Parallel,
     [string]$LogRoot = "",
     [int]$Baudrate = 115200,
@@ -256,10 +256,17 @@ function Save-RunSummary {
         "  - Done. Reseting device...",
         "",
         "logs:",
-        "  one file per port: <PORT>.log",
-        "  one command per port: <PORT>.command.txt"
+        "  one file per port: port-<PORT>.log",
+        "  one command per port: port-<PORT>.command.txt"
     )
     Set-Content -Path (Join-Path $runDir "run_summary.txt") -Value $summary -Encoding ASCII
+}
+
+function Get-PortLogStem {
+    param([string]$PortName)
+
+    $safeName = $PortName -replace '[\\/:*?"<>|]', '_'
+    return "port-$safeName"
 }
 
 function Save-PortCommand {
@@ -280,7 +287,7 @@ function Save-PortCommand {
         "  SerialWritePostGap adds a delay after complete large writes; it does not split packets.",
         "  Serial write chunking is only enabled when SerialWriteChunkSize > 0."
     )
-    Set-Content -Path (Join-Path $runDir "$PortName.command.txt") -Value $commandText -Encoding ASCII
+    Set-Content -Path (Join-Path $runDir "$(Get-PortLogStem $PortName).command.txt") -Value $commandText -Encoding ASCII
 }
 
 Save-RunSummary
@@ -288,16 +295,30 @@ Save-RunSummary
 function Invoke-OneBurn {
     param([string]$PortName)
 
-    $log = Join-Path $runDir "$PortName.log"
+    $log = Join-Path $runDir "$(Get-PortLogStem $PortName).log"
     $args = New-BurnArgs -PortName $PortName
     Save-PortCommand -PortName $PortName -BurnArgs $args
     Write-Host "[$PortName] start, log=$log"
-    & $pythonPath @args 2>&1 | ForEach-Object {
-        $line = "$_"
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $pythonPath @args 2>&1 | ForEach-Object {
+            $line = "$_"
+            Add-Content -Path $log -Value $line
+            Write-Host "[$PortName] $line"
+        }
+        $exitCode = $LASTEXITCODE
+    } catch {
+        $line = "burn wrapper caught error: $($_.Exception.Message)"
         Add-Content -Path $log -Value $line
         Write-Host "[$PortName] $line"
+        $exitCode = 98
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
     }
-    $exitCode = $LASTEXITCODE
+    if ($null -eq $exitCode) {
+        $exitCode = 99
+    }
     Write-Host "[$PortName] exit=$exitCode"
     return [pscustomobject]@{ Port = $PortName; ExitCode = $exitCode; Log = $log }
 }
@@ -311,7 +332,7 @@ if (-not $Parallel.IsPresent) {
     Write-Host "Parallel mode: software reset only; no manual reset expected."
     $jobs = @()
     foreach ($port in $Ports) {
-        $log = Join-Path $runDir "$port.log"
+        $log = Join-Path $runDir "$(Get-PortLogStem $port).log"
         $args = New-BurnArgs -PortName $port
         Save-PortCommand -PortName $port -BurnArgs $args
         $jobs += Start-Job -Name "flash_$port" -ArgumentList $pythonPath, $args, $log, $port -ScriptBlock {
@@ -365,7 +386,7 @@ if (-not $Parallel.IsPresent) {
         if ($resultByPort.ContainsKey($port)) {
             $results += $resultByPort[$port]
         } else {
-            $results += [pscustomobject]@{ Port = $port; ExitCode = 99; Log = Join-Path $runDir "$port.log" }
+            $results += [pscustomobject]@{ Port = $port; ExitCode = 99; Log = Join-Path $runDir "$(Get-PortLogStem $port).log" }
         }
     }
 }
